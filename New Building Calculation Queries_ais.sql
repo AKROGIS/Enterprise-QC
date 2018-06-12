@@ -51,7 +51,11 @@ update gis.AKR_BLDG_OTHER_PT_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NU
 update gis.AKR_BLDG_FOOTPRINT_PY_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
 update gis.AKR_BLDG_OTHER_PY_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
 -- 6) SOURCEDATE: Nothing to do.
--- 7) XYACCURACY: Nothing to do.
+-- 7) if XYACCURACY is NULL or an empty string, change to Unknown
+update gis.AKR_BLDG_CENTER_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+update gis.AKR_BLDG_OTHER_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+update gis.AKR_BLDG_FOOTPRINT_PY_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+update gis.AKR_BLDG_OTHER_PY_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
 -- 8) if NOTES is an empty string, change to NULL
 update gis.AKR_BLDG_CENTER_PT_evw set NOTES = NULL where NOTES = ''
 update gis.AKR_BLDG_OTHER_PT_evw set NOTES = NULL where NOTES = ''

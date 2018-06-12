@@ -215,6 +215,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -264,11 +265,11 @@ select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issu
 union all
 select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue from gis.AKR_BLDG_CENTER_PT_evw where SOURCEDATE > GETDATE()
 union all
--- 7) XYACCURACY is a required domain value
-select OBJECTID, 'Error: XYACCURACY is not provided' as Issue from gis.AKR_BLDG_CENTER_PT_evw where XYACCURACY is null
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_CENTER_PT_evw where XYACCURACY is null or XYACCURACY = ''
 union all
 select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1
-  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t2.code is null
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
 union all
 -- 8) NOTES is not required, but if it provided is it should not be an empty string
 --    This can be checked and fixed automatically; no need to alert the user.
@@ -518,6 +519,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_FOOTPRINT_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_FOOTPRINT_PY_evw AS D
 join (
 
@@ -569,11 +571,11 @@ select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issu
 union all
 select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where SOURCEDATE > GETDATE()
 union all
--- 7) XYACCURACY is a required domain value
-select OBJECTID, 'Error: XYACCURACY is not provided' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where XYACCURACY is null
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where XYACCURACY is null or XYACCURACY = ''
 union all
 select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw as t1
-  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t2.code is null
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
 -- 8) NOTES is not required, but if it provided is it should not be an empty string
 --    This can be checked and fixed automatically; no need to alert the user.
 
@@ -591,6 +593,7 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 
 
@@ -632,10 +635,10 @@ select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issu
 union all
 select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue from gis.AKR_BLDG_OTHER_PT_evw where SOURCEDATE > GETDATE()
 union all
-select OBJECTID, 'Error: XYACCURACY is not provided' as Issue from gis.AKR_BLDG_OTHER_PT_evw where XYACCURACY is null
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_OTHER_PT_evw where XYACCURACY is null or XYACCURACY = ''
 union all
 select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PT_evw as t1
-  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t2.code is null
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
 
 ) AS I
 on D.OBJECTID = I.OBJECTID
@@ -647,6 +650,7 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 
 
@@ -688,10 +692,10 @@ select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issu
 union all
 select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue from gis.AKR_BLDG_OTHER_PY_evw where SOURCEDATE > GETDATE()
 union all
-select OBJECTID, 'Error: XYACCURACY is not provided' as Issue from gis.AKR_BLDG_OTHER_PY_evw where XYACCURACY is null
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_OTHER_PY_evw where XYACCURACY is null or XYACCURACY = ''
 union all
 select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PY_evw as t1
-  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t2.code is null
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
 
 ) AS I
 on D.OBJECTID = I.OBJECTID
