@@ -220,6 +220,8 @@ GO
 
 
 
+
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -383,16 +385,16 @@ select t1.OBJECTID, 'Error: ISEXTANT does not match BLDGSTATUS' as Issue from gi
 union all
 -- 22) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
 --     TODO: are there requirements of other fields (i.e. BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE) when PUBLICDISPLAY is true?
-select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue from gis.AKR_BLDG_CENTER_PT_evw where ISEXTANT is null
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue from gis.AKR_BLDG_CENTER_PT_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
 union all
 select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1
-  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t2.code is null
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
 union all
 -- 23) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
-select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue from gis.AKR_BLDG_CENTER_PT_evw where ISEXTANT is null
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue from gis.AKR_BLDG_CENTER_PT_evw where DATAACCESS is null or DATAACCESS = ''
 union all
 select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1
-  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t2.code is null
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
 union all
 -- 22/23) PUBLICDISPLAY and DATAACCESS are related
 select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue from gis.AKR_BLDG_CENTER_PT_evw

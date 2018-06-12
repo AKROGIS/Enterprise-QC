@@ -118,9 +118,9 @@ update gis.AKR_BLDG_CENTER_PT_evw set SEASDESC = 'Winter seasonal closure' where
 -- 21) ISEXTANT defaults to 'True' with a warning (during QC)
 update gis.AKR_BLDG_CENTER_PT_evw set ISEXTANT = 'True' where ISEXTANT is NULL
 -- 22) PUBLICDISPLAY defaults to No Public Map Display
-update gis.AKR_BLDG_CENTER_PT_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL
+update gis.AKR_BLDG_CENTER_PT_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
 -- 23) DATAACCESS defaults to No Public Map Display
-update gis.AKR_BLDG_CENTER_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL
+update gis.AKR_BLDG_CENTER_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
 -- 24) UNITCODE is a spatial calc if null
 -- TODO: Should we first calc from FMSS? would also need to fix qc check.  What if FMSS value is not in spatial extent?
 merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_UNIT as t2
