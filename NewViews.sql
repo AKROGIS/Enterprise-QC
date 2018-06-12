@@ -219,6 +219,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -394,7 +395,7 @@ select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue from 
   left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t2.code is null
 union all
 -- 22/23) PUBLICDISPLAY and DATAACCESS are related
-select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue from gis.AKR_BLDG_CENTER_PT
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue from gis.AKR_BLDG_CENTER_PT_evw
   where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
 union all
 -- 24) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
@@ -529,6 +530,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_FOOTPRINT_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_FOOTPRINT_PY_evw AS D
 join (
 
@@ -565,7 +567,7 @@ union all
 select t1.OBJECTID, 'Error: FEATUREID not found in AKR_BLDG_CENTER_PT' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw as t1
   left join gis.AKR_BLDG_CENTER_PT_evw as t2 on t1.FEATUREID = t2.FEATUREID where t1.FEATUREID is not null and t2.FEATUREID is null
 union all
-select OBJECTID, 'Error: FEATUREID not unique' as Issue from gis.AKR_BLDG_FOOTPRINT_PY
+select OBJECTID, 'Error: FEATUREID not unique' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw
   where FEATUREID in (select FEATUREID from gis.AKR_BLDG_FOOTPRINT_PY_evw group by FEATUREID having count(*) > 1)
 union all
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
@@ -610,6 +612,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_OTHER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_OTHER_PT_EVW AS D
 join (
 --------------------
@@ -621,7 +624,7 @@ select OBJECTID, 'Error: POINTTYPE must not be null' as Issue from gis.AKR_BLDG_
 union all
 select OBJECTID, 'Error: POINTTYPE must not be Center point' as Issue from gis.AKR_BLDG_OTHER_PT_evw where POINTTYPE = 'Center point'
 union all
-select t1.OBJECTID, 'Error: POINTTYPE is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PT as t1
+select t1.OBJECTID, 'Error: POINTTYPE is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PT_evw as t1
   left join dbo.DOM_POINTTYPE as t2 on t1.POINTTYPE = t2.Code where t1.POINTTYPE is not null and t1.POINTTYPE <> 'Center point' and t2.Code is null
 union all
 -- 2-8) Are equivalent to those for gis.AKR_BLDG_FOOTPRINT_PY; see discussion for gis.AKR_BLDG_FOOTPRINT_PY_evw for details
@@ -672,6 +675,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_OTHER_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_OTHER_PY_EVW AS D
 join (
 --------------------
@@ -680,9 +684,9 @@ join (
 -- 1) POLYGONTYPE must be an acceptable value; see discussion for gis.AKR_BLDG_FOOTPRINT_PY
 select OBJECTID, 'Error: POLYGONTYPE must not be null' as Issue from gis.AKR_BLDG_OTHER_PY_evw where POLYGONTYPE is null
 union all
-select OBJECTID, 'Error: POLYGONTYPE must not Perimeter polygon' as Issue from gis.AKR_BLDG_OTHER_PY_evw where POLYGONTYPE = 'Perimeter polygon'
+select OBJECTID, 'Error: POLYGONTYPE must not be Perimeter polygon' as Issue from gis.AKR_BLDG_OTHER_PY_evw where POLYGONTYPE = 'Perimeter polygon'
 union all
-select t1.OBJECTID, 'Error: POLYGONTYPE is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PY as t1
+select t1.OBJECTID, 'Error: POLYGONTYPE is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PY_evw as t1
   left join dbo.DOM_POLYGONTYPE as t2 on t1.POLYGONTYPE = t2.Code where t1.POLYGONTYPE is not null and t1.POLYGONTYPE <> 'Perimeter polygon' and t2.Code is null
 union all
 -- 2-8) Are equivalent to those for gis.AKR_BLDG_FOOTPRINT_PY; see discussion for gis.AKR_BLDG_FOOTPRINT_PY_evw for details
