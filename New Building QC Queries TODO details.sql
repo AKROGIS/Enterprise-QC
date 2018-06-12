@@ -1,18 +1,4 @@
 ﻿-------------------------
--- TODO MAPMETHOD DOMAIN
--------------------------
-select Code from DOM_MAPMETHOD
-
-select * from gis.AKR_BLDG_CENTER_PT as p left join DOM_MAPMETHOD as d on p.MAPMETHOD = d.Code where d.code is null
-select * from gis.AKR_BLDG_OTHER_PT as p left join DOM_MAPMETHOD as d on p.MAPMETHOD = d.Code where d.code is null
-select * from gis.AKR_BLDG_FOOTPRINT_PY as p left join DOM_MAPMETHOD as d on p.MAPMETHOD = d.Code where d.code is null
-
-select MAPMETHOD, count(*) from gis.AKR_BLDG_CENTER_PT group by MAPMETHOD
-select MAPMETHOD, count(*) from gis.AKR_BLDG_OTHER_PT group by MAPMETHOD
-select MAPMETHOD, count(*) from gis.AKR_BLDG_FOOTPRINT_PY group by MAPMETHOD
-
-
--------------------------
 -- TODO PUBLICDISPLAY
 -------------------------
 select BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE, FACOWNER, MAPLABEL, BLDGNAME from gis.AKR_BLDG_CENTER_PT where PUBLICDISPLAY = 'Public Map Display'

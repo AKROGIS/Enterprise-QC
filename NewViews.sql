@@ -216,6 +216,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -252,9 +253,11 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
 	  OR right(FEATUREID,1) <> '}'
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
--- 4) MAPMETHOD is required free text; the only check we can make is that it is non null and not an empty string
---    TODO: Should we apply an AKR contstraint that it must be a domain value
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_CENTER_PT_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
 union all
 -- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
 select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_CENTER_PT_evw where MAPSOURCE is null or MAPSOURCE = ''
@@ -520,6 +523,8 @@ GO
 
 
 
+
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_FOOTPRINT_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_FOOTPRINT_PY_evw AS D
 join (
 
@@ -559,8 +564,11 @@ union all
 select OBJECTID, 'Error: FEATUREID not unique' as Issue from gis.AKR_BLDG_FOOTPRINT_PY
   where FEATUREID in (select FEATUREID from gis.AKR_BLDG_FOOTPRINT_PY_evw group by FEATUREID having count(*) > 1)
 union all
--- 4) MAPMETHOD is required free text; the only check we can make is that it is non null and not an empty string
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
 union all
 -- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
 select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where MAPSOURCE is null or MAPSOURCE = ''
@@ -597,6 +605,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_OTHER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_OTHER_PT_EVW AS D
 join (
 --------------------
@@ -629,6 +638,9 @@ select t1.OBJECTID, 'Error: FEATUREID not found in AKR_BLDG_CENTER_PT' as Issue 
 union all
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_OTHER_PT_evw where MAPMETHOD is null or MAPMETHOD = ''
 union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PT_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
 select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_OTHER_PT_evw where MAPSOURCE is null or MAPSOURCE = ''
 union all
 select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue from gis.AKR_BLDG_OTHER_PT_evw where SOURCEDATE < convert(Datetime2,'1995')
@@ -650,6 +662,7 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 
 
@@ -685,6 +698,9 @@ select t1.OBJECTID, 'Error: FEATUREID not found in AKR_BLDG_CENTER_PT' as Issue 
   left join gis.AKR_BLDG_CENTER_PT_evw as t2 on t1.FEATUREID = t2.FEATUREID where t1.FEATUREID is not null and t2.FEATUREID is null
 union all
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_OTHER_PY_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PY_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
 union all
 select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue from gis.AKR_BLDG_OTHER_PY_evw where MAPSOURCE is null or MAPSOURCE = ''
 union all
