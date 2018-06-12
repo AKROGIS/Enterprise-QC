@@ -217,6 +217,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -371,10 +372,10 @@ union all
 select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1
   left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
 union all
--- 12/21 ISEXTANT must align with BLDGSTATUS. Status: Existing requires Extant: True (other combinations are acceptable)
+-- 12/21 ISEXTANT must align with BLDGSTATUS. Status: Existing requires Extant not False (other combinations are acceptable)
 select t1.OBJECTID, 'Error: ISEXTANT does not match BLDGSTATUS' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1
   left join (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from dbo.DOM_BLDGSTATUS)) as f
-  on f.Location = t1.FACLOCID where t1.ISEXTANT <> 'True' and (t1.BLDGSTATUS = 'Existing' or (t1.BLDGSTATUS is null and f.Status = 'Existing'))
+  on f.Location = t1.FACLOCID where t1.ISEXTANT = 'False' and (t1.BLDGSTATUS = 'Existing' or (t1.BLDGSTATUS is null and f.Status = 'Existing'))
 union all
 -- 22) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
 --     TODO: are there requirements of other fields (i.e. BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE) when PUBLICDISPLAY is true?
