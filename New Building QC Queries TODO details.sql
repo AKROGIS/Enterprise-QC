@@ -5,8 +5,15 @@
 -- Should this be enforced as an additional AKR constraint?
 
 -------------------------
+-- TODO BLDGNAME/MAPLABEL
+-------------------------
+-- Standard does not require anything.
+-- Should we require something as an additional AKR constraint?
+
+-------------------------
 -- TODO PUBLICDISPLAY
 -------------------------
+-- Should we complain about public data with attributes that have "non-public" values (i.e. isextant is False)?
 select BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE, FACOWNER, MAPLABEL, BLDGNAME from gis.AKR_BLDG_CENTER_PT where PUBLICDISPLAY = 'Public Map Display'
   and (BLDGSTATUS <> 'Existing' or isextant = 'False' or unitcode is null )
 select BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE, FACOWNER, MAPLABEL, BLDGNAME from gis.AKR_BLDG_CENTER_PT where PUBLICDISPLAY = 'Public Map Display'
@@ -15,7 +22,7 @@ select BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE, FACOWNER, MAPLABEL, BL
   and (FACOWNER not in ('NPS', 'FEDERAL'))
 
 -------------------------
--- TODO: UNITCODE
+-- TODO: UNITCODE:  DOM v. AKR_BND
 -------------------------
 -- No missing unit codes
 select t1.UNITCODE, t1.MAPLABEL, t1.BLDGNAME from gis.AKR_BLDG_CENTER_PT_evw as t1 where t1.UNITCODE is null
@@ -48,6 +55,7 @@ select d.code, d.UNITTYPE, u.Unit_Type from DOM_UNITCODE as d inner join gis.akr
 -------------------------
 -- TODO GROUPCODE
 -------------------------
+-- Use AKR_Group spatial layer, GroupCode column of DOM_UNITCODE or create a new DOM_GROUPCODE?
 select GROUPCODE, count(*) from gis.AKR_BLDG_CENTER_PT_evw group by GROUPCODE
 select GROUPCODE, count(*) from dbo.DOM_UNITCODE group by GROUPCODE
 --select * from dbo.DOM_UNITCODE where GROUPCODE = 'WEAR'

@@ -7,6 +7,7 @@
 --   (if there are new QC issues, then it is bug in our QC check;  In addition to fixing any issues, fix the QC check to alert the user
 --    to the issue that will arise after running the calc.)
 -- You will need to exec sde.set_default then re-exec sde.edit_version in order for the QC to get the latest; Not sure how to update ArcMap
+-- For ArcMap change version to default, and then change back to named edit version to see the changes.
 
 -- NOTE: an update with a join (say updating unitname based on unitcode by joining to DOM_UNITCODE) will fail with this error:
 --       UPDATE is not allowed because the statement updates view "gis.AKR_BLDG_CENTER_PT_evw" which participates in a join and has an INSTEAD OF UPDATE trigger.
@@ -168,3 +169,5 @@ merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_UNIT as t2
 
 -- Stop editing
 exec sde.edit_version @version, 2; -- 2 to stop edits
+
+exec sde.set_default
