@@ -218,6 +218,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -286,7 +287,9 @@ union all
 --     This can be checked and fixed automatically; no need to alert the user.
 -- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
--- 12) BLDGSTATUS is required and must be in domain; default is a valid FMSS value or Existing; must match valid value in FMSS Lookup.
+-- 12) BLDGSTATUS is required and must be in domain; default is a valid FMSS value or Existing;
+--     Additional AKR Constraint: BLDGSTATUS must match valid value in FMSS Lookup.
+--     TODO: discuss this additional AKR Constraint
 select p.OBJECTID, 'Warning: BLDGSTATUS is not provided, default value of *Existing* will be used' as Issue from gis.AKR_BLDG_CENTER_PT_evw as p
   left join (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from dbo.DOM_BLDGSTATUS)) as f
   on f.Location = p.FACLOCID where (BLDGSTATUS is null or BLDGSTATUS = '') and f.Status is null

@@ -1,4 +1,10 @@
 ﻿-------------------------
+-- TODO BLDGSTATUS
+-------------------------
+-- Standard does not require BLDGSTATUS match (via mapping) the FMSS.Status
+-- Should this be enforced as an additional AKR constraint?
+
+-------------------------
 -- TODO PUBLICDISPLAY
 -------------------------
 select BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE, FACOWNER, MAPLABEL, BLDGNAME from gis.AKR_BLDG_CENTER_PT where PUBLICDISPLAY = 'Public Map Display'
