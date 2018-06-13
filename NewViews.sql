@@ -4,6 +4,105 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+CREATE VIEW [dbo].[QC_ALL_FC_DOMAIN_VALUES] AS
+-- Codes/Values specified in the ArcGIS domains
+SELECT
+  Name,
+  codedValue.value('Code[1]', 'nvarchar(max)') AS "Code",
+  codedValue.value('Name[1]', 'nvarchar(max)') AS "Value"
+FROM
+   sde.GDB_ITEMS
+CROSS APPLY
+   Definition.nodes('/GPCodedValueDomain2/CodedValues/CodedValue') AS CodedValues(codedValue)
+WHERE
+   type = '8C368B12-A12E-4C7E-9638-C9C64E69E98F'  -- Item Type Name = 'Coded Value Domain' from sde.GDB_ITEMTYPES
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE VIEW [dbo].[QC_ALL_QC_DOMAIN_VALUES] as SELECT * FROM (
+-- Union the different QC domains into a table for comparison with ArcGIS Domains
+select 'DOM_ATCHTYPE' as TableName, 'DOM_ATCHTYPE_NPS2017' as DomainName, Code, Code as Value from DOM_ATCHTYPE
+union all
+select 'DOM_BLDGCODETYPE' as TableName, 'DOM_BLDGCODE_NPS2017' as DomainName, Code, Code as Value from DOM_BLDGCODETYPE
+union all
+select 'DOM_BLDGCODETYPE' as TableName, 'DOM_BLDGTYPE_NPS2017' as DomainName, Type, Type as Value from DOM_BLDGCODETYPE
+union all
+select 'DOM_BLDGSTATUS' as TableName, 'DOM_BLDGSTATUS_NPS2017' as DomainName, Code, Code as Value from DOM_BLDGSTATUS
+union all
+select 'DOM_DATAACCESS' as TableName, 'DOM_DATAACCESS_NPS2016' as DomainName, Code, Code as Value from DOM_DATAACCESS
+union all
+select 'DOM_FACOCCUMAINT' as TableName, 'DOM_FACOCCUMAINT_NPS2017' as DomainName, Code, Code as Value from DOM_FACOCCUMAINT
+union all
+select 'DOM_FACOWNER' as TableName, 'DOM_FACOWNER_NPS2017' as DomainName, Code, Code as Value from DOM_FACOWNER
+union all
+select 'DOM_FACUSE' as TableName, 'DOM_FACUSE_NPS2017' as DomainName, Code, Code as Value from DOM_FACUSE
+union all
+select 'DOM_ISEXTANT' as TableName, 'DOM_ISEXTANT_NPS2016' as DomainName, Code, Code as Value from DOM_ISEXTANT
+union all
+select 'DOM_LINETYPE' as TableName, 'DOM_LINETYPE_NPS2016' as DomainName, Code, Code as Value from DOM_LINETYPE
+union all
+select 'DOM_MAPMETHOD' as TableName, 'DOM_MAPMETHOD_NPSAKR2016' as DomainName, Code, Code as Value from DOM_MAPMETHOD
+union all
+select 'DOM_POINTTYPE' as TableName, 'DOM_POINTTYPE_NPS2016' as DomainName, Code, Code as Value from DOM_POINTTYPE
+union all
+select 'DOM_POLYGONTYPE' as TableName, 'DOM_POLYGONTYPE_NPS2016' as DomainName, Code, Code as Value from DOM_POLYGONTYPE
+union all
+select 'DOM_PUBLICDISPLAY' as TableName, 'DOM_PUBLICDISPLAY_NPS2016' as DomainName, Code, Code as Value from DOM_PUBLICDISPLAY
+union all
+select 'DOM_UNITCODE' as TableName, 'DOM_UNITCODE_NPSAKR2016' as DomainName, Code, Code as Value from DOM_UNITCODE
+union all
+select 'DOM_XYACCURACY' as TableName, 'DOM_XYACCURACY_NPS2016' as DomainName, Code, Code as Value from DOM_XYACCURACY
+union all
+select 'DOM_YES_NO_UNK' as TableName, 'DOM_YES_NO_UNK_NPS2016' as DomainName, Code, Code as Value from DOM_YES_NO_UNK
+) as d
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE VIEW [dbo].[QC_DOMAIN_VALUES_NOT_IN_FC] as
+-- Values in the DOM_* tables but not in a feature class picklist
+select qc.* from QC_ALL_QC_DOMAIN_VALUES as qc
+left join QC_ALL_FC_DOMAIN_VALUES as d
+on qc.DomainName = d.Name and qc.Code = d.Code
+left join 
+(
+	select i2.Name as Domain, i1.Name as Feature from sde.GDB_ITEMRELATIONSHIPS r
+	  join sde.GDB_ITEMS as i1 on r.OriginID = i1.UUID
+	  join sde.GDB_ITEMS as i2 on r.DestID = i2.UUID
+	WHERE r.type = '17E08ADB-2B31-4DCD-8FDD-DF529E88F843'  -- Relationship Type Name = 'DomainInDataset' from sde.GDB_ITEMRELATIONSHIPTYPES
+)
+as f on qc.DomainName = f.Domain
+where d.Code is null or f.Domain is null
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE VIEW [dbo].[QC_FEATURE_CLASS_DOMAIN_VALUES_NOT_IN_QC_DOM_TABLE] as
+-- feature classes using domain values not in the QC tables
+select f.Feature, d.* from
+(
+	select i2.Name as Domain, i1.Name as Feature from sde.GDB_ITEMRELATIONSHIPS r
+	  join sde.GDB_ITEMS as i1 on r.OriginID = i1.UUID
+	  join sde.GDB_ITEMS as i2 on r.DestID = i2.UUID
+	WHERE r.type = '17E08ADB-2B31-4DCD-8FDD-DF529E88F843'  -- Relationship Type Name = 'DomainInDataset' from sde.GDB_ITEMRELATIONSHIPTYPES
+)
+as f
+left join QC_ALL_FC_DOMAIN_VALUES as d
+on f.Domain = d.Name
+left join QC_ALL_QC_DOMAIN_VALUES as qc
+on f.Domain = qc.DomainName and d.Code = qc.Code
+where d.Name is null or qc.DomainName is null
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 CREATE VIEW [dbo].[AKR_BLDG_PT] as
 -- Center Points
 SELECT [OBJECTID]
