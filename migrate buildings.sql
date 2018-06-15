@@ -568,6 +568,9 @@ update t1 set BLDGTYPE = t2.Description from AKR_BLDG_CENTER_PT as t1 left join 
 -- Some of the buildings that got a default status of Existing before FMSS integration should be decomissioned based on the is_extant property
 update AKR_BLDG_CENTER_PT set BLDGSTATUS = 'Decommissioned' where BLDGSTATUS = 'Existing' and ISEXTANT = 'False' and FACLOCID is null
 
+-- Three buildings have FACLOCIDs that are not in the FMSS Export.  These look more like Asset Numbers, so they were moved until we can verify
+select FACLOCID, FACASSETID from gis.AKR_BLDG_CENTER_PT where OBJECTID in (3603, 3604, 3607)
+update gis.AKR_BLDG_CENTER_PT set FACASSETID = FACLOCID, FACLOCID = NULL where OBJECTID in (3603, 3604, 3607)
 
 -- Flag current versions of features that have an old version; we will delete the old and then add the new one into the history.
 update AKR_BLDG_FOOTPRINT_PY set ISCURRENTGEO = 'fut' where FEATUREID in (select FEATUREID from AKR_BLDG_FOOTPRINT_PY group by FEATUREID having count(*) > 1 where ISCURRENTGEO = 'No') where ISCURRENTGEO = 'Yes'

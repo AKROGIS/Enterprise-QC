@@ -320,6 +320,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -557,9 +558,12 @@ union all
 -- 28) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
 select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.AKR_BLDG_CENTER_PT_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
--- 29) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+-- 29) FACLOCID is optional free text, but if provided it must be unique and match a *Building* Location in the FMSS Export
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+select t1.OBJECTID, 'Error: FACLOCID is not a Building (4100) asset' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t2.Asset_Code <> '4100'
 union all
 select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1 join
        (select FACLOCID from gis.AKR_BLDG_CENTER_PT_evw where FACLOCID is not null and FACLOCID <> '' group by FACLOCID having count(*) > 1) as t2 on t1.FACLOCID = t2.FACLOCID
