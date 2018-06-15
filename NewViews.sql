@@ -566,7 +566,7 @@ union all
 select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.AKR_BLDG_CENTER_PT_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
 -- 29) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
-select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1 join
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
 select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1 join
