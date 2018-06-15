@@ -30,17 +30,17 @@ exec sde.set_current_version @version
 -- Start editing
 exec sde.edit_version @version, 1 -- 1 to start edits
 
--- 1a) Add POINTYPE = 'Center point' if null in gis.AKR_BLDG_CENTER_PT
-update gis.AKR_BLDG_CENTER_PT_evw set POINTTYPE = 'Center point' where POINTTYPE is null
--- 1b) Add POLYGONTYPE = 'Perimeter polygon' if null in gis.AKR_BLDG_FOOTPRINT_PY
-update gis.AKR_BLDG_FOOTPRINT_PY_evw set POLYGONTYPE = 'Perimeter polygon' where POLYGONTYPE is null
--- 2) Add GEOMETRYID if null in all
-update gis.AKR_BLDG_CENTER_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null
-update gis.AKR_BLDG_OTHER_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null
-update gis.AKR_BLDG_FOOTPRINT_PY_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null
-update gis.AKR_BLDG_OTHER_PY_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null
--- 3) Add FEATUREID if null in gis.AKR_BLDG_CENTER_PT
-update gis.AKR_BLDG_CENTER_PT_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null
+-- 1a) Add POINTYPE = 'Center point' if null/empty in gis.AKR_BLDG_CENTER_PT
+update gis.AKR_BLDG_CENTER_PT_evw set POINTTYPE = 'Center point' where POINTTYPE is null or POINTTYPE = '' 
+-- 1b) Add POLYGONTYPE = 'Perimeter polygon' if null/empty in gis.AKR_BLDG_FOOTPRINT_PY
+update gis.AKR_BLDG_FOOTPRINT_PY_evw set POLYGONTYPE = 'Perimeter polygon' where POLYGONTYPE is null or POLYGONTYPE = '' 
+-- 2) Add GEOMETRYID if null/empty
+update gis.AKR_BLDG_CENTER_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+update gis.AKR_BLDG_OTHER_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+update gis.AKR_BLDG_FOOTPRINT_PY_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+update gis.AKR_BLDG_OTHER_PY_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+-- 3) Add FEATUREID if null/empty in gis.AKR_BLDG_CENTER_PT
+update gis.AKR_BLDG_CENTER_PT_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
 -- 4) if MAPMETHOD is NULL or an empty string, change to Unknown
 update gis.AKR_BLDG_CENTER_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
 update gis.AKR_BLDG_OTHER_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''

@@ -320,16 +320,6 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 
-
-
-
-
-
-
-
-
-
-
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -345,7 +335,8 @@ join (
 select OBJECTID, 'Error: POINTTYPE is not a Center point' as Issue from gis.AKR_BLDG_CENTER_PT_evw where POINTTYPE is not null and POINTTYPE <> '' and POINTTYPE <> 'Center point'
 union all 
 -- 2) GEOMETRYID must be unique and well-formed or null (in which case we will generate a unique well-formed value)
-select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.AKR_BLDG_CENTER_PT_evw where GEOMETRYID in (select GEOMETRYID from gis.AKR_BLDG_CENTER_PT_evw group by GEOMETRYID having count(*) > 1)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.AKR_BLDG_CENTER_PT_evw where GEOMETRYID in
+       (select GEOMETRYID from gis.AKR_BLDG_CENTER_PT_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
 union all
 select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 	from gis.AKR_BLDG_CENTER_PT_evw where
@@ -356,7 +347,8 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
 -- 3) FEATUREID must be unique and well-formed or null (in which case we will generate a unique well-formed value)
-select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.AKR_BLDG_CENTER_PT_evw where FEATUREID in (select FEATUREID from gis.AKR_BLDG_CENTER_PT_evw group by FEATUREID having count(*) > 1)
+select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.AKR_BLDG_CENTER_PT_evw where FEATUREID in
+       (select FEATUREID from gis.AKR_BLDG_CENTER_PT_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
 union all
 select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
 	from gis.AKR_BLDG_CENTER_PT_evw where
@@ -635,12 +627,6 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-
-
-
-
-
-
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_FOOTPRINT_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_FOOTPRINT_PY_evw AS D
 join (
 
@@ -655,10 +641,11 @@ join (
 --    foundation of the building.  It may be derived or estimated.  A building can have only one footprint, which will be
 --    used for general mapping purposes.  Other polygon representations of the building for detailed mapping or analysis
 --    need to be stored in gis.AKR_BLDG_OTHER_PY_evw with a POLYGONTYPE not equal to 'Perimeter polygon'
-select OBJECTID, 'Error: POLYGONTYPE is not Perimeter polygon' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where POLYGONTYPE is not null and POLYGONTYPE <> 'Perimeter polygon'
+select OBJECTID, 'Error: POLYGONTYPE is not Perimeter polygon' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where POLYGONTYPE is not null and POLYGONTYPE <> '' and POLYGONTYPE <> 'Perimeter polygon'
 union all
 -- 2) GEOMETRYID must be unique and well-formed or null (in which case we will generate a unique well-formed value)
-select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where GEOMETRYID in (select GEOMETRYID from gis.AKR_BLDG_FOOTPRINT_PY_evw group by GEOMETRYID having count(*) > 1)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.AKR_BLDG_FOOTPRINT_PY_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
 union all
 select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 from gis.AKR_BLDG_FOOTPRINT_PY_evw where
@@ -718,11 +705,6 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-
-
-
-
-
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_OTHER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_OTHER_PT_EVW AS D
 join (
 --------------------
@@ -738,7 +720,8 @@ select t1.OBJECTID, 'Error: POINTTYPE is not a recognized value' as Issue from g
   left join dbo.DOM_POINTTYPE as t2 on t1.POINTTYPE = t2.Code where t1.POINTTYPE is not null and t1.POINTTYPE <> 'Center point' and t2.Code is null
 union all
 -- 2-8) Are equivalent to those for gis.AKR_BLDG_FOOTPRINT_PY; see discussion for gis.AKR_BLDG_FOOTPRINT_PY_evw for details
-select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.AKR_BLDG_OTHER_PT_evw where GEOMETRYID in (select GEOMETRYID from gis.AKR_BLDG_OTHER_PT_evw group by GEOMETRYID having count(*) > 1)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.AKR_BLDG_OTHER_PT_evw where GEOMETRYID in
+       (select GEOMETRYID from gis.AKR_BLDG_OTHER_PT_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
 union all
 select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 from gis.AKR_BLDG_OTHER_PT_evw where
@@ -779,12 +762,6 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
-
-
-
-
-
 
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_OTHER_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_OTHER_PY_EVW AS D
 join (
