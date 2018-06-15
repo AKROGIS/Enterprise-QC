@@ -342,7 +342,7 @@ join (
 -- 1) POINTTYPE must be 'Center point' (if NULL assumed to be 'Center point' - no warning)
 --    even if the "Center point" is actually arbitrary, or derived, there must be one and only one
 --    identified as the 'Center point' as required by the building data standard
-select OBJECTID, 'Error: POINTTYPE is not a Center point' as Issue from gis.AKR_BLDG_CENTER_PT_evw where POINTTYPE is null or POINTTYPE <> 'Center point'
+select OBJECTID, 'Error: POINTTYPE is not a Center point' as Issue from gis.AKR_BLDG_CENTER_PT_evw where POINTTYPE is not null and POINTTYPE <> '' and POINTTYPE <> 'Center point'
 union all 
 -- 2) GEOMETRYID must be unique and well-formed or null (in which case we will generate a unique well-formed value)
 select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.AKR_BLDG_CENTER_PT_evw where GEOMETRYID in (select GEOMETRYID from gis.AKR_BLDG_CENTER_PT_evw group by GEOMETRYID having count(*) > 1)
