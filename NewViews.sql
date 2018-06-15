@@ -814,3 +814,205 @@ LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_BLDG_OTHER_PY'
 WHERE E.feature_oid IS NULL
 GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE VIEW [dbo].[QC_ISSUES_PARKLOTS_PY] AS select I.Issue, D.* from  gis.PARKLOTS_PY_evw AS D
+join (
+
+-------------------------
+-- gis.PARKLOTS_PY
+-------------------------
+
+-- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
+
+-- 1) POLYGONTYPE must be an recognized value; if it is null/empty, then it will default to 'Circumscribed polygon' without a warning
+select t1.OBJECTID, 'Error: POLYGONTYPE is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PY_evw as t1
+  left join dbo.DOM_POLYGONTYPE as t2 on t1.POLYGONTYPE = t2.Code where t1.POLYGONTYPE is not null and t1.POLYGONTYPE <> '' and t2.Code is null
+union all 
+-- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.PARKLOTS_PY_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.PARKLOTS_PY_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
+	from gis.PARKLOTS_PY_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    If a single parking lot has multiple polygons, then use a multipolygon (merge in ArcMap), or create an exception.
+select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.PARKLOTS_PY_evw where FEATUREID in 
+       (select FEATUREID from gis.PARKLOTS_PY_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
+union all
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
+	from gis.PARKLOTS_PY_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.PARKLOTS_PY_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue from gis.PARKLOTS_PY_evw where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue from gis.PARKLOTS_PY_evw where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue from gis.PARKLOTS_PY_evw where SOURCEDATE > GETDATE()
+union all
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue from gis.PARKLOTS_PY_evw where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 8) NOTES is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) LOTNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: LOTNAME must use proper case' as Issue from gis.PARKLOTS_PY_evw where LOTNAME = upper(LOTNAME) Collate Latin1_General_CS_AI or LOTNAME = lower(LOTNAME) Collate Latin1_General_CS_AI
+union all
+-- 10) LOTALTNAME is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 12) LOTTYPE must be in DOM_LOTTYPE. If NULL (or empty string) it is assumed to be 'Parking Lot' - with no warning
+select t1.OBJECTID, 'Error: LOTTYPE is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
+       left join dbo.DOM_LOTTYPE as t2 on t1.LOTTYPE = t2.Code where t1.LOTTYPE is not null and t1.LOTTYPE <> '' and t2.Code is null
+union all 
+-- 13) SEASONAL is a optional domain value; must match valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
+       left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue from gis.PARKLOTS_PY_evw as p join 
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
+union all
+-- 14) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
+select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue from gis.PARKLOTS_PY_evw as p
+  left join (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
+union all
+-- 15) MAINTAINER is a optional domain value; TODO: if FACLOCID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
+       left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+union all
+-- 16) ISEXTANT is a required domain value; Default to True with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue from gis.PARKLOTS_PY_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
+  left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 17) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 18) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: are there requirements of other fields (i.e. BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE) when PUBLICDISPLAY is true?
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue from gis.PARKLOTS_PY_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 19) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue from gis.PARKLOTS_PY_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 18/19) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue from gis.PARKLOTS_PY_evw
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 20) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue from gis.PARKLOTS_PY_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+-- TODO This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
+select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue from gis.PARKLOTS_PY_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue from gis.PARKLOTS_PY_evw as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 21) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.PARKLOTS_PY_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.PARKLOTS_PY_evw as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 22) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue from gis.PARKLOTS_PY_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue from gis.PARKLOTS_PY_evw as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.PARKLOTS_PY_evw as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 23) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue from gis.PARKLOTS_PY_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 24) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.PARKLOTS_PY_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 25) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.PARKLOTS_PY_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+select t1.OBJECTID, 'Error: FACLOCID does not match a Parking Area in FMSS' as Issue from gis.PARKLOTS_PY_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Asset_Code <> '1300'
+union all
+select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue from gis.PARKLOTS_PY_evw as t1 join
+       (select FACLOCID from gis.PARKLOTS_PY_evw where FACLOCID is not null and FACLOCID <> '' group by FACLOCID having count(*) > 1) as t2 on t1.FACLOCID = t2.FACLOCID
+union all
+-- 26) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
+--     TODO:  Get asset export from FMSS and compare
+select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.PARKLOTS_PY_evw as t1 join
+       (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+
+-- ???????????????????????????????????
+-- What about webedituser, webcomment?
+-- ???????????????????????????????????
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'PARKLOTS_PY'
+WHERE E.feature_oid IS NULL
+GO
