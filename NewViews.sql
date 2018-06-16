@@ -22,6 +22,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+
 CREATE VIEW [dbo].[QC_ALL_QC_DOMAIN_VALUES] as SELECT * FROM (
 -- Union the different QC domains into a table for comparison with ArcGIS Domains
 select 'DOM_ATCHTYPE' as TableName, 'DOM_ATCHTYPE_NPS2017' as DomainName, Code, Code as Value from DOM_ATCHTYPE
@@ -56,6 +57,16 @@ select 'DOM_POLYGONTYPE' as TableName, 'DOM_POLYGONTYPE_NPS2016' as DomainName, 
 union all
 select 'DOM_PUBLICDISPLAY' as TableName, 'DOM_PUBLICDISPLAY_NPS2016' as DomainName, Code, Code as Value from DOM_PUBLICDISPLAY
 union all
+select 'DOM_RDCLASS' as TableName, 'DOM_RDCLASS_NPS2016' as DomainName, Code, Code as Value from DOM_RDCLASS
+union all
+select 'DOM_RDMAINTAINER' as TableName, 'DOM_RDMAINTAINER_NPS2016' as DomainName, Code, Code as Value from DOM_RDMAINTAINER
+union all
+select 'DOM_RDONEWAY' as TableName, 'DOM_RDONEWAY_NPS2016' as DomainName, Code, Code as Value from DOM_RDONEWAY
+union all
+select 'DOM_RDSTATUS' as TableName, 'DOM_RDSTATUS_NPS2016' as DomainName, Code, Code as Value from DOM_RDSTATUS
+union all
+select 'DOM_RDSURFACE' as TableName, 'DOM_RDSURFACE_NPS2016' as DomainName, Code, Code as Value from DOM_RDSURFACE
+union all
 select 'DOM_UNITCODE' as TableName, 'DOM_UNITCODE_NPSAKR2016' as DomainName, Code, Code as Value from DOM_UNITCODE
 union all
 select 'DOM_XYACCURACY' as TableName, 'DOM_XYACCURACY_NPS2016' as DomainName, Code, Code as Value from DOM_XYACCURACY
@@ -65,6 +76,8 @@ union all
 select 'DOM_YES_NO_BOTH' as TableName, 'DOM_YES_NO_BOTH_NPSAKR2016' as DomainName, Code, Code as Value from DOM_YES_NO_BOTH
 union all
 select 'DOM_YES_NO_UNK' as TableName, 'DOM_YES_NO_UNK_NPS2016' as DomainName, Code, Code as Value from DOM_YES_NO_UNK
+union all
+select 'DOM_YES_NO_UNK_OTH' as TableName, 'DOM_YES_NO_UNK_OTH_NPS2016' as DomainName, Code, Code as Value from DOM_YES_NO_UNK_OTH
 ) as d
 GO
 SET ANSI_NULLS ON
