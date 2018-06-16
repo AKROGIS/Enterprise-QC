@@ -23,6 +23,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 
+
 CREATE VIEW [dbo].[QC_ALL_QC_DOMAIN_VALUES] as SELECT * FROM (
 -- Union the different QC domains into a table for comparison with ArcGIS Domains
 select 'DOM_ATCHTYPE' as TableName, 'DOM_ATCHTYPE_NPS2017' as DomainName, Code, Code as Value from DOM_ATCHTYPE
@@ -67,7 +68,23 @@ select 'DOM_RDSTATUS' as TableName, 'DOM_RDSTATUS_NPS2016' as DomainName, Code, 
 union all
 select 'DOM_RDSURFACE' as TableName, 'DOM_RDSURFACE_NPS2016' as DomainName, Code, Code as Value from DOM_RDSURFACE
 union all
+select 'DOM_TRLCLASS' as TableName, 'DOM_TRLCLASS_NPS2016' as DomainName, Code, Code as Value from DOM_TRLCLASS
+union all
+select 'DOM_TRLFEATTYPE' as TableName, 'DOM_TRLFEATTYPE_NPSAKR2016' as DomainName, Code, Code as Value from DOM_TRLFEATTYPE
+union all
+select 'DOM_TRLSTATUS' as TableName, 'DOM_TRLSTATUS_NPSAKR2016' as DomainName, Code, Code as Value from DOM_TRLSTATUS
+union all
+select 'DOM_TRLSURFACE' as TableName, 'DOM_TRLSURFACE_NPS2016' as DomainName, Code, Code as Value from DOM_TRLSURFACE
+union all
+select 'DOM_TRLTRACK' as TableName, 'DOM_TRLTRACK_NPSAKR2016' as DomainName, Code, Code as Value from DOM_TRLTRACK
+union all
+select 'DOM_TRLTYPE' as TableName, 'DOM_TRLTYPE_NPS2016' as DomainName, Code, Code as Value from DOM_TRLTYPE
+union all
 select 'DOM_UNITCODE' as TableName, 'DOM_UNITCODE_NPSAKR2016' as DomainName, Code, Code as Value from DOM_UNITCODE
+union all
+select 'DOM_UOM' as TableName, 'DOM_UOM_NPSAKR2015' as DomainName, Code, Code as Value from DOM_UOM
+union all
+select 'DOM_WAYSIDE_FEAT' as TableName, 'DOM_WAYSIDE_FEAT_NPSAKR2015' as DomainName, Code, Code as Value from DOM_WAYSIDE_FEAT
 union all
 select 'DOM_XYACCURACY' as TableName, 'DOM_XYACCURACY_NPS2016' as DomainName, Code, Code as Value from DOM_XYACCURACY
 union all
@@ -76,6 +93,8 @@ union all
 select 'DOM_YES_NO_BOTH' as TableName, 'DOM_YES_NO_BOTH_NPSAKR2016' as DomainName, Code, Code as Value from DOM_YES_NO_BOTH
 union all
 select 'DOM_YES_NO_UNK' as TableName, 'DOM_YES_NO_UNK_NPS2016' as DomainName, Code, Code as Value from DOM_YES_NO_UNK
+union all
+select 'DOM_YES_NO_UNK_NA' as TableName, 'DOM_YES_NO_UNK_NA_NPSAKR2016' as DomainName, Code, Code as Value from DOM_YES_NO_UNK_NA
 union all
 select 'DOM_YES_NO_UNK_OTH' as TableName, 'DOM_YES_NO_UNK_OTH_NPS2016' as DomainName, Code, Code as Value from DOM_YES_NO_UNK_OTH
 ) as d
