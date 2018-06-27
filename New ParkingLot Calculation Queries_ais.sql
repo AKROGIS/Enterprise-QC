@@ -5,31 +5,32 @@ update gis.PARKLOTS_PY_evw set LOTALTNAME = NULL where LOTALTNAME = ''
 -- 3) if MAPLABEL is an empty string, change to NULL
 update gis.PARKLOTS_PY_evw set MAPLABEL = NULL where MAPLABEL = ''
 -- 4) Add LOTTYPE = 'Parking Lot' if null in gis.PARKLOTS_PY
-update gis.PARKLOTS_PY_evw set POLYGONTYPE = 'Circumscribed polygon' where POLYGONTYPE is null or POLYGONTYPE = '' 
+update gis.PARKLOTS_PY_evw set LOTTYPE = 'Parking Lot' where LOTTYPE is null or LOTTYPE = '' 
 -- 5) if SEASONAL is null and FACLOCID is non-null use FMSS Lookup.
-merge into gis.PARKLOTS_PY_evw as p
-  using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
-  on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
-  when matched then update set SEASONAL = f.OPSEAS;
+--    TODO: requires a complete and correct FMSS Extract
+--merge into gis.PARKLOTS_PY_evw as p
+--  using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+--  on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+--  when matched then update set SEASONAL = f.OPSEAS;
 -- 6) if SEASDESC is an empty string, change to NULL
 --    Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
 update gis.PARKLOTS_PY_evw set SEASDESC = NULL where SEASDESC = ''
 update gis.PARKLOTS_PY_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
 -- 7) if MAINTAINER is null and FACLOCID is non-null use FMSS Lookup.
 --    TODO: requires changing the domain to match FMSS and then populate from FMSS
-merge into gis.PARKLOTS_PY_evw as p
-  using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
-  on f.Location = p.FACLOCID and (p.MAINTAINER is null and f.FAMARESP is not null)
-  when matched then update set MAINTAINER = f.FAMARESP;
+--merge into gis.PARKLOTS_PY_evw as p
+--  using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
+--  on f.Location = p.FACLOCID and (p.MAINTAINER is null and f.FAMARESP is not null)
+--  when matched then update set MAINTAINER = f.FAMARESP;
 -- 8) ISEXTANT defaults to 'True' with a warning (during QC)
 update gis.PARKLOTS_PY_evw set ISEXTANT = 'True' where ISEXTANT is NULL
 -- 9) Add POLYGONTYPE = 'Perimeter polygon' if null/empty in gis.PARKLOTS_PY
+update gis.PARKLOTS_PY_evw set POLYGONTYPE = 'Perimeter polygon' where POLYGONTYPE is null or POLYGONTYPE = '' 
 -- 10) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
 --     TODO: set to BOTH if the parking lot straddles a boundary (currently set to YES if any part of a parking lot is within the boundary)
 merge into gis.PARKLOTS_PY_evw as t1 using gis.AKR_UNIT as t2
   on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END <> t1.ISOUTPARK)
   when matched then update set ISOUTPARK = CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END;
-update gis.PARKLOTS_PY_evw set POLYGONTYPE = 'Perimeter polygon' where POLYGONTYPE is null or POLYGONTYPE = '' 
 -- 11) PUBLICDISPLAY defaults to No Public Map Display
 update gis.PARKLOTS_PY_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
 -- 12) DATAACCESS defaults to No Public Map Display
@@ -40,14 +41,11 @@ merge into gis.PARKLOTS_PY_evw as t1 using gis.AKR_UNIT as t2
   on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
   when matched then update set UNITCODE = t2.Unit_Code;
 -- 14) UNITNAME is always calc'd from UNITCODE
-update gis.PARKLOTS_PY_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is null
+--     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+update gis.PARKLOTS_PY_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
 merge into gis.PARKLOTS_PY_evw as t1 using DOM_UNITCODE as t2
   on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
   when matched then update set UNITNAME = t2.UNITNAME;
---  TODO: Should we get UNITNAME from AKR_UNIT or DOM_UNITCODE?  Unit codes and Names differ
---  merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_UNIT as t2
---    on t1.UNITCODE = t2.Unit_Code and t1.UNITNAME <> t2.UNIT_NAME
---    when matched then update set UNITNAME = t2.UNIT_NAME;
 -- 15) if GROUPCODE is an empty string, change to NULL
 update gis.PARKLOTS_PY_evw set GROUPCODE = NULL where GROUPCODE = ''
 -- 16) GROUPNAME is always calc'd from GROUPCODE

@@ -4,6 +4,165 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+CREATE FUNCTION [dbo].[ToProperCase](@string VARCHAR(255)) RETURNS VARCHAR(255)
+AS
+BEGIN
+  DECLARE @i INT           -- index
+  DECLARE @l INT           -- input length
+  DECLARE @c NCHAR(1)      -- current char
+  DECLARE @f INT           -- first letter flag (1/0)
+  DECLARE @o VARCHAR(255)  -- output string
+  DECLARE @w VARCHAR(10)   -- characters considered as white space
+
+  SET @w = '[' + CHAR(13) + CHAR(10) + CHAR(9) + CHAR(160) + ' ' + ']'
+  SET @i = 1
+  SET @l = LEN(@string)
+  SET @f = 1
+  SET @o = ''
+
+  WHILE @i <= @l
+  BEGIN
+    SET @c = SUBSTRING(@string, @i, 1)
+    IF @f = 1 
+    BEGIN
+     SET @o = @o + @c
+     SET @f = 0
+    END
+    ELSE
+    BEGIN
+     SET @o = @o + LOWER(@c)
+    END
+
+    IF @c LIKE @w SET @f = 1
+
+    SET @i = @i + 1
+  END
+
+  RETURN @o
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE FUNCTION [dbo].[TrailUse](
+     @a nvarchar(10), -- Foot
+     @b nvarchar(10), -- Bike
+     @c nvarchar(10), -- Horse
+     @d nvarchar(10), -- ATV
+     @e nvarchar(10), -- 4WD
+     @f nvarchar(10), -- Motorbike
+     @g nvarchar(10), -- snowmachine
+     @h nvarchar(10), -- snowshoe
+     @i nvarchar(10), -- ski (back country ski tour)
+     @j nvarchar(10), -- Dogsled
+     @k nvarchar(10), -- boat
+     @l nvarchar(10), -- canoe
+	 	 -- AKR Additions (listed as Other)
+     @m nvarchar(10) = NULL, -- OHVSUB
+     @n nvarchar(10) = NULL, -- nordic (groomed nordic ski trails)
+     @o nvarchar(10) = NULL, -- downhill (groomed alpine skiing)
+     @p nvarchar(10) = NULL, -- canyoneer
+     @q nvarchar(10) = NULL, -- climb	 
+     @r nvarchar(10) = NULL, -- other1	 
+     @s nvarchar(10) = NULL, -- other2 
+     @t nvarchar(10) = NULL  -- other3	 
+) RETURNS VARCHAR(255)
+AS
+BEGIN
+  DECLARE @result varchar(255)
+  DECLARE @other varchar(255)
+  if @m = 'Yes' or @n = 'Yes' or @o = 'Yes' or @p = 'Yes' or @q = 'Yes' or @r = 'Yes' or @s = 'Yes' or @t = 'Yes'
+  BEGIN
+	SET @other = '|Other'
+  END
+  SET @result = SUBSTRING(CONCAT(
+    CASE @a WHEN 'Yes' THEN '|Hiker/Pedestrian' ELSE NULL END,
+    CASE @b WHEN 'Yes' THEN '|Bicycle' ELSE NULL END,
+    CASE @c WHEN 'Yes' THEN '|Pack and Saddle' ELSE NULL END,
+    CASE @d WHEN 'Yes' THEN '|All-Terrain Vehicle' ELSE NULL END,
+    CASE @e WHEN 'Yes' THEN '|Four-Wheel Drive Vehicle > 50” in Tread Width' ELSE NULL END,
+    CASE @f WHEN 'Yes' THEN '|Motorcycle' ELSE NULL END,
+    CASE @g WHEN 'Yes' THEN '|Snowmobile' ELSE NULL END,
+    CASE @h WHEN 'Yes' THEN '|Snowshoe' ELSE NULL END,
+    CASE @i WHEN 'Yes' THEN '|Cross-Country Ski' ELSE NULL END,
+    CASE @j WHEN 'Yes' THEN '|Dog Sled' ELSE NULL END,
+    CASE @k WHEN 'Yes' THEN '|Motorized Watercraft' ELSE NULL END,
+    CASE @l WHEN 'Yes' THEN '|Non-Motorized Watercraft' ELSE NULL END,
+	@other
+  ), 2, 254)
+  IF @result = ''
+  BEGIN
+    SET @result = 'Unknown'
+  END
+  RETURN @result
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE FUNCTION [dbo].[TrailUseAKR](
+     @a nvarchar(10), -- Foot
+     @b nvarchar(10), -- Bike
+     @c nvarchar(10), -- Horse
+     @d nvarchar(10), -- ATV
+     @e nvarchar(10), -- 4WD
+     @f nvarchar(10), -- Motorbike
+     @g nvarchar(10), -- snowmachine
+     @h nvarchar(10), -- snowshoe
+     @i nvarchar(10), -- nordic (groomed nordic ski trails)
+     @j nvarchar(10), -- Dogsled
+     @k nvarchar(10), -- boat
+     @l nvarchar(10), -- canoe
+	 -- AKR Additions
+     @m nvarchar(10), -- OHVSUB (other)
+     @n nvarchar(10), -- ski (back country ski tour)
+     @o nvarchar(10), -- downhill (groomed alpine skiing)
+     @p nvarchar(10), -- canyoneer
+     @q nvarchar(10), -- climb	 
+     @r nvarchar(10) = NULL, -- other1	 
+     @s nvarchar(10) = NULL, -- other2 
+     @t nvarchar(10) = NULL  -- other3	 
+) RETURNS VARCHAR(255)
+AS
+BEGIN
+  DECLARE @result varchar(255)
+  DECLARE @other varchar(255)
+  if @r = 'Yes' or @s = 'Yes' or @t = 'Yes'
+  BEGIN
+	SET @other = '|Other'
+  END
+  SET @result = SUBSTRING(CONCAT(
+    CASE @a WHEN 'Yes' THEN '|Hiker/Pedestrian' WHEN 'No' THEN '|No Hiker/Pedestrian' ELSE NULL END,
+    CASE @b WHEN 'Yes' THEN '|Bicycle' WHEN 'No' THEN '|No Bicycle' ELSE NULL END,
+    CASE @c WHEN 'Yes' THEN '|Pack and Saddle' WHEN 'No' THEN '|No Pack and Saddle' ELSE NULL END,
+    CASE @d WHEN 'Yes' THEN '|All-Terrain Vehicle' WHEN 'No' THEN '|No All-Terrain Vehicle' ELSE NULL END,
+    CASE @e WHEN 'Yes' THEN '|Four-Wheel Drive Vehicle > 50” in Tread Width' WHEN 'No' THEN '|No Four-Wheel Drive Vehicle > 50” in Tread Width' ELSE NULL END,
+    CASE @f WHEN 'Yes' THEN '|Motorcycle' WHEN 'No' THEN '|No Motorcycle' ELSE NULL END,
+    CASE @g WHEN 'Yes' THEN '|Snowmobile' WHEN 'No' THEN '|No Snowmobile' ELSE NULL END,
+    CASE @h WHEN 'Yes' THEN '|Snowshoe' WHEN 'No' THEN '|No Snowshoe' ELSE NULL END,
+    CASE @i WHEN 'Yes' THEN '|Cross-Country Ski' WHEN 'No' THEN '|No Cross-Country Ski' ELSE NULL END,
+    CASE @j WHEN 'Yes' THEN '|Dog Sled' WHEN 'No' THEN '|No Dog Sled' ELSE NULL END,
+    CASE @k WHEN 'Yes' THEN '|Motorized Watercraft' WHEN 'No' THEN '|No Motorized Watercraft' ELSE NULL END,
+    CASE @l WHEN 'Yes' THEN '|Non-Motorized Watercraft' WHEN 'No' THEN '|No Non-Motorized Watercraft' ELSE NULL END,
+    CASE @m WHEN 'Yes' THEN '|OHV for Subsistence Use Only' WHEN 'No' THEN '|No OHV for Subsistence Use' ELSE NULL END,
+    CASE @n WHEN 'Yes' THEN '|Backcountry Ski' WHEN 'No' THEN '|No Backcountry Ski' ELSE NULL END,
+    CASE @o WHEN 'Yes' THEN '|Downhill Ski' WHEN 'No' THEN '|No Downhill Ski' ELSE NULL END,
+    CASE @p WHEN 'Yes' THEN '|Canyoneering' WHEN 'No' THEN '|No Canyoneering' ELSE NULL END,
+    CASE @q WHEN 'Yes' THEN '|Climbing' WHEN 'No' THEN '|No Climbing' ELSE NULL END
+  ), 2, 254)
+  IF @result = ''
+  BEGIN
+    SET @result = 'Unknown'
+  END
+  RETURN @result
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 CREATE VIEW [dbo].[QC_ALL_FC_DOMAIN_VALUES] AS
 -- Codes/Values specified in the ArcGIS domains
 SELECT
@@ -1058,7 +1217,6 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-
 CREATE VIEW [dbo].[QC_ISSUES_ROADS_LN] AS select I.Issue, D.* from  gis.ROADS_LN_evw AS D
 join (
 
@@ -1088,7 +1246,10 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
 -- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
---    If a single parking lot has multiple polygons, then use a multipolygon (merge in ArcMap), or create an exception.
+--    TODO: Option 1) If a Road has multiple segments, then merge or use a multi-polyline or create an exception.
+--          Option 2) Relaxe the Uniqueness requirement.  This allows a long road to be broken into multiple smaller segments, and allows different linetypes
+--                    however, it also allows errors like two different (by geography or attributes) roads having the same featureid (common copy/paste error)
+--                    need to add additional checks like RDNAME are the same for all segements with the same FEATUREID 
 select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.ROADS_LN_evw where FEATUREID in 
        (select FEATUREID from gis.ROADS_LN_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
 union all
@@ -1123,10 +1284,6 @@ select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from 
 union all
 -- 8) NOTES is not required, but if it provided is it should not be an empty string
 --    This can be checked and fixed automatically; no need to alert the user.
-
--- DONE: RDNAME, RDALTNAME, RDSTATUS, RDMAINTAINER
--- TODO: RDCLASS, RDSURFACE, RDONEWAY, RDLANES, RDHICLEAR, RTENUMBER, ISBRIDGE, ISTUNNEL, ROUTEID
-
 -- 9) RDNAME is not required, but if it provided is it should not be an empty string
 --    This can be checked and fixed automatically; no need to alert the user.
 --    Must use proper case - can only check for all upper or all lower case
@@ -1136,12 +1293,44 @@ union all
 --     This can be checked and fixed automatically; no need to alert the user.
 -- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
--- 12) RDSTATUS must be in DOM_RDSTATUS. If NULL (or empty string) it is assumed to be 'Existing' - with no warning
-select t1.OBJECTID, 'Error: LOTTYPE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+-- 12) RDSTATUS is a required domain value; default is 'Existing'
+--     TODO: Compare with FMSS
+select OBJECTID, 'Warning: RDSTATUS is not provided, default value of *Existing* will be used' as Issue from gis.ROADS_LN_evw where RDSTATUS is null or RDSTATUS = ''
+union all
+select t1.OBJECTID, 'Error: RDSTATUS is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
        left join dbo.DOM_RDSTATUS as t2 on t1.RDSTATUS = t2.Code where t1.RDSTATUS is not null and t1.RDSTATUS <> '' and t2.Code is null
 union all 
-
--- 13) SEASONAL is a optional domain value; must match valid value in FMSS Lookup.
+-- 13) RDCLASS is a required domain value; default is 'Unknown'
+--     if a feature has a FACLOCID then RDCLASS = 'Parking Lot Road' implies FMSS.asset_code = '1300' and visa-versa
+--     TODO: if a feature has a FACLOCID then the FMSS Funtional Class implies a RDCLASS.  See section 4.3 of the standard
+select OBJECTID, 'Warning: RDCLASS is not provided, default value of *Unknown* will be used' as Issue from gis.ROADS_LN_evw where RDCLASS is null or RDCLASS = ''
+union all
+select t1.OBJECTID, 'Error: RDCLASS is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+       left join dbo.DOM_RDCLASS as t2 on t1.RDCLASS = t2.Code where t1.RDCLASS is not null and t1.RDCLASS <> '' and t2.Code is null
+union all 
+select t1.OBJECTID, 'Error: RDCLASS does not match the FMSS.Asset_Code' as Issue from gis.ROADS_LN_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.RDCLASS = 'Parking Lot Road' and t2.Asset_Code <> '1300') or (t1.RDCLASS <> 'Parking Lot Road' and t2.Asset_Code = '1300'))
+union all
+-- 14) RDSURFACE is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: RDSURFACE is not provided, default value of *Unknown* will be used' as Issue from gis.ROADS_LN_evw where RDSURFACE is null or RDSURFACE = ''
+union all
+select t1.OBJECTID, 'Error: RDSURFACE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+       left join dbo.DOM_RDSURFACE as t2 on t1.RDSURFACE = t2.Code where t1.RDSURFACE is not null and t1.RDSURFACE <> '' and t2.Code is null
+union all 
+-- 15) RDONEWAY is an optional domain value; default is Null
+select t1.OBJECTID, 'Error: RDONEWAY is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+       left join dbo.DOM_RDONEWAY as t2 on t1.RDONEWAY = t2.Code where t1.RDONEWAY is not null and t1.RDONEWAY <> '' and t2.Code is null
+union all 
+-- 16) RDLANES is an optional range value 1-8; default is Null
+select OBJECTID, 'Error: RDLANES is not a recognized value' as Issue from gis.ROADS_LN_evw where RDLANES < 1 or RDLANES > 8
+union all 
+-- 17) RDHICLEAR is an optional domain value; default is Null
+select t1.OBJECTID, 'Error: RDHICLEAR is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+       left join dbo.DOM_YES_NO_UNK_OTH as t2 on t1.RDHICLEAR = t2.Code where t1.RDHICLEAR is not null and t1.RDHICLEAR <> '' and t2.Code is null
+union all 
+-- 18) RTENUMBER is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 19) SEASONAL is a optional domain value; must match valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
        left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
 union all
@@ -1149,43 +1338,43 @@ select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue from gi
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
   on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
 union all
--- 14) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
+-- 20) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
 select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue from gis.ROADS_LN_evw as p
   left join (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
   on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
 union all
--- 15) RDMAINTAINER is a optional domain value; TODO: if FACLOCID is provided this should match a valid value in FMSS Lookup.
+-- 21) RDMAINTAINER is a optional domain value;
+--     TODO: if FACLOCID is provided this should match a valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
        left join dbo.DOM_RDMAINTAINER as t2 on t1.RDMAINTAINER = t2.Code where t1.RDMAINTAINER is not null and t2.Code is null
 union all
--- 16) ISEXTANT is a required domain value; Default to True with Warning
+-- 22) ISEXTANT is a required domain value; Default to 'True' with Warning
 select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue from gis.ROADS_LN_evw where ISEXTANT is null
 union all
 select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
   left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
 union all
--- 17) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
--- 18) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
---     TODO: are there requirements of other fields (i.e. BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE) when PUBLICDISPLAY is true?
+-- 23) PUBLICDISPLAY is a required Domain Value; Default to 'No Public Map Display' with Warning
+--     TODO: are there requirements of other fields (i.e. RDSTATUS, ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
 select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue from gis.ROADS_LN_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
 union all
 select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
   left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
 union all
--- 19) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+-- 24) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
 select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue from gis.ROADS_LN_evw where DATAACCESS is null or DATAACCESS = ''
 union all
 select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
   left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
 union all
--- 18/19) PUBLICDISPLAY and DATAACCESS are related
+-- 23/24) PUBLICDISPLAY and DATAACCESS are related
 select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue from gis.ROADS_LN_evw
   where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
 union all
--- 20) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+-- 25) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
 --     Error if it doesn't match valid value in FMSS Lookup Location.Park
 --     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
-select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: UNITCODE is required when the road is not within a unit boundary' as Issue from gis.ROADS_LN_evw as t1
   left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
 union all
 -- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
@@ -1203,7 +1392,7 @@ select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue from gis.
   (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
   on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
--- 21) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+-- 26) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
 select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.ROADS_LN_evw as t1 join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
 union all
@@ -1211,7 +1400,7 @@ union all
 --   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.ROADS_LN_evw as t1 join
 --     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
 --   union all
--- 22) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+-- 27) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
 --     it can be null and not spatially within a group (this check is problematic, see discussion below),
 --     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
 --     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
@@ -1232,27 +1421,55 @@ union all
 --  and t1.OBJECTID not in (select t3.OBJECTID from gis.ROADS_LN_evw as t3 left join 
 --  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
 --union all
--- 23) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+-- 28) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
 select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue from gis.ROADS_LN_evw as t1 join
   gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
 union all
--- 24) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+-- 29) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
 select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.ROADS_LN_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
--- 25) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+-- 30) ROUTEID is optional free text, but if provided it must be unique and match a records in the RIP
+--     TODO: Get export of RIP, and ensure value is valid.
+--     TODO: Verify format is NPS-UNITCODE-ROUTENUMBER (may be implicit in the RIP foreign key validation)
+--     TODO: ROUTEID should be duplicate if featureid is duplicate, i.e. all line segments with the same ROUTEID must have the same featureid and all segements with the same featureid must have the same ROUTEID 
+--     TODO: The ROUTEID is also related to a FMSS Functional Class. i.e. FMSS Functional Class I => Route numbers 1..99, II => 100..199, ...
+select t1.OBJECTID, 'Error: ROUTEID is not unique' as Issue from gis.ROADS_LN_evw as t1 join
+       (select ROUTEID from gis.ROADS_LN_evw where ROUTEID is not null and ROUTEID <> '' group by ROUTEID having count(*) > 1) as t2 on t1.ROUTEID = t2.ROUTEID
+union all
+-- 31) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+--     TODO: FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
+--     TODO: A bridge/tunnel in a road will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the road on/in the bridge/tunnel
+--     TODO: Asset
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.ROADS_LN_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
-union all
-select t1.OBJECTID, 'Error: FACLOCID does not match a Road in FMSS' as Issue from gis.ROADS_LN_evw as t1 join
-  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Asset_Code not in ('1100', '1700', '1800')
 union all
 select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue from gis.ROADS_LN_evw as t1 join
        (select FACLOCID from gis.ROADS_LN_evw where FACLOCID is not null and FACLOCID <> '' group by FACLOCID having count(*) > 1) as t2 on t1.FACLOCID = t2.FACLOCID
 union all
--- 26) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
+select t1.OBJECTID, 'Error: FACLOCID does not match a Road in FMSS' as Issue from gis.ROADS_LN_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Asset_Code not in ('1100', '1300', '1700', '1800')
+union all
+-- 32) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
 --     TODO:  Get asset export from FMSS and compare
 select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.ROADS_LN_evw as t1 join
        (select FACASSETID from gis.ROADS_LN_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+union all
+-- 33) ISOUTPARK: This is an AKR extension, it is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 34) ISBRIDGE: This is an AKR extension; it is a required element in the Yes/No domain; it silently defaults to 'No'
+--     if this feature has a FACLOCID then ISBRIDGE = 'Yes' implies FMSS.asset_code = '1700' and visa-versa
+select t1.OBJECTID, 'Error: ISBRIDGE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.ISBRIDGE = t2.Code where t1.ISBRIDGE is not null and t1.ISBRIDGE <> '' and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: ISBRIDGE does not match the FMSS.Asset_Code' as Issue from gis.ROADS_LN_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISBRIDGE = 'Yes' and t2.Asset_Code <> '1700') or (t1.ISBRIDGE <> 'Yes' and t2.Asset_Code = '1700'))
+union all
+-- 35) ISTUNNEL: This is an AKR extension; it is a required element in the Yes/No domain; it silently defaults to 'No'
+--     if this feature has a FACLOCID then ISBRIDGE = 'Yes' implies FMSS.asset_code = '1700' and visa-versa
+select t1.OBJECTID, 'Error: ISTUNNEL is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.ISTUNNEL = t2.Code where t1.ISTUNNEL is not null and t1.ISTUNNEL <> '' and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code' as Issue from gis.ROADS_LN_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISTUNNEL = 'Yes' and t2.Asset_Code <> '1800') or (t1.ISTUNNEL <> 'Yes' and t2.Asset_Code = '1800'))
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -1262,5 +1479,346 @@ select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.ROADS_LN
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'ROADS_LN'
+WHERE E.feature_oid IS NULL
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+
+
+CREATE VIEW [dbo].[QC_ISSUES_TRAILS_LN] AS select I.Issue, D.* from  gis.TRAILS_LN_evw AS D
+join (
+
+-------------------------
+-- gis.TRAILS_LN
+-------------------------
+
+-- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
+
+-- 1) LINETYPE must be an recognized value; if it is null/empty, then it will default to 'Arbitrary line' without a warning
+--    TODO this is not part of the standard (maybe core after the fact), most is centerline
+--    should we do something like bldgs with center being required, and edge or other being optional and linked
+--    maybe require that this is a centerline feature class.
+select t1.OBJECTID, 'Error: LINETYPE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+  left join dbo.DOM_LINETYPE as t2 on t1.LINETYPE = t2.Code where t1.LINETYPE is not null and t1.LINETYPE <> '' and t2.Code is null
+union all 
+-- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.TRAILS_LN_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.TRAILS_LN_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
+	from gis.TRAILS_LN_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    TODO: Option 1) If a Road has multiple segments, then merge or use a multi-polyline or create an exception.
+--          Option 2) Relaxe the Uniqueness requirement.  This allows a long road to be broken into multiple smaller segments, and allows different linetypes
+--                    however, it also allows errors like two different (by geography or attributes) roads having the same featureid (common copy/paste error)
+--                    need to add additional checks like TRLNAME are the same for all segements with the same FEATUREID 
+select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.TRAILS_LN_evw where FEATUREID in 
+       (select FEATUREID from gis.TRAILS_LN_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
+union all
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
+	from gis.TRAILS_LN_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_LN_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_LN_evw where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue from gis.TRAILS_LN_evw where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue from gis.TRAILS_LN_evw where SOURCEDATE > GETDATE()
+union all
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_LN_evw where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 8) NOTES is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) TRLNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: TRLNAME must use proper case' as Issue from gis.TRAILS_LN_evw where TRLNAME = upper(TRLNAME) Collate Latin1_General_CS_AI or TRLNAME = lower(TRLNAME) Collate Latin1_General_CS_AI
+union all
+-- 10) TRLALTNAME is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 12) TRLFEATTYPE is a required domain value; default is Unknown
+--     TODO: Compare with FMSS i.e. if there is a valid FACLOCID, with an 'Existing' Status, then it can't be an unmaintained trail
+select OBJECTID, 'Warning: TRLFEATTYPE is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_LN_evw where TRLFEATTYPE is null or TRLFEATTYPE = ''
+union all
+select t1.OBJECTID, 'Error: TRLFEATTYPE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_TRLFEATTYPE as t2 on t1.TRLFEATTYPE = t2.Code where t1.TRLFEATTYPE is not null and t1.TRLFEATTYPE <> '' and t2.Code is null
+union all 
+-- 13) TRLSTATUS is a required domain value; default is 'Existing'
+--     TODO: Compare with FMSS
+select OBJECTID, 'Warning: TRLSTATUS is not provided, default value of *Existing* will be used' as Issue from gis.TRAILS_LN_evw where TRLSTATUS is null or TRLSTATUS = ''
+union all
+select t1.OBJECTID, 'Error: TRLSTATUS is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_TRLSTATUS as t2 on t1.TRLSTATUS = t2.Code where t1.TRLSTATUS is not null and t1.TRLSTATUS <> '' and t2.Code is null
+union all
+-- 14) TRLSURFACE is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: TRLSURFACE is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_LN_evw where TRLSURFACE is null or TRLSURFACE = ''
+union all
+select t1.OBJECTID, 'Error: TRLSURFACE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_TRLSURFACE as t2 on t1.TRLSURFACE = t2.Code where t1.TRLSURFACE is not null and t1.TRLSURFACE <> '' and t2.Code is null
+union all 
+-- 15) TRLTYPE is a required domain value; default is Unknown
+select OBJECTID, 'Warning: TRLTYPE is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_LN_evw where TRLTYPE is null or TRLTYPE = ''
+union all
+select t1.OBJECTID, 'Error: TRLTYPE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_TRLTYPE as t2 on t1.TRLTYPE = t2.Code where t1.TRLTYPE is not null and t1.TRLTYPE <> '' and t2.Code is null
+union all 
+-- 16) TRLCLASS is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: TRLCLASS is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_LN_evw where TRLCLASS is null or TRLCLASS = ''
+union all
+select t1.OBJECTID, 'Error: TRLCLASS is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_TRLCLASS as t2 on t1.TRLCLASS = t2.Code where t1.TRLCLASS is not null and t1.TRLCLASS <> '' and t2.Code is null
+union all 
+-- 17) TRLUSE is a required pipe delimited list of approved uses
+--     In AKR, this is a calculated field based on the various TRLUSE_* boolean columns
+--     It will always be silently updated.  Woe to the unwary user that edits this field.
+-- 18) SEASONAL is a optional domain value; must match valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue from gis.TRAILS_LN_evw as p join 
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
+union all
+-- 19) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
+select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue from gis.TRAILS_LN_evw as p
+  left join (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
+union all
+-- 20) MAINTAINER is a optional domain value;
+--     TODO: if FACLOCID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+union all
+-- 21) ISEXTANT is a required domain value; Default to 'True' with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue from gis.TRAILS_LN_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+  left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 22) PUBLICDISPLAY is a required Domain Value; Default to 'No Public Map Display' with Warning
+--     TODO: are there requirements of other fields (i.e. TRLSTATUS, ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue from gis.TRAILS_LN_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 23) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue from gis.TRAILS_LN_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 22/23) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue from gis.TRAILS_LN_evw
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 24) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select t1.OBJECTID, 'Error: UNITCODE is required when the road is not within a unit boundary' as Issue from gis.TRAILS_LN_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+-- TODO This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
+select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue from gis.TRAILS_LN_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue from gis.TRAILS_LN_evw as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 25) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.TRAILS_LN_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.TRAILS_LN_evw as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 26) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue from gis.TRAILS_LN_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue from gis.TRAILS_LN_evw as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.TRAILS_LN_evw as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 27) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue from gis.TRAILS_LN_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 28) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.TRAILS_LN_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 29) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+--     TODO: FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
+--     TODO: A bridge/tunnel in a road will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the road on/in the bridge/tunnel
+--     TODO: Asset
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.TRAILS_LN_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue from gis.TRAILS_LN_evw as t1 join
+       (select FACLOCID from gis.TRAILS_LN_evw where FACLOCID is not null and FACLOCID <> '' group by FACLOCID having count(*) > 1) as t2 on t1.FACLOCID = t2.FACLOCID
+union all
+select t1.OBJECTID, 'Error: FACLOCID does not match a Trail in FMSS' as Issue from gis.TRAILS_LN_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Asset_Code not in ('2100', '2200', '2300')
+union all
+-- 30) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
+--     TODO:  Get asset export from FMSS and compare
+select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.TRAILS_LN_evw as t1 join
+       (select FACASSETID from gis.TRAILS_LN_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+union all
+----------------------------------------------------
+-- AKR Additions to the Trails Spatial Data Standard
+----------------------------------------------------
+-- 31) ISOUTPARK: This is an AKR extension, it is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 32) ISBRIDGE: This is an AKR extension; it is a required element in the Yes/No domain; it silently defaults to 'No'
+--     if this feature has a FACLOCID then ISBRIDGE = 'Yes' implies FMSS.asset_code = '1700' and visa-versa
+select t1.OBJECTID, 'Error: ISBRIDGE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.ISBRIDGE = t2.Code where t1.ISBRIDGE is not null and t1.ISBRIDGE <> '' and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: ISBRIDGE does not match the FMSS.Asset_Code' as Issue from gis.TRAILS_LN_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISBRIDGE = 'Yes' and t2.Asset_Code <> '2200') or (t1.ISBRIDGE <> 'Yes' and t2.Asset_Code = '2200'))
+union all
+-- 33) ISTUNNEL: This is an AKR extension; it is a required element in the Yes/No domain; it silently defaults to 'No'
+--     if this feature has a FACLOCID then ISBRIDGE = 'Yes' implies FMSS.asset_code = '1700' and visa-versa
+select t1.OBJECTID, 'Error: ISTUNNEL is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.ISTUNNEL = t2.Code where t1.ISTUNNEL is not null and t1.ISTUNNEL <> '' and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code' as Issue from gis.TRAILS_LN_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISTUNNEL = 'Yes' and t2.Asset_Code <> '2300') or (t1.ISTUNNEL <> 'Yes' and t2.Asset_Code = '2300'))
+union all 
+-- 34) TRLTRACK: This is an AKR extension; it is a required domain element; defaults to 'Unknown' with warning
+select OBJECTID, 'Warning: TRLTRACK is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_LN_evw where TRLTRACK is null or TRLTRACK = ''
+union all
+select t1.OBJECTID, 'Error: TRLTRACK is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_TRLTRACK as t2 on t1.TRLTRACK = t2.Code where t1.TRLTRACK is not null and t1.TRLTRACK <> '' and t2.Code is null
+union all 
+-- 35) TRLISSOCIAL: This is an AKR extension; it is a required domain element; defaults to 'No' without a warning
+select t1.OBJECTID, 'Error: TRLISSOCIAL is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLISSOCIAL = t2.Code where t1.TRLISSOCIAL is not null and t1.TRLISSOCIAL <> '' and t2.Code is null
+union all
+-- 36) TRLISANIMAL: This is an AKR extension; it is a required domain element; defaults to 'No' without a warning
+select t1.OBJECTID, 'Error: TRLISANIMAL is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLISANIMAL = t2.Code where t1.TRLISANIMAL is not null and t1.TRLISANIMAL <> '' and t2.Code is null
+union all
+-- 37) TRLISADMIN: This is an AKR extension; it is a required domain element; defaults to 'No' without a warning
+select t1.OBJECTID, 'Error: TRLISADMIN is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLISADMIN = t2.Code where t1.TRLISADMIN is not null and t1.TRLISADMIN <> '' and t2.Code is null
+union all
+--TODO: Look for illogical combinations of TRLFEATTYPE and TRLIS*
+-- 38) WHLENGTH_FT: This is an AKR extension; it is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: WHLENGTH_FT is not allowed to be a negative number' as Issue from gis.TRAILS_LN_evw where WHLENGTH_FT < 0
+union all
+-- 39) TRLDESC: This is an AKR extension; it is an optional free text field; it should not be an empty string
+-- 40) TRLUSE_*: This is an AKR extension; It defaults to NULL (no data); Yes if the use is specifically supported; No if it is specifically prohibited
+select t1.OBJECTID, 'Error: TRLUSE_FOOT is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_FOOT = t2.Code where t1.TRLUSE_FOOT is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_BICYCLE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_BICYCLE = t2.Code where t1.TRLUSE_BICYCLE is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_HORSE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_HORSE = t2.Code where t1.TRLUSE_HORSE is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_ATV is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_ATV = t2.Code where t1.TRLUSE_ATV is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_4WD is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_4WD = t2.Code where t1.TRLUSE_4WD is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_OHVSUB is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_OHVSUB = t2.Code where t1.TRLUSE_OHVSUB is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_MOTORCYCLE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_MOTORCYCLE = t2.Code where t1.TRLUSE_MOTORCYCLE is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_SNOWMOBILE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_SNOWMOBILE = t2.Code where t1.TRLUSE_SNOWMOBILE is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_SNOWSHOE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_SNOWSHOE = t2.Code where t1.TRLUSE_SNOWSHOE is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_SKITOUR is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_SKITOUR = t2.Code where t1.TRLUSE_SKITOUR is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_NORDIC is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_NORDIC = t2.Code where t1.TRLUSE_NORDIC is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_DOWNHILL is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_DOWNHILL = t2.Code where t1.TRLUSE_DOWNHILL is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_DOGSLED is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_DOGSLED = t2.Code where t1.TRLUSE_DOGSLED is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_CANYONEER is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_CANYONEER = t2.Code where t1.TRLUSE_CANYONEER is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_CLIMB is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_CLIMB = t2.Code where t1.TRLUSE_CLIMB is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_MOTORBOAT is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_MOTORBOAT = t2.Code where t1.TRLUSE_MOTORBOAT is not null and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLUSE_CANOE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
+       left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_CANOE = t2.Code where t1.TRLUSE_CANOE is not null and t2.Code is null
+--TODO: Look for illogical combinations of TRLTYPE and TRLUSE_*
+
+-- ???????????????????????????????????
+-- What about webedituser, webcomment?
+-- ???????????????????????????????????
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_LN'
 WHERE E.feature_oid IS NULL
 GO

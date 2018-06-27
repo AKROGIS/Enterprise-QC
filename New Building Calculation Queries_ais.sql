@@ -128,14 +128,11 @@ merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_UNIT as t2
   on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
   when matched then update set UNITCODE = t2.Unit_Code;
 -- 25) UNITNAME is always calc'd from UNITCODE
-update gis.AKR_BLDG_CENTER_PT_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is null
+--     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+update gis.AKR_BLDG_CENTER_PT_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
 merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using DOM_UNITCODE as t2
   on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
   when matched then update set UNITNAME = t2.UNITNAME;
---  TODO: Should we get UNITNAME from AKR_UNIT or DOM_UNITCODE?  Unit codes and Names differ
---  merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_UNIT as t2
---    on t1.UNITCODE = t2.Unit_Code and t1.UNITNAME <> t2.UNIT_NAME
---    when matched then update set UNITNAME = t2.UNIT_NAME;
 -- 26) if GROUPCODE is an empty string, change to NULL
 update gis.AKR_BLDG_CENTER_PT_evw set GROUPCODE = NULL where GROUPCODE = ''
 -- 27) GROUPNAME is always calc'd from GROUPCODE
