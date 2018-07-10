@@ -47,10 +47,9 @@ update gis.ROADS_LN_evw set ISEXTANT = 'True' where ISEXTANT is NULL
 -- 18) Add LINETYPE = 'Center line' if null/empty in gis.ROADS_LN
 update gis.ROADS_LN_evw set LINETYPE = 'Center line' where LINETYPE is null or LINETYPE = '' 
 -- 19) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
---     TODO: set to BOTH if the road straddles a boundary (currently set to YES if any part of a road is within the boundary)
 merge into gis.ROADS_LN_evw as t1 using gis.AKR_UNIT as t2
-  on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END <> t1.ISOUTPARK)
-  when matched then update set ISOUTPARK = CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END;
+  on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+  when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
 -- 20) PUBLICDISPLAY defaults to No Public Map Display
 update gis.ROADS_LN_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
 -- 21) DATAACCESS defaults to No Public Map Display
