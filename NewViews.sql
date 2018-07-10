@@ -1480,12 +1480,456 @@ on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'ROADS_LN'
 WHERE E.feature_oid IS NULL
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+
+CREATE VIEW [dbo].[QC_ISSUES_TRAILS_ATTRIBUTE_PT] AS select I.Issue, D.* from gis.TRAILS_ATTRIBUTE_PT_evw AS D
+join (
+
+--------------------------
+-- gis.TRAILS_ATTRIBUTE_PT
+--------------------------
+
+-- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
+
+-- 1) POINTTYPE must be an recognized value; if it is null/empty, then it will default to 'Arbitrary point' without a warning
+select t1.OBJECTID, 'Error: POINTTYPE is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join dbo.DOM_POINTTYPE as t2 on t1.POINTTYPE = t2.Code where t1.POINTTYPE is not null and t1.POINTTYPE <> '' and t2.Code is null
+union all 
+-- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.TRAILS_ATTRIBUTE_PT_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
+	from gis.TRAILS_ATTRIBUTE_PT_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    TODO: are these feature independent of the trails, or are these the 'parent' featureid?
+--    TODO: if the feature is tied to a 'parent' trail, would some of the attributes also be tied?  i.e. a sign on a internal trail should probably be internal
+-- All FEATUREIDs should match a trail
+select t1.OBJECTID, 'Error: FEATUREID not found in TRAILS_LN' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t1.FEATUREID is not null and t2.FEATUREID is null
+union all
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
+	from gis.TRAILS_ATTRIBUTE_PT_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where SOURCEDATE > GETDATE()
+union all
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 8) NOTES is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) TRLATTRTYPE must be non null and in DOM_TRLFEATFEATTYPE.  There is no default value
+select OBJECTID, 'Error: TRLATTRTYPE is required' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where TRLATTRTYPE is null
+union all
+select t1.OBJECTID, 'Error: TRLATTRTYPE is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+       left join dbo.DOM_TRLATTRTYPE as t2 on t1.TRLATTRTYPE = t2.Code where t1.TRLATTRTYPE is not null and t1.TRLATTRTYPE <> '' and t2.Code is null
+union all
+-- 10) TRLATTRTYPEOTHER is optional free text unless TRLATTRTYPE = 'Other'. If it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+--     Note: if there are common values here they can be promoted to TRLATTRTYPE
+select OBJECTID, 'Error: TRLATTRTYPEOTHER is required when TRLFEATTYPE is Other' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw
+       where TRLATTRTYPE = 'Other' and (TRLATTRTYPEOTHER is null or TRLATTRTYPEOTHER = '')
+union all
+select OBJECTID, 'Warning: TRLATTRTYPEOTHER will be cleared when TRLFEATTYPE is not Other' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw
+       where TRLATTRTYPE <> 'Other' and TRLATTRTYPEOTHER is not null and TRLATTRTYPEOTHER <> ''
+union all
+-- 11) TRLATTRDESC is optional free text, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 12) TRLATTRVALUE is optional int, but if it provided is it must be positive.
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 13) WHLENGTH is optional real, but if it provided is it must be positive.
+--     if it is zero, it will be silently converted to null
+select OBJECTID, 'Error: WHLENGTH must be a poitive number' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where WHLENGTH < 0
+union all
+-- 14) WHLENUOM is an optional domain value (DOM_UOM); if WHLENGTH is not null it must be not null;
+--     if WHLENGTH is null, this field will be silently set to null.
+select OBJECTID, 'Error: WHLENUOM is required when WHLENGTH is positive' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where (WHLENUOM is null or WHLENUOM = '') and WHLENGTH > 0
+union all
+select t1.OBJECTID, 'Error: WHLENUOM is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join dbo.DOM_UOM as t2 on t1.WHLENUOM = t2.code where t1.WHLENUOM is not null and t1.WHLENUOM <> '' and t2.code is null
+union all
+-- 15) ISEXTANT is a required domain value; Default to True with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 16) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 17) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: Are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE, ??) when PUBLICDISPLAY is true?
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 18) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 17/18) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 19) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+-- TODO: This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
+select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 20) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 21) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.TRAILS_ATTRIBUTE_PT_evw as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 22) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 23) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 24) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+-- A trail attribute must be a 2100 (Trail) or a 2200 (Trail Bridge).
+select t1.OBJECTID, 'Error: FACLOCID is not approriate for this kind of trail feature (based on the Asset Code)' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+  where (t2.Asset_Code <> '2100' and t2.Asset_Code <> '2200')
+union all
+-- FACLOCID does not need to be unique (a single trail can have several features) 
+-- FACLOCID must be the same as the parent trail
+-- TODO: this seams reasonable, but there are over 23,000 issues.  Could be because trail data is bad (lots of duplicate FeatureIDs with different FACLOCIDs) 
+--select t1.OBJECTID, 'Error: FACLOCID does not match the parent trail' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
+--       gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t2.FACLOCID is null or t1.FACLOCID <> t2.FACLOCID
+--union all
+-- 25) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
+--     TODO:  Get asset export from FMSS and compare
+select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
+       (select FACASSETID from gis.TRAILS_ATTRIBUTE_PT_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+
+-- ???????????????????????????????????
+-- What about webedituser, webcomment?
+-- ???????????????????????????????????
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_ATTRIBUTE_PT'
+WHERE E.Explanation IS NULL
 GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+
+CREATE VIEW [dbo].[QC_ISSUES_TRAILS_FEATURE_PT] AS select I.Issue, D.* from  gis.TRAILS_FEATURE_PT_evw AS D
+join (
+
+-------------------------
+-- gis.TRAILS_FEATURE_PT
+-------------------------
+
+-- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
+
+-- 1) POINTTYPE must be an recognized value; if it is null/empty, then it will default to 'Arbitrary point' without a warning
+select t1.OBJECTID, 'Error: POINTTYPE is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join dbo.DOM_POINTTYPE as t2 on t1.POINTTYPE = t2.Code where t1.POINTTYPE is not null and t1.POINTTYPE <> '' and t2.Code is null
+union all 
+-- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.TRAILS_FEATURE_PT_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.TRAILS_FEATURE_PT_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
+	from gis.TRAILS_FEATURE_PT_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    TODO: are these feature independent of the trails, or are these the 'parent' featureid?
+--    TODO: if the feature is tied to a 'parent' trail, would some of the attributes also be tied?  i.e. a sign on a internal trail should probably be internal
+-- A FEATUREID should either match a trail feature or be unique
+select t1.OBJECTID, 'Error: FEATUREID not matching a TRAILS_LN must be unique' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t1.FEATUREID is not null and t2.FEATUREID is null
+  and t1.FEATUREID in (select FEATUREID from gis.TRAILS_FEATURE_PT_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
+union all
+-- A featureID should be unique
+--select OBJECTID, 'Error: FEATUREID must be unique' as Issue from gis.TRAILS_FEATURE_PT_evw where FEATUREID in 
+--       (select FEATUREID from gis.TRAILS_FEATURE_PT_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
+--union all
+-- TODO: Maybe all FEATUREIDs should match a trail
+--select t1.OBJECTID, 'Error: FEATUREID not found in TRAILS_LN' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+--  left join gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t1.FEATUREID is not null and t2.FEATUREID is null
+--union all
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
+	from gis.TRAILS_FEATURE_PT_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_FEATURE_PT_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_FEATURE_PT_evw where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue from gis.TRAILS_FEATURE_PT_evw where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue from gis.TRAILS_FEATURE_PT_evw where SOURCEDATE > GETDATE()
+union all
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_FEATURE_PT_evw where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 8) NOTES is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) TRLFEATNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: TRLFEATNAME must use proper case' as Issue from gis.TRAILS_FEATURE_PT_evw where TRLFEATNAME = upper(TRLFEATNAME) Collate Latin1_General_CS_AI or TRLFEATNAME = lower(TRLFEATNAME) Collate Latin1_General_CS_AI
+union all
+-- 10) TRLFEATALTNAME is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 11) MAPLABEL is optional free text, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 12) TRLFEATTYPE must be non null and in DOM_TRLFEATFEATTYPE.  Theres is no default value
+select OBJECTID, 'Error: TRLFEATTYPE is required' as Issue from gis.TRAILS_FEATURE_PT_evw where TRLFEATTYPE is null
+union all
+select t1.OBJECTID, 'Error: TRLFEATTYPE is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+       left join dbo.DOM_TRLFEATFEATTYPE as t2 on t1.TRLFEATTYPE = t2.Code where t1.TRLFEATTYPE is not null and t1.TRLFEATTYPE <> '' and t2.Code is null
+union all
+-- 13) TRLFEATTYPEOTHER is optional free text unless TRLFEATTYPE = 'Other'. If it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+--     Note: if there are common values here they can be promoted to TRLFEATTYPE
+select OBJECTID, 'Error: TRLFEATTYPEOTHER is required when TRLFEATTYPE is Other' as Issue from gis.TRAILS_FEATURE_PT_evw
+       where TRLFEATTYPE = 'Other' and (TRLFEATTYPEOTHER is null or TRLFEATTYPEOTHER = '')
+union all
+select OBJECTID, 'Warning: TRLFEATTYPEOTHER will be cleared when TRLFEATTYPE is not Other' as Issue from gis.TRAILS_FEATURE_PT_evw
+       where TRLFEATTYPE <> 'Other' and TRLFEATTYPEOTHER is not null and TRLFEATTYPEOTHER <> ''
+union all
+-- 14) TRLFEATSUBTYPE is optional free text, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+--     TODO: do we want to make this a domain value that is sensitive to the TRLFEATTYPE
+-- 15) TRLFEATDESC is optional free text, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 16) TRLFEATCOUNT is optional int, but if it provided is it must be positive.
+--     if it is zero, it will be silently converted to null
+select OBJECTID, 'Error: TRLFEATCOUNT must be a poitive number' as Issue from gis.TRAILS_FEATURE_PT_evw where TRLFEATCOUNT < 0
+union all
+-- 17) WHLENGTH is optional real, but if it provided is it must be positive.
+--     if it is zero, it will be silently converted to null
+select OBJECTID, 'Error: WHLENGTH must be a poitive number' as Issue from gis.TRAILS_FEATURE_PT_evw where WHLENGTH < 0
+union all
+-- 18) WHLENUOM is an optional domain value (DOM_UOM); if WHLENGTH is not null it must be not null;
+--     if WHLENGTH is null, this field will be silently set to null.
+select OBJECTID, 'Error: WHLENUOM is required when WHLENGTH is positive' as Issue from gis.TRAILS_FEATURE_PT_evw where (WHLENUOM is null or WHLENUOM = '') and WHLENGTH > 0
+union all
+select t1.OBJECTID, 'Error: WHLENUOM is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join dbo.DOM_UOM as t2 on t1.WHLENUOM = t2.code where t1.WHLENUOM is not null and t1.WHLENUOM <> '' and t2.code is null
+union all
+-- 19) ISEXTANT is a required domain value; Default to True with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue from gis.TRAILS_FEATURE_PT_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 20) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 21) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: Are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE, ??) when PUBLICDISPLAY is true?
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue from gis.TRAILS_FEATURE_PT_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 22) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue from gis.TRAILS_FEATURE_PT_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 21/22) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue from gis.TRAILS_FEATURE_PT_evw
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 23) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+-- TODO: This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
+select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue from gis.TRAILS_FEATURE_PT_evw as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 24) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 25) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue from gis.TRAILS_FEATURE_PT_evw as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.TRAILS_FEATURE_PT_evw as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 26) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 27) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.TRAILS_FEATURE_PT_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 28) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+-- A trail feature must be a 2100 (Trail) or a 2200 (Trail Bridge). A 2200 can be a TRLFEATTYPE Bridge or Walkable Structure. A TRLFEATTYPE Bridge must be a 2200, but a Walkable Structure can be a 2100 or a 2200
+select t1.OBJECTID, 'Error: FACLOCID is not approriate for this kind of trail feature (based on the Asset Code)' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+  where (t2.Asset_Code <> '2100' and t2.Asset_Code <> '2200')
+     or (t2.Asset_Code = '2200' and t1.TRLFEATTYPE <> 'Bridge' and t1.TRLFEATTYPE <> 'Walkable Structure')
+     or (t1.TRLFEATTYPE = 'Bridge' and t2.Asset_Code <> '2200')
+     or (t1.TRLFEATTYPE = 'Walkable Structure' and t2.Asset_Code <> '2200' and t2.Asset_Code <> '2100')
+union all
+-- FACLOCID does not need to be unique (a single trail can have several features) 
+-- FACLOCID must be the same as the parent trail
+select t1.OBJECTID, 'Error: FACLOCID does not match the parent trail' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
+       gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t2.FACLOCID is null or t1.FACLOCID <> t2.FACLOCID
+union all
+-- 29) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
+--     TODO:  Get asset export from FMSS and compare
+select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
+       (select FACASSETID from gis.TRAILS_FEATURE_PT_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+
+-- ???????????????????????????????????
+-- What about webedituser, webcomment?
+-- ???????????????????????????????????
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_FEATURE_PT'
+WHERE E.Explanation IS NULL
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 
 
 
