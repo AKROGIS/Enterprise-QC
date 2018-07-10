@@ -1253,7 +1253,7 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 union all
 -- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
 --    TODO: Option 1) If a Road has multiple segments, then merge or use a multi-polyline or create an exception.
---          Option 2) Relaxe the Uniqueness requirement.  This allows a long road to be broken into multiple smaller segments, and allows different linetypes
+--          Option 2) Relax the Uniqueness requirement.  This allows a long road to be broken into multiple smaller segments, and allows different linetypes
 --                    however, it also allows errors like two different (by geography or attributes) roads having the same featureid (common copy/paste error)
 --                    need to add additional checks like RDNAME are the same for all segements with the same FEATUREID 
 select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.ROADS_LN_evw where FEATUREID in 
@@ -1445,7 +1445,6 @@ union all
 -- 31) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
 --     TODO: FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
 --     TODO: A bridge/tunnel in a road will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the road on/in the bridge/tunnel
---     TODO: Asset
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.ROADS_LN_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
@@ -1476,6 +1475,12 @@ select t1.OBJECTID, 'Error: ISTUNNEL is not a recognized value' as Issue from gi
 union all
 select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code' as Issue from gis.ROADS_LN_evw as t1 join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISTUNNEL = 'Yes' and t2.Asset_Code <> '1800') or (t1.ISTUNNEL <> 'Yes' and t2.Asset_Code = '1800'))
+--TODO: Shape Checks?
+--union all
+--select OBJECTID, 'Warning: Road is shorter than 5 meters' as Issue from gis.ROADS_LN_evw where SHAPE.STLength() < 5
+--union all
+--select OBJECTID, 'Error: Multiline roads are not allowed' as Issue from gis.ROADS_LN_evw where SHAPE.STGeometryType() = 'MultiLineString'
+
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -1969,10 +1974,14 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
 -- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
---    TODO: Option 1) If a Road has multiple segments, then merge or use a multi-polyline or create an exception.
---          Option 2) Relaxe the Uniqueness requirement.  This allows a long road to be broken into multiple smaller segments, and allows different linetypes
---                    however, it also allows errors like two different (by geography or attributes) roads having the same featureid (common copy/paste error)
---                    need to add additional checks like TRLNAME are the same for all segements with the same FEATUREID 
+--    TODO: Define what it means to be a trail "feature" when should featureID be the same or different for different trail records (segments)
+--    TODO: Decide if FEATUREID must be unique
+--          Option 1) If a Trail has multiple segments, then  a) merge or b) use a multi-polyline or c) create an exception.
+--          Option 2) Relax the uniqueness requirement.  This allows a long trail to be broken into multiple smaller segments, and allows different trail types
+--                    (e.g. main and spur) to be part of the same "trail".
+--                    however, it also allows errors like two different (by geography or attributes) trails having the same featureid (common copy/paste error)
+--                    should we add additional checks like FACLOCID/TRLNAME are the same for all segements with the same FEATUREID?
+--                    Can we do a proximity/connectedness check for all trails that share the same FEATUREID?  I don't know how.
 select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.TRAILS_LN_evw where FEATUREID in 
        (select FEATUREID from gis.TRAILS_LN_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
 union all
@@ -2151,8 +2160,7 @@ select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from
 union all
 -- 29) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
 --     TODO: FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
---     TODO: A bridge/tunnel in a road will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the road on/in the bridge/tunnel
---     TODO: Asset
+--     TODO: A bridge/tunnel in a trail will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the trail on/in the bridge/tunnel
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.TRAILS_LN_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
@@ -2262,6 +2270,13 @@ union all
 select t1.OBJECTID, 'Error: TRLUSE_CANOE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_CANOE = t2.Code where t1.TRLUSE_CANOE is not null and t2.Code is null
 --TODO: Look for illogical combinations of TRLTYPE and TRLUSE_*
+--TODO: Shape Checks?
+--union all
+--select OBJECTID, 'Warning: Trail shorter than 5 meters' as Issue from gis.TRAILS_LN_evw where SHAPE.STLength() < 5
+--union all
+--select OBJECTID, 'Error: Multiline trails are not allowed' as Issue from gis.TRAILS_LN_evw  where SHAPE.STGeometryType() = 'MultiLineString'
+
+
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
