@@ -512,6 +512,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -815,12 +816,13 @@ select p.OBJECTID, 'Error: PARKBLDGID does not match FMSS.PARKNUMB' as Issue fro
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_BLDG_CENTER_PT'
-WHERE E.feature_oid IS NULL
+WHERE E.Explanation IS NULL
 GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_FOOTPRINT_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_FOOTPRINT_PY_evw AS D
 join (
@@ -893,12 +895,13 @@ select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from 
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_BLDG_FOOTPRINT_PY'
-WHERE E.feature_oid IS NULL
+WHERE E.Explanation IS NULL
 GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_OTHER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_OTHER_PT_EVW AS D
 join (
@@ -951,12 +954,13 @@ select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from 
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_BLDG_OTHER_PT'
-WHERE E.feature_oid IS NULL
+WHERE E.Explanation IS NULL
 GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_OTHER_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_OTHER_PY_EVW AS D
 join (
@@ -1007,12 +1011,13 @@ select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from 
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_BLDG_OTHER_PY'
-WHERE E.feature_oid IS NULL
+WHERE E.Explanation IS NULL
 GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 
 CREATE VIEW [dbo].[QC_ISSUES_PARKLOTS_PY] AS select I.Issue, D.* from  gis.PARKLOTS_PY_evw AS D
@@ -1210,12 +1215,13 @@ select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.PARKLOTS
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'PARKLOTS_PY'
-WHERE E.feature_oid IS NULL
+WHERE E.Explanation IS NULL
 GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 CREATE VIEW [dbo].[QC_ISSUES_ROADS_LN] AS select I.Issue, D.* from  gis.ROADS_LN_evw AS D
 join (
@@ -1479,7 +1485,8 @@ select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code' as Issu
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'ROADS_LN'
-WHERE E.feature_oid IS NULL
+WHERE E.Explanation IS NULL
+GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -2264,5 +2271,5 @@ select t1.OBJECTID, 'Error: TRLUSE_CANOE is not a recognized value' as Issue fro
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_LN'
-WHERE E.feature_oid IS NULL
+WHERE E.Explanation IS NULL
 GO
