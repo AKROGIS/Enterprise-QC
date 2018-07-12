@@ -510,9 +510,6 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-
-
-
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -761,9 +758,16 @@ select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue from gis.AKR_BLDG_C
        (select FACLOCID from gis.AKR_BLDG_CENTER_PT_evw where FACLOCID is not null and FACLOCID <> '' group by FACLOCID having count(*) > 1) as t2 on t1.FACLOCID = t2.FACLOCID
 union all
 -- 30) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
---     TODO:  Get asset export from FMSS and compare
 select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1 join
        (select FACASSETID from gis.AKR_BLDG_CENTER_PT_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
+union all
+select t1.OBJECTID, 'Error: FACASSETID does not match a Building (4100) asset in FMSS' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where (t1.FACLOCID is null or t1.FACLOCID = t3.Location) and t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code <> '4100'
 union all
 -- 31) CRID is optional free text, but if provided it must be unique and match an CR_ID in the Cultural Resource Database
 --     TODO:  Get a link to the Cultural Resource Database and compare
@@ -1018,8 +1022,6 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-
-
 CREATE VIEW [dbo].[QC_ISSUES_PARKLOTS_PY] AS select I.Issue, D.* from  gis.PARKLOTS_PY_evw AS D
 join (
 
@@ -1045,11 +1047,8 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 	  OR right(GEOMETRYID,1) <> '}'
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
--- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
---    If a single parking lot has multiple polygons, then use a multipolygon (merge in ArcMap), or create an exception.
-select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.PARKLOTS_PY_evw where FEATUREID in 
-       (select FEATUREID from gis.PARKLOTS_PY_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
-union all
+-- 3) FEATUREID must be well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    All records with the same FeatureID must be proximal (in the vicinity of each other)
 select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
 	from gis.PARKLOTS_PY_evw where
 	  -- Will ignore FEATUREID = NULL 
@@ -1057,6 +1056,7 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
 	  OR left(FEATUREID,1) <> '{'
 	  OR right(FEATUREID,1) <> '}'
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+--    TODO: Query for records with a FEATUREID far away from the average for all features with the FEATUREID
 union all
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.PARKLOTS_PY_evw where MAPMETHOD is null or MAPMETHOD = ''
@@ -1107,9 +1107,12 @@ select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a def
   left join (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
   on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
 union all
--- 15) MAINTAINER is a optional domain value; TODO: if FACLOCID is provided this should match a valid value in FMSS Lookup.
+-- 15) MAINTAINER is a optional domain value; if FACLOCID is provided this should match a valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
        left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: FACMAINTAIN does not match FMSS.FAMARESP' as Issue from gis.PARKLOTS_PY_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID join dbo.DOM_MAINTAINER as d on f.FAMARESP = d.FMSS where p.MAINTAINER <> d.Code
 union all
 -- 16) ISEXTANT is a required domain value; Default to True with Warning
 select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue from gis.PARKLOTS_PY_evw where ISEXTANT is null
@@ -1119,7 +1122,7 @@ select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue from gi
 union all
 -- 17) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
 -- 18) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
---     TODO: are there requirements of other fields (i.e. BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE) when PUBLICDISPLAY is true?
+--     TODO: are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
 select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue from gis.PARKLOTS_PY_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
 union all
 select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
@@ -1148,7 +1151,7 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1 left join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
--- TODO This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
+-- TODO This query is very slow with versioning when the dataset gets larger.  Figure it out, live with it, or run as separate check occasionally
 select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue from gis.PARKLOTS_PY_evw as t1
   left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
 union all
@@ -1192,20 +1195,33 @@ union all
 -- 24) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
 select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.PARKLOTS_PY_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
--- 25) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+-- 25) FACLOCID is optional free text, but if provided it must match a Parking Lot Location in the FMSS Export;
+--     All records with the same FACLOCID must have the same FEATUREID
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.PARKLOTS_PY_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
 select t1.OBJECTID, 'Error: FACLOCID does not match a Parking Area in FMSS' as Issue from gis.PARKLOTS_PY_evw as t1 join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Asset_Code <> '1300'
 union all
-select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue from gis.PARKLOTS_PY_evw as t1 join
-       (select FACLOCID from gis.PARKLOTS_PY_evw where FACLOCID is not null and FACLOCID <> '' group by FACLOCID having count(*) > 1) as t2 on t1.FACLOCID = t2.FACLOCID
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue from gis.PARKLOTS_PY_evw where FACLOCID in (
+    select FACLOCID from (select FACLOCID from gis.PARKLOTS_PY_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
 union all
--- 26) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
---     TODO:  Get asset export from FMSS and compare
-select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.PARKLOTS_PY_evw as t1 join
-       (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+-- 26) FACASSETID is optional free text, provided it must match a Parking Lot Location in the FMSS Assets Export
+--     All records with the same FACASSETID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue from gis.PARKLOTS_PY_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue from gis.PARKLOTS_PY_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
+union all
+select t1.OBJECTID, 'Error: FACASSETID does not match a Parking Area in FMSS' as Issue from gis.PARKLOTS_PY_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location  where (t1.FACLOCID is null or t1.FACLOCID = t3.Location) and t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code <> '1300'
+union all
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue from gis.PARKLOTS_PY_evw where FACASSETID in (
+    select FACASSETID from (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
+
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -1221,7 +1237,6 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 CREATE VIEW [dbo].[QC_ISSUES_ROADS_LN] AS select I.Issue, D.* from  gis.ROADS_LN_evw AS D
 join (
@@ -1251,14 +1266,13 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 	  OR right(GEOMETRYID,1) <> '}'
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
--- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
---    TODO: Option 1) If a Road has multiple segments, then merge or use a multi-polyline or create an exception.
---          Option 2) Relax the Uniqueness requirement.  This allows a long road to be broken into multiple smaller segments, and allows different linetypes
---                    however, it also allows errors like two different (by geography or attributes) roads having the same featureid (common copy/paste error)
---                    need to add additional checks like RDNAME are the same for all segements with the same FEATUREID 
-select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.ROADS_LN_evw where FEATUREID in 
-       (select FEATUREID from gis.ROADS_LN_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
-union all
+-- 3) FEATUREID must be must be well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    We haven't yet defined what it means, exactly, to be a road feature (i.e. what segments should share a FEATUREID), but we know that FEATUREID will not be unique.
+--       This allows a long road to be broken into multiple smaller segments, and allows different segments with different attributes to be part of the same road.
+--       however, it also allows errors like two different (by geography or attributes) trails having the same featureid (common copy/paste error)
+--    All records with the same FeatureID must be proximal (in the vicinity of each other)
+--    TODO: consider what attributes, in addition to FMSS attributes, should be the same when FEATUREID is the same
+--    TODO: Query for records with a FEATUREID far away from the average for all features with the FEATUREID
 select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
 	from gis.ROADS_LN_evw where
 	  -- Will ignore FEATUREID = NULL 
@@ -1442,22 +1456,33 @@ union all
 select t1.OBJECTID, 'Error: ROUTEID is not unique' as Issue from gis.ROADS_LN_evw as t1 join
        (select ROUTEID from gis.ROADS_LN_evw where ROUTEID is not null and ROUTEID <> '' group by ROUTEID having count(*) > 1) as t2 on t1.ROUTEID = t2.ROUTEID
 union all
--- 31) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
---     TODO: FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
+-- 31) FACLOCID is optional free text, but if provided it must match a Location in the FMSS Export
+--     FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
 --     TODO: A bridge/tunnel in a road will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the road on/in the bridge/tunnel
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.ROADS_LN_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
-select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue from gis.ROADS_LN_evw as t1 join
-       (select FACLOCID from gis.ROADS_LN_evw where FACLOCID is not null and FACLOCID <> '' group by FACLOCID having count(*) > 1) as t2 on t1.FACLOCID = t2.FACLOCID
-union all
 select t1.OBJECTID, 'Error: FACLOCID does not match a Road in FMSS' as Issue from gis.ROADS_LN_evw as t1 join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Asset_Code not in ('1100', '1300', '1700', '1800')
 union all
--- 32) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
---     TODO:  Get asset export from FMSS and compare
-select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.ROADS_LN_evw as t1 join
-       (select FACASSETID from gis.ROADS_LN_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue from gis.ROADS_LN_evw where FACLOCID in (
+    select FACLOCID from (select FACLOCID from gis.ROADS_LN_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
+union all
+-- 32) FACASSETID is optional free text, provided it must match a Road Location in the FMSS Assets Export
+--     All records with the same FACASSETID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue from gis.ROADS_LN_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue from gis.ROADS_LN_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
+union all
+select t1.OBJECTID, 'Error: FACASSETID does not match a road asset in FMSS' as Issue from gis.ROADS_LN_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code not in ('1100', '1700', '1800')
+union all
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue from gis.ROADS_LN_evw where FACASSETID in (
+    select FACASSETID from (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
 union all
 -- 33) ISOUTPARK: This is an AKR extension, it is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
 -- 34) ISBRIDGE: This is an AKR extension; it is a required element in the Yes/No domain; it silently defaults to 'No'
@@ -1499,6 +1524,7 @@ GO
 
 
 
+
 CREATE VIEW [dbo].[QC_ISSUES_TRAILS_ATTRIBUTE_PT] AS select I.Issue, D.* from gis.TRAILS_ATTRIBUTE_PT_evw AS D
 join (
 
@@ -1524,7 +1550,7 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 	  OR right(GEOMETRYID,1) <> '}'
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
--- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+-- 3) FEATUREID must be must be well-formed or null/empty (in which case we will generate a unique well-formed value)
 --    TODO: are these feature independent of the trails, or are these the 'parent' featureid?
 --    TODO: if the feature is tied to a 'parent' trail, would some of the attributes also be tied?  i.e. a sign on a internal trail should probably be internal
 -- All FEATUREIDs should match a trail
@@ -1673,25 +1699,39 @@ union all
 -- 23) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
 select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
--- 24) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+-- 24) FACLOCID is optional free text, but if provided it must match a trail location in the FMSS Export
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
--- A trail attribute must be a 2100 (Trail) or a 2200 (Trail Bridge).
+-- A trail attribute must be a 2100 (Trail) or a 2200 (Trail Bridge) or a 2300 (Trail Tunnel).
 select t1.OBJECTID, 'Error: FACLOCID is not approriate for this kind of trail feature (based on the Asset Code)' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
-  where (t2.Asset_Code <> '2100' and t2.Asset_Code <> '2200')
+  where (t2.Asset_Code <> '2100' and t2.Asset_Code <> '2200' and t2.Asset_Code <> '2300')
 union all
--- FACLOCID does not need to be unique (a single trail can have several features) 
 -- FACLOCID must be the same as the parent trail
--- TODO: this seams reasonable, but there are over 23,000 issues.  Could be because trail data is bad (lots of duplicate FeatureIDs with different FACLOCIDs) 
---select t1.OBJECTID, 'Error: FACLOCID does not match the parent trail' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
---       gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t2.FACLOCID is null or t1.FACLOCID <> t2.FACLOCID
+-- TODO: This needs to be fixed; since featureid is not unique, this is a many to many relation,
+--       so it will report a lot of false positives until the data is cleaned up.
+--select t1.OBJECTID, 'Error: FACLOCID does not match the parent trail' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
+--       gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t2.FEATUREID is not null and (t1.FACLOCID <> t2.FACLOCID or (t1.FACLOCID is null and t2.FACLOCID is not null) or (t2.FACLOCID is null and t1.FACLOCID is not null))
 --union all
--- 25) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
---     TODO:  Get asset export from FMSS and compare
-select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
-       (select FACASSETID from gis.TRAILS_ATTRIBUTE_PT_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where FACLOCID in (
+    select FACLOCID from (select FACLOCID from gis.TRAILS_ATTRIBUTE_PT_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
+union all
+-- 25) FACASSETID is optional free text, provided it must match a Trail Location in the FMSS Assets Export
+--     All records with the same FACASSETID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
+union all
+select t1.OBJECTID, 'Error: FACASSETID does not match a trail asset in FMSS' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code not in ('2100', '2200', '2300')
+union all
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue from gis.TRAILS_ATTRIBUTE_PT_evw where FACASSETID in (
+    select FACASSETID from (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -1707,6 +1747,7 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 
 CREATE VIEW [dbo].[QC_ISSUES_TRAILS_FEATURE_PT] AS select I.Issue, D.* from  gis.TRAILS_FEATURE_PT_evw AS D
@@ -1734,7 +1775,11 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 	  OR right(GEOMETRYID,1) <> '}'
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
--- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+-- 3) FEATUREID must be well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    TODO: What is a featureid in this case?
+--          is each sign, bench, etc a unique feature
+--          are all the culverts on a trail a feature with the same featureid
+--          is it a foreign key to the trail featureid that this sign, bench, etc is a part of (near to, maintained with, etc)
 --    TODO: are these feature independent of the trails, or are these the 'parent' featureid?
 --    TODO: if the feature is tied to a 'parent' trail, would some of the attributes also be tied?  i.e. a sign on a internal trail should probably be internal
 -- A FEATUREID should either match a trail feature or be unique
@@ -1906,7 +1951,7 @@ union all
 -- 27) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
 select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.TRAILS_FEATURE_PT_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
--- 28) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
+-- 28) FACLOCID is optional free text, but if provided it must match a Trail Location in the FMSS Export
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
@@ -1923,10 +1968,26 @@ union all
 select t1.OBJECTID, 'Error: FACLOCID does not match the parent trail' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
        gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t2.FACLOCID is null or t1.FACLOCID <> t2.FACLOCID
 union all
--- 29) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
---     TODO:  Get asset export from FMSS and compare
-select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
-       (select FACASSETID from gis.TRAILS_FEATURE_PT_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue from gis.TRAILS_FEATURE_PT_evw where FACLOCID in (
+    select FACLOCID from (select FACLOCID from gis.TRAILS_FEATURE_PT_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
+union all
+-- 29) FACASSETID is optional free text, provided it must match a Trail Location in the FMSS Assets Export
+--     All records with the same FACASSETID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
+union all
+select t1.OBJECTID, 'Error: FACASSETID does not match a trail asset in FMSS' as Issue from gis.TRAILS_FEATURE_PT_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code not in ('2100', '2200', '2300')
+union all
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue from gis.TRAILS_FEATURE_PT_evw where FACASSETID in (
+    select FACASSETID from (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
+
+
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -1942,8 +2003,6 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
-
 
 CREATE VIEW [dbo].[QC_ISSUES_TRAILS_LN] AS select I.Issue, D.* from  gis.TRAILS_LN_evw AS D
 join (
@@ -1973,18 +2032,13 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
 	  OR right(GEOMETRYID,1) <> '}'
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
--- 3) FEATUREID must be must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
---    TODO: Define what it means to be a trail "feature" when should featureID be the same or different for different trail records (segments)
---    TODO: Decide if FEATUREID must be unique
---          Option 1) If a Trail has multiple segments, then  a) merge or b) use a multi-polyline or c) create an exception.
---          Option 2) Relax the uniqueness requirement.  This allows a long trail to be broken into multiple smaller segments, and allows different trail types
---                    (e.g. main and spur) to be part of the same "trail".
---                    however, it also allows errors like two different (by geography or attributes) trails having the same featureid (common copy/paste error)
---                    should we add additional checks like FACLOCID/TRLNAME are the same for all segements with the same FEATUREID?
---                    Can we do a proximity/connectedness check for all trails that share the same FEATUREID?  I don't know how.
-select OBJECTID, 'Error: FEATUREID is not unique' as Issue from gis.TRAILS_LN_evw where FEATUREID in 
-       (select FEATUREID from gis.TRAILS_LN_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
-union all
+-- 3) FEATUREID must be must be well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    We haven't yet defined what it means, exactly, to be a trail feature (i.e. what segments should share a FEATUREID), but we know that FEATUREID will not be unique.
+--       This allows a long trail to be broken into multiple smaller segments, and allows different trail types (e.g. main and spur) to be part of the same "trail".
+--       however, it also allows errors like two different (by geography or attributes) trails having the same featureid (common copy/paste error)
+--    All records with the same FeatureID must be proximal (in the vicinity of each other)
+--    TODO: consider what attributes, in addition to FMSS attributes, should be the same when FEATUREID is the same
+--    TODO: Query for records with a FEATUREID far away from the average for all features with the FEATUREID
 select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
 	from gis.TRAILS_LN_evw where
 	  -- Will ignore FEATUREID = NULL 
@@ -2033,13 +2087,16 @@ select t1.OBJECTID, 'Error: TRLFEATTYPE is not a recognized value' as Issue from
        left join dbo.DOM_TRLFEATTYPE as t2 on t1.TRLFEATTYPE = t2.Code where t1.TRLFEATTYPE is not null and t1.TRLFEATTYPE <> '' and t2.Code is null
 union all 
 -- 13) TRLSTATUS is a required domain value; default is 'Existing'
---     TODO: Compare with FMSS
+--     different parts of a single 'Feature' can have different status
+--     TODO: Compare with FMSS; all parts of the feature with same FACLOCID will have the same status 
 select OBJECTID, 'Warning: TRLSTATUS is not provided, default value of *Existing* will be used' as Issue from gis.TRAILS_LN_evw where TRLSTATUS is null or TRLSTATUS = ''
 union all
 select t1.OBJECTID, 'Error: TRLSTATUS is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_TRLSTATUS as t2 on t1.TRLSTATUS = t2.Code where t1.TRLSTATUS is not null and t1.TRLSTATUS <> '' and t2.Code is null
 union all
 -- 14) TRLSURFACE is a required domain value; default is 'Unknown'
+--     different parts of a single 'Feature' can have different surface
+--     TODO: Compare with FMSS; all parts of the feature with same FACLOCID will have the same surface 
 select OBJECTID, 'Warning: TRLSURFACE is not provided, default value of *Unknown* will be used' as Issue from gis.TRAILS_LN_evw where TRLSURFACE is null or TRLSURFACE = ''
 union all
 select t1.OBJECTID, 'Error: TRLSURFACE is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
@@ -2159,21 +2216,33 @@ union all
 select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.TRAILS_LN_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
 -- 29) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
---     TODO: FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
+--     all line segments with the same FACLOCID must have the same featureid
+--     NOTE: not all segements with the same featureid must have the same FACLOCID (we may associated spurs, etc with a trail network (one feature) that are not maintained in FMSS)
 --     TODO: A bridge/tunnel in a trail will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the trail on/in the bridge/tunnel
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.TRAILS_LN_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
-select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue from gis.TRAILS_LN_evw as t1 join
-       (select FACLOCID from gis.TRAILS_LN_evw where FACLOCID is not null and FACLOCID <> '' group by FACLOCID having count(*) > 1) as t2 on t1.FACLOCID = t2.FACLOCID
-union all
 select t1.OBJECTID, 'Error: FACLOCID does not match a Trail in FMSS' as Issue from gis.TRAILS_LN_evw as t1 join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Asset_Code not in ('2100', '2200', '2300')
 union all
--- 30) FACASSETID is optional free text, but if provided it must be unique and match an ID in the FMSS Assets Export
---     TODO:  Get asset export from FMSS and compare
-select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue from gis.TRAILS_LN_evw as t1 join
-       (select FACASSETID from gis.TRAILS_LN_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue from gis.TRAILS_LN_evw where FACLOCID in (
+    select FACLOCID from (select FACLOCID from gis.TRAILS_LN_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
+union all
+-- 32) FACASSETID is optional free text, provided it must match a Trail Location in the FMSS Assets Export
+--     All records with the same FACASSETID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue from gis.TRAILS_LN_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue from gis.TRAILS_LN_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
+union all
+select t1.OBJECTID, 'Error: FACASSETID does not match a trail asset in FMSS' as Issue from gis.TRAILS_LN_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code not in ('2100', '2200', '2300')
+union all
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue from gis.TRAILS_LN_evw where FACASSETID in (
+    select FACASSETID from (select FACASSETID from gis.TRAILS_LN_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
 union all
 ----------------------------------------------------
 -- AKR Additions to the Trails Spatial Data Standard
