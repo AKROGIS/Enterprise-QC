@@ -2358,3 +2358,751 @@ LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_LN'
 WHERE E.Explanation IS NULL
 GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2018-07-13
+-- Description:	Calculated properties for Buildings
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Buildings] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- 1a) Add POINTYPE = 'Center point' if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.AKR_BLDG_CENTER_PT_evw set POINTTYPE = 'Center point' where POINTTYPE is null or POINTTYPE = '' 
+    -- 1b) Add POLYGONTYPE = 'Perimeter polygon' if null/empty in gis.AKR_BLDG_FOOTPRINT_PY
+    update gis.AKR_BLDG_FOOTPRINT_PY_evw set POLYGONTYPE = 'Perimeter polygon' where POLYGONTYPE is null or POLYGONTYPE = '' 
+    -- 2) Add GEOMETRYID if null/empty
+    update gis.AKR_BLDG_CENTER_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    update gis.AKR_BLDG_OTHER_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    update gis.AKR_BLDG_FOOTPRINT_PY_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    update gis.AKR_BLDG_OTHER_PY_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 3) Add FEATUREID if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.AKR_BLDG_CENTER_PT_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    -- 4) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.AKR_BLDG_CENTER_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    update gis.AKR_BLDG_OTHER_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    update gis.AKR_BLDG_FOOTPRINT_PY_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    update gis.AKR_BLDG_OTHER_PY_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 5) if MAPSOURCE is NULL or an empty string, change to Unknown
+    --    by SQL Magic '' is the same as any string of just white space
+    update gis.AKR_BLDG_CENTER_PT_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    update gis.AKR_BLDG_OTHER_PT_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    update gis.AKR_BLDG_FOOTPRINT_PY_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    update gis.AKR_BLDG_OTHER_PY_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 6) SOURCEDATE: Nothing to do.
+    -- 7) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.AKR_BLDG_CENTER_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    update gis.AKR_BLDG_OTHER_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    update gis.AKR_BLDG_FOOTPRINT_PY_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    update gis.AKR_BLDG_OTHER_PY_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 8) if NOTES is an empty string, change to NULL
+    update gis.AKR_BLDG_CENTER_PT_evw set NOTES = NULL where NOTES = ''
+    update gis.AKR_BLDG_OTHER_PT_evw set NOTES = NULL where NOTES = ''
+    update gis.AKR_BLDG_FOOTPRINT_PY_evw set NOTES = NULL where NOTES = ''
+    update gis.AKR_BLDG_OTHER_PY_evw set NOTES = NULL where NOTES = ''
+    -- 9) if BLDGNAME is an empty string, change to NULL
+    update gis.AKR_BLDG_CENTER_PT_evw set BLDGNAME = NULL where BLDGNAME = ''
+    -- 10) if BLDGALTNAME is an empty string, change to NULL
+    update gis.AKR_BLDG_CENTER_PT_evw set BLDGALTNAME = NULL where BLDGALTNAME = ''
+    -- 11) if MAPLABEL is an empty string, change to NULL
+    update gis.AKR_BLDG_CENTER_PT_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 12) if BLDGSTATUS; provide default value of Existing if missing
+    merge into gis.AKR_BLDG_CENTER_PT_evw as p
+      using (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from DOM_BLDGSTATUS)) as f
+      on f.Location = p.FACLOCID and ((p.BLDGSTATUS is null or BLDGSTATUS = '') and f.Status is not null)
+      when matched then update set BLDGSTATUS = f.Status;
+    update gis.AKR_BLDG_CENTER_PT_evw set BLDGSTATUS = 'Existing' where BLDGSTATUS is null or BLDGSTATUS = ''
+    -- 13/14) if BLDGCODE or BLDGTYPE is null but not the other replace null with lookup
+    --     Be sure to set BLDGCODE from BLDGTYPE before comparing BLDGCODE to FMSS (do not compare BLDGTYPE to FMSS directly)
+    merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using DOM_BLDGCODETYPE as t2
+      on t1.BLDGTYPE = t2.Type and t1.BLDGCODE is null and t1.BLDGTYPE is not null and t2.Code is not null
+      when matched then update set BLDGCODE = t2.Code;
+    merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using DOM_BLDGCODETYPE as t2
+      on t1.BLDGCODE = t2.Code and t1.BLDGTYPE is null and t1.BLDGCODE is not null and t2.Type is not null
+      when matched then update set  BLDGTYPE = t2.Type;
+    merge into gis.AKR_BLDG_CENTER_PT_evw as p
+      using (SELECT DOI_Code, Location FROM dbo.FMSSExport where DOI_Code in (select Code from DOM_BLDGCODETYPE)) as f
+      on f.Location = p.FACLOCID and (p.BLDGCODE is null and f.DOI_Code is not null)
+      when matched then update set BLDGCODE = f.DOI_Code;
+    -- 15) if FACOWNER is null and FACLOCID is non-null use FMSS Lookup.
+    merge into gis.AKR_BLDG_CENTER_PT_evw as p
+      using (SELECT Asset_Ownership, Location FROM dbo.FMSSExport where Asset_Ownership in (select Code from DOM_FACOWNER)) as f
+      on f.Location = p.FACLOCID and (p.FACOWNER is null and f.Asset_Ownership is not null)
+      when matched then update set FACOWNER = f.Asset_Ownership;
+    -- 16) if FACOCCUPANT is null and FACLOCID is non-null use FMSS Lookup.
+    merge into gis.AKR_BLDG_CENTER_PT_evw as p
+      using (SELECT Occupant, Location FROM dbo.FMSSExport where Occupant in (select Code from DOM_FACOCCUMAINT)) as f
+      on f.Location = p.FACLOCID and (p.FACOCCUPANT is null and f.Occupant is not null)
+      when matched then update set FACOCCUPANT = f.Occupant;
+    -- 17) if FACMAINTAIN is null and FACLOCID is non-null use FMSS Lookup.
+    merge into gis.AKR_BLDG_CENTER_PT_evw as p
+      using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.FACMAINTAIN is null and f.FAMARESP is not null)
+      when matched then update set FACMAINTAIN = f.FAMARESP;
+    -- 18) if FACUSE is null and FACLOCID is non-null use FMSS Lookup.
+    merge into gis.AKR_BLDG_CENTER_PT_evw as p
+      using (SELECT PRIMUSE, Location FROM dbo.FMSSExport where PRIMUSE in (select Code from DOM_FACUSE)) as f
+      on f.Location = p.FACLOCID and (p.FACUSE is null and f.PRIMUSE is not null)
+      when matched then update set FACUSE = f.PRIMUSE;
+    -- 19) if SEASONAL is null and FACLOCID is non-null use FMSS Lookup.
+    merge into gis.AKR_BLDG_CENTER_PT_evw as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    -- 20) if SEASDESC is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.AKR_BLDG_CENTER_PT_evw set SEASDESC = NULL where SEASDESC = ''
+    update gis.AKR_BLDG_CENTER_PT_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+    -- 21) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.AKR_BLDG_CENTER_PT_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 22) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.AKR_BLDG_CENTER_PT_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 23) DATAACCESS defaults to No Public Map Display
+    update gis.AKR_BLDG_CENTER_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 24) UNITCODE is a spatial calc if null
+    -- TODO: Should we first calc from FMSS? would also need to fix qc check.  What if FMSS value is not in spatial extent?
+    merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 25) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.AKR_BLDG_CENTER_PT_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 26) if GROUPCODE is an empty string, change to NULL
+    update gis.AKR_BLDG_CENTER_PT_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 27) GROUPNAME is always calc'd from GROUPCODE
+    update gis.AKR_BLDG_CENTER_PT_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 28) REGIONCODE is always set to AKR
+    update gis.AKR_BLDG_CENTER_PT_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- 29) if FACLOCID is empty string change to null
+    update gis.AKR_BLDG_CENTER_PT_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 30) if FACASSETID is empty string change to null
+    update gis.AKR_BLDG_CENTER_PT_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 31) if CRID is empty string change to null
+    update gis.AKR_BLDG_CENTER_PT_evw set CRID = NULL where CRID = ''
+    -- 32) if ASMISID is empty string change to null
+    update gis.AKR_BLDG_CENTER_PT_evw set ASMISID = NULL where ASMISID = ''
+    -- 33) if CLIID is empty string change to null
+    update gis.AKR_BLDG_CENTER_PT_evw set CLIID = NULL where CLIID = ''
+    -- 34) if LCSID is empty string change to null
+    update gis.AKR_BLDG_CENTER_PT_evw set LCSID = NULL where LCSID = ''
+    -- 35) if FIREBLDGID is empty string change to null
+    update gis.AKR_BLDG_CENTER_PT_evw set FIREBLDGID = NULL where FIREBLDGID = ''
+    -- 36) if PARKBLDGID is empty string change to null
+    update gis.AKR_BLDG_CENTER_PT_evw set PARKBLDGID = NULL where PARKBLDGID = ''
+    -- 37) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    --     TODO: for more accuracy, use the building footprint (some footprints in Skagway straddle the boundary)
+    merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END;
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2018-07-13
+-- Description:	Calculated properties for Parking Lots
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_ParkingLots] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- 1) if LOTNAME is an empty string, change to NULL
+    update gis.PARKLOTS_PY_evw set LOTNAME = NULL where LOTNAME = ''
+    -- 2) if LOTALTNAME is an empty string, change to NULL
+    update gis.PARKLOTS_PY_evw set LOTALTNAME = NULL where LOTALTNAME = ''
+    -- 3) if MAPLABEL is an empty string, change to NULL
+    update gis.PARKLOTS_PY_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 4) Add LOTTYPE = 'Parking Lot' if null in gis.PARKLOTS_PY
+    update gis.PARKLOTS_PY_evw set LOTTYPE = 'Parking Lot' where LOTTYPE is null or LOTTYPE = '' 
+    -- 5) if SEASONAL is null and FACLOCID is non-null use FMSS Lookup.
+    --    TODO: requires a complete and correct FMSS Extract
+    --merge into gis.PARKLOTS_PY_evw as p
+    --  using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+    --  on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+    --  when matched then update set SEASONAL = f.OPSEAS;
+    -- 6) if SEASDESC is an empty string, change to NULL
+    --    Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.PARKLOTS_PY_evw set SEASDESC = NULL where SEASDESC = ''
+    update gis.PARKLOTS_PY_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+    -- 7) if MAINTAINER is null and FACLOCID is non-null use FMSS Lookup.
+    --    TODO: requires changing the domain to match FMSS and then populate from FMSS
+    --merge into gis.PARKLOTS_PY_evw as p
+    --  using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
+    --  on f.Location = p.FACLOCID and (p.MAINTAINER is null and f.FAMARESP is not null)
+    --  when matched then update set MAINTAINER = f.FAMARESP;
+    -- 8) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.PARKLOTS_PY_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 9) Add POLYGONTYPE = 'Perimeter polygon' if null/empty in gis.PARKLOTS_PY
+    update gis.PARKLOTS_PY_evw set POLYGONTYPE = 'Perimeter polygon' where POLYGONTYPE is null or POLYGONTYPE = '' 
+    -- 10) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    --     TODO: set to BOTH if the parking lot straddles a boundary (currently set to YES if any part of a parking lot is within the boundary)
+    merge into gis.PARKLOTS_PY_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END;
+    -- 11) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.PARKLOTS_PY_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 12) DATAACCESS defaults to No Public Map Display
+    update gis.PARKLOTS_PY_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 13) UNITCODE is a spatial calc if null
+    -- TODO: Should we first calc from FMSS? would also need to fix qc check.  What if FMSS value is not in spatial extent?
+    merge into gis.PARKLOTS_PY_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 14) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.PARKLOTS_PY_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.PARKLOTS_PY_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 15) if GROUPCODE is an empty string, change to NULL
+    update gis.PARKLOTS_PY_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 16) GROUPNAME is always calc'd from GROUPCODE
+    update gis.PARKLOTS_PY_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.PARKLOTS_PY_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 17) REGIONCODE is always set to AKR
+    update gis.PARKLOTS_PY_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- 18) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.PARKLOTS_PY_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 19) if MAPSOURCE is NULL or an empty string, change to Unknown
+    --     by SQL Magic '' is the same as any string of just white space
+    update gis.PARKLOTS_PY_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 20) SOURCEDATE: Nothing to do.
+    -- 21) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.PARKLOTS_PY_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 22) if FACLOCID is empty string change to null
+    update gis.PARKLOTS_PY_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 23) if FACASSETID is empty string change to null
+    update gis.PARKLOTS_PY_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 24) Add FEATUREID if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.PARKLOTS_PY_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    -- 25) Add GEOMETRYID if null/empty
+    update gis.PARKLOTS_PY_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 26) if NOTES is an empty string, change to NULL
+    update gis.PARKLOTS_PY_evw set NOTES = NULL where NOTES = ''
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2018-07-13
+-- Description:	Calculated properties for Roads
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Roads] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- 1) if RDNAME is an empty string, change to NULL
+    update gis.ROADS_LN_evw set RDNAME = NULL where RDNAME = ''
+    -- 2) if RDALTNAME is an empty string, change to NULL
+    update gis.ROADS_LN_evw set RDALTNAME = NULL where RDALTNAME = ''
+    -- 3) if MAPLABEL is an empty string, change to NULL
+    update gis.ROADS_LN_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 4) RDSTATUS - defaults FMSSExport.Status or 'Existing'
+    merge into gis.ROADS_LN_evw as p
+      using (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from DOM_RDSTATUS)) as f
+      on f.Location = p.FACLOCID and ((p.RDSTATUS is null or RDSTATUS = '') and f.Status is not null)
+      when matched then update set RDSTATUS = f.Status;
+    update gis.ROADS_LN_evw set RDSTATUS = 'Existing' where RDSTATUS is null or RDSTATUS = ''
+    -- 5) RDCLASS defaults to 'Unknown'
+    --     TODO: if a feature has a FACLOCID then the FMSS Funtional Class implies a RDCLASS.  See section 4.3 of the standard
+    update gis.ROADS_LN_evw set RDCLASS = 'Unknown' where RDCLASS is null or RDCLASS = ''
+    -- 6) RDSURFACE defaults to 'Unknown'
+    update gis.ROADS_LN_evw set RDSURFACE = 'Unknown' where RDSURFACE is null or RDSURFACE = ''
+    -- 7) RDONEWAY is not required, but if it provided is it should not be an empty string
+    update gis.ROADS_LN_evw set RDONEWAY = NULL where RDONEWAY = ''
+    -- 9) RDLANES -- Nothing to do.
+    -- 10) RDHICLEAR is not required, but if it provided is it should not be an empty string
+    update gis.ROADS_LN_evw set RDHICLEAR = NULL where RDHICLEAR = ''
+    -- 11) RTENUMBER is not required, but if it provided is it should not be an empty string
+    update gis.ROADS_LN_evw set RTENUMBER = NULL where RTENUMBER = ''
+    -- 12) ISBRIDGE is an AKR extension; it silently defaults to 'No'
+    update gis.ROADS_LN_evw set ISBRIDGE = 'No' where ISBRIDGE is null or ISBRIDGE = ''
+    -- 13) ISTUNNEL  is an AKR extension; it silently defaults to 'No'
+    update gis.ROADS_LN_evw set ISTUNNEL = 'No' where ISTUNNEL is null or ISTUNNEL = ''
+    -- 14) if SEASONAL is null and FACLOCID is non-null use FMSS Lookup.
+    --     TODO: Get GOOD FMSS data
+    --merge into gis.ROADS_LN_evw as p
+    --  using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+    --  on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+    --  when matched then update set SEASONAL = f.OPSEAS;
+    -- 15) if SEASDESC is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.ROADS_LN_evw set SEASDESC = NULL where SEASDESC = ''
+    update gis.ROADS_LN_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+    -- 16) if RDMAINTAINER is null and FACLOCID is non-null use FMSS Lookup.
+    --     TODO: requires changing the domain to match FMSS and then populate from FMSS
+    --merge into gis.ROADS_LN_evw as p
+    --  using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
+    --  on f.Location = p.FACLOCID and (p.RDMAINTAINER is null and f.FAMARESP is not null)
+    --  when matched then update set RDMAINTAINER = f.FAMARESP;
+    -- 17) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.ROADS_LN_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 18) Add LINETYPE = 'Center line' if null/empty in gis.ROADS_LN
+    update gis.ROADS_LN_evw set LINETYPE = 'Center line' where LINETYPE is null or LINETYPE = '' 
+    -- 19) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.ROADS_LN_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+    -- 20) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.ROADS_LN_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 21) DATAACCESS defaults to No Public Map Display
+    update gis.ROADS_LN_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 22) UNITCODE is a spatial calc if null
+    -- TODO: Should we first calc from FMSS? would also need to fix qc check.  What if FMSS value is not in spatial extent?
+    merge into gis.ROADS_LN_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 23) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.ROADS_LN_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.ROADS_LN_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 24) if GROUPCODE is an empty string, change to NULL
+    update gis.ROADS_LN_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 25) GROUPNAME is always calc'd from GROUPCODE
+    update gis.ROADS_LN_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.ROADS_LN_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 26) REGIONCODE is always set to AKR
+    update gis.ROADS_LN_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- 27) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.ROADS_LN_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 28) if MAPSOURCE is NULL or an empty string, change to Unknown
+    --     by SQL Magic '' is the same as any string of just white space
+    update gis.ROADS_LN_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 29) SOURCEDATE: Nothing to do.
+    -- 30) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.ROADS_LN_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 31) ROUTEID is not required, but if it provided is it should not be an empty string
+    update gis.ROADS_LN_evw set ROUTEID = NULL where ROUTEID = ''
+    -- 32) if FACLOCID is empty string change to null
+    update gis.ROADS_LN_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 33) if FACASSETID is empty string change to null
+    update gis.ROADS_LN_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 34) Add FEATUREID if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.ROADS_LN_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    -- 35) Add GEOMETRYID if null/empty
+    update gis.ROADS_LN_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 36) if NOTES is an empty string, change to NULL
+    update gis.ROADS_LN_evw set NOTES = NULL where NOTES = ''
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2018-07-13
+-- Description:	Calculated properties for Trail Attribute Points
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Trail_Attributes] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- 1) TRLATTRTYPE - Required Domain Value; no default value; nothing to do.
+    -- 2) TRLATTRTYPEOTHER: This is an AKR extension; it is optional free text.  Set empty string to null
+    update gis.TRAILS_ATTRIBUTE_PT_evw set TRLATTRTYPEOTHER = null where TRLATTRTYPEOTHER = ''
+    update gis.TRAILS_ATTRIBUTE_PT_evw set TRLATTRTYPEOTHER = null where TRLATTRTYPE <> 'Other' and TRLATTRTYPEOTHER <> null 
+    -- 3) TRLATTRVALUE: This is an AKR extension; it is optional free text.  Set empty string to null
+    update gis.TRAILS_ATTRIBUTE_PT_evw set TRLATTRVALUE = NULL where TRLATTRVALUE = ''
+    -- 4) TRLATTRDESC is an AKR extension; it is optional free text.  Set empty string to null
+    update gis.TRAILS_ATTRIBUTE_PT_evw set TRLATTRDESC = NULL where TRLATTRDESC = ''
+
+    -- 5) WHLENGTH is an AKR extension; it silently clears zero to null
+    update gis.TRAILS_ATTRIBUTE_PT_evw set WHLENGTH = NULL where WHLENGTH = 0
+    -- 6) WHLENUOM  is an AKR extension; it silently defaults to 'No'
+    update gis.TRAILS_ATTRIBUTE_PT_evw set WHLENUOM = NULL where WHLENUOM = ''
+    update gis.TRAILS_ATTRIBUTE_PT_evw set WHLENUOM = NULL where WHLENGTH is NULL and WHLENUOM is not null
+    -- 7) POINTTYPE: if it is null/empty, then it will default to 'Arbitrary point'
+    update gis.TRAILS_ATTRIBUTE_PT_evw set POINTTYPE = 'Arbitrary point' where POINTTYPE is null or POINTTYPE = '' 
+    -- 8) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.TRAILS_ATTRIBUTE_PT_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 9) ISOUTPARK (See the end, this must be done after UNITCODE)
+    -- 10) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.TRAILS_ATTRIBUTE_PT_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 11) DATAACCESS defaults to No Public Map Display
+    update gis.TRAILS_ATTRIBUTE_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 12) UNITCODE is a spatial calc if null
+    merge into gis.TRAILS_ATTRIBUTE_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 13) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.TRAILS_ATTRIBUTE_PT_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.TRAILS_ATTRIBUTE_PT_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 14) if GROUPCODE is an empty string, change to NULL
+    update gis.TRAILS_ATTRIBUTE_PT_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 15) GROUPNAME is always calc'd from GROUPCODE
+    update gis.TRAILS_ATTRIBUTE_PT_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.TRAILS_ATTRIBUTE_PT_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 16) REGIONCODE is always set to AKR
+    update gis.TRAILS_ATTRIBUTE_PT_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- 17) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.TRAILS_ATTRIBUTE_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 18) if MAPSOURCE is NULL or an empty string, change to Unknown
+    update gis.TRAILS_ATTRIBUTE_PT_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 19) SOURCEDATE: Nothing to do.
+    -- 20) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.TRAILS_ATTRIBUTE_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 21) if FACLOCID is empty string change to null
+    update gis.TRAILS_ATTRIBUTE_PT_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 22) if FACASSETID is empty string change to null
+    update gis.TRAILS_ATTRIBUTE_PT_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 23) FEATUREID: No action
+    -- 24) Add GEOMETRYID if null/empty
+    update gis.TRAILS_ATTRIBUTE_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 25) if NOTES is an empty string, change to NULL
+    update gis.TRAILS_ATTRIBUTE_PT_evw set NOTES = NULL where NOTES = ''
+    -- 9) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.TRAILS_ATTRIBUTE_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2018-07-13
+-- Description:	Calculated properties for Trail Feature Points
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Trail_Features] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+-- 1) if TRLFEATNAME is an empty string, change to NULL
+    update gis.TRAILS_FEATURE_PT_evw set TRLFEATNAME = NULL where TRLFEATNAME = ''
+    -- 2) if TRLFEATALTNAME is an empty string, change to NULL
+    update gis.TRAILS_FEATURE_PT_evw set TRLFEATALTNAME = NULL where TRLFEATALTNAME = ''
+    -- 3) if MAPLABEL is an empty string, change to NULL
+    update gis.TRAILS_FEATURE_PT_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 4) TRLFEATTYPE - Required Domain Value; no default value; nothing to do.
+    -- 5) TRLFEATTYPEOTHER: This is an AKR extension; it is optional free text.  Set empty string to null
+    update gis.TRAILS_FEATURE_PT_evw set TRLFEATTYPEOTHER = null where TRLFEATTYPEOTHER = ''
+    update gis.TRAILS_FEATURE_PT_evw set TRLFEATTYPEOTHER = null where TRLFEATTYPE <> 'Other' and TRLFEATTYPEOTHER <> null 
+    -- 6) TRLFEATSUBTYPE: This is an AKR extension; it is optional free text.  Set empty string to null
+    update gis.TRAILS_FEATURE_PT_evw set TRLFEATSUBTYPE = NULL where TRLFEATSUBTYPE = ''
+    -- 7) TRLFEATDESC is an AKR extension; it is optional free text.  Set empty string to null
+    update gis.TRAILS_FEATURE_PT_evw set TRLFEATDESC = NULL where TRLFEATDESC = ''
+    -- 8) TRLFEATCOUNT is an AKR extension; it silently clears zero to null
+    update gis.TRAILS_FEATURE_PT_evw set TRLFEATCOUNT = NULL where TRLFEATCOUNT = 0
+    -- 9) WHLENGTH is an AKR extension; it silently clears zero to null
+    update gis.TRAILS_FEATURE_PT_evw set WHLENGTH = NULL where WHLENGTH = 0
+    -- 10) WHLENUOM  is an AKR extension; it silently defaults to 'No'
+    update gis.TRAILS_FEATURE_PT_evw set WHLENUOM = NULL where WHLENUOM = ''
+    update gis.TRAILS_FEATURE_PT_evw set WHLENUOM = NULL where WHLENGTH is NULL and WHLENUOM is not null
+    -- 11) POINTTYPE: if it is null/empty, then it will default to 'Arbitrary point'
+    update gis.TRAILS_FEATURE_PT_evw set POINTTYPE = 'Arbitrary point' where POINTTYPE is null or POINTTYPE = '' 
+    -- 12) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.TRAILS_FEATURE_PT_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 13) ISOUTPARK (See the end, this must be done after UNITCODE)
+    -- 14) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.TRAILS_FEATURE_PT_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 15) DATAACCESS defaults to No Public Map Display
+    update gis.TRAILS_FEATURE_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 16) UNITCODE is a spatial calc if null
+    merge into gis.TRAILS_FEATURE_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 17) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.TRAILS_FEATURE_PT_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.TRAILS_FEATURE_PT_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 18) if GROUPCODE is an empty string, change to NULL
+    update gis.TRAILS_FEATURE_PT_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 19) GROUPNAME is always calc'd from GROUPCODE
+    update gis.TRAILS_FEATURE_PT_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.TRAILS_FEATURE_PT_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 20) REGIONCODE is always set to AKR
+    update gis.TRAILS_FEATURE_PT_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- 21) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.TRAILS_FEATURE_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 22) if MAPSOURCE is NULL or an empty string, change to Unknown
+    update gis.TRAILS_FEATURE_PT_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 23) SOURCEDATE: Nothing to do.
+    -- 24) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.TRAILS_FEATURE_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 25) if FACLOCID is empty string change to null
+    update gis.TRAILS_FEATURE_PT_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 26) if FACASSETID is empty string change to null
+    update gis.TRAILS_FEATURE_PT_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 27) FEATUREID: No action
+    -- 28) Add GEOMETRYID if null/empty
+    update gis.TRAILS_FEATURE_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 29) if NOTES is an empty string, change to NULL
+    update gis.TRAILS_FEATURE_PT_evw set NOTES = NULL where NOTES = ''
+    -- 13) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.TRAILS_FEATURE_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2018-07-13
+-- Description:	Calculated properties for Trails
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Trails] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- TODO: Coordinate with FMSS.  Per the standard, Possible TSDS fields that can be populated using FMSS data are: 
+    --       TRLNAME, TRLALTNAME, TRLSTATUS, TRLCLASS, TRLSURFACE, TRLTYPE, TRLUSE, SEASONAL, SEADESC, MAINTAINER, ISEXTENT, RESTRICTIION and ASSETID.
+
+    -- 1) if TRLNAME is an empty string, change to NULL
+    update gis.TRAILS_LN_evw set TRLNAME = NULL where TRLNAME = ''
+    -- 2) if TRLALTNAME is an empty string, change to NULL
+    update gis.TRAILS_LN_evw set TRLALTNAME = NULL where TRLALTNAME = ''
+    -- 3) if MAPLABEL is an empty string, change to NULL
+    update gis.TRAILS_LN_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 4) TRLFEATTYPE - Required Domain Value; defaults to 'Unknown'
+    update gis.TRAILS_LN_evw set TRLFEATTYPE = 'Unknown' where TRLFEATTYPE is null or TRLFEATTYPE = ''
+    -- 5) TRLSTATUS - defaults to FMSSExport.Status or 'Existing'
+    merge into gis.TRAILS_LN_evw as p
+      using (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from DOM_RDSTATUS)) as f
+      on f.Location = p.FACLOCID and ((p.TRLSTATUS is null or p.TRLSTATUS = '') and f.Status is not null)
+      when matched then update set TRLSTATUS = f.Status;
+    update gis.TRAILS_LN_evw set TRLSTATUS = 'Existing' where TRLSTATUS is null or TRLSTATUS = ''
+    -- 6) TRLTRACK: This is an AKR extension; Required domain element; defaults to 'Unknown'
+    update gis.TRAILS_LN_evw set TRLTRACK = 'Unknown' where TRLTRACK is null or TRLTRACK = ''
+    -- 7) TRLCLASS defaults to 'Unknown'
+    --     TODO: if a feature has a FACLOCID then the FMSS Funtional Class implies a TRLCLASS.  See section 4.3 of the standard
+    update gis.TRAILS_LN_evw set TRLCLASS = 'Unknown' where TRLCLASS is null or TRLCLASS = ''
+    -- 8) TRLUSE_* -- Nothing to do, invalid values (including empty string) will generate an error
+    -- 8) Create function to Calc TRLUSE from TRL_USE_*
+    --    TODO decide if we want TRLUSE to be non-compliant, or if we want to add another field for AKR custom uses;  dbo.TrailUse() is compliant, dbo.TrailUseAKR() is not
+    update gis.TRAILS_LN_evw set TRLUSE =
+      dbo.TrailUse(TRLUSE_FOOT,TRLUSE_BICYCLE,TRLUSE_HORSE,TRLUSE_ATV,TRLUSE_4WD,TRLUSE_MOTORCYCLE,TRLUSE_SNOWMOBILE,TRLUSE_SNOWSHOE,TRLUSE_NORDIC,
+                   TRLUSE_DOGSLED,TRLUSE_MOTORBOAT,TRLUSE_CANOE,TRLUSE_OHVSUB,TRLUSE_SKITOUR,TRLUSE_DOWNHILL,TRLUSE_CANYONEER,TRLUSE_CLIMB,DEFAULT,DEFAULT,DEFAULT)
+      where TRLUSE <> dbo.TrailUse(TRLUSE_FOOT,TRLUSE_BICYCLE,TRLUSE_HORSE,TRLUSE_ATV,TRLUSE_4WD,TRLUSE_MOTORCYCLE,TRLUSE_SNOWMOBILE,TRLUSE_SNOWSHOE,TRLUSE_NORDIC,
+                                   TRLUSE_DOGSLED,TRLUSE_MOTORBOAT,TRLUSE_CANOE,TRLUSE_OHVSUB,TRLUSE_SKITOUR,TRLUSE_DOWNHILL,TRLUSE_CANYONEER,TRLUSE_CLIMB,DEFAULT,DEFAULT,DEFAULT)
+    -- 9) TRLISSOCIAL is an AKR extension; it silently defaults to 'No'
+    update gis.TRAILS_LN_evw set TRLISSOCIAL = 'No' where TRLISSOCIAL is null or TRLISSOCIAL = ''
+    -- 10) TRLISANIMAL  is an AKR extension; it silently defaults to 'No'
+    update gis.TRAILS_LN_evw set TRLISANIMAL = 'No' where TRLISANIMAL is null or TRLISANIMAL = ''
+    -- 11) TRLISADMIN is an AKR extension; it silently defaults to 'No'
+    update gis.TRAILS_LN_evw set TRLISADMIN = 'No' where TRLISADMIN is null or TRLISADMIN = ''
+    -- 12) TRLSURFACE defaults to 'Unknown'
+    update gis.TRAILS_LN_evw set TRLSURFACE = 'Unknown' where TRLSURFACE is null or TRLSURFACE = ''
+    -- 13) WHLENGTH_FT: This is an AKR extension; it is an optional numerical value > Zero. If zero is provided convert to Null.
+    update gis.TRAILS_LN_evw set WHLENGTH_FT = NULL where WHLENGTH_FT = 0
+    -- 14) TRLDESC: This is an AKR extension; Optional free text; it should not be an empty string
+    update gis.TRAILS_LN_evw set TRLDESC = NULL where TRLDESC = ''
+    -- 15) ISBRIDGE is an AKR extension; it silently defaults to 'No'
+    update gis.TRAILS_LN_evw set ISBRIDGE = 'No' where ISBRIDGE is null or ISBRIDGE = ''
+    -- 16) ISTUNNEL  is an AKR extension; it silently defaults to 'No'
+    update gis.TRAILS_LN_evw set ISTUNNEL = 'No' where ISTUNNEL is null or ISTUNNEL = ''
+    -- 17) if SEASONAL is null and FACLOCID is non-null use FMSS Lookup.
+    --     TODO: Get GOOD FMSS data
+    --merge into gis.TRAILS_LN_evw as p
+    --  using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+    --  on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+    --  when matched then update set SEASONAL = f.OPSEAS;
+    -- 18) if SEASDESC is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.TRAILS_LN_evw set SEASDESC = NULL where SEASDESC = ''
+    update gis.TRAILS_LN_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+    -- 19) if MAINTAINER is null and FACLOCID is non-null use FMSS Lookup.
+    --     TODO: requires changing the domain to match FMSS and then populate from FMSS
+    --merge into gis.TRAILS_LN_evw as p
+    --  using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
+    --  on f.Location = p.FACLOCID and (p.MAINTAINER is null and f.FAMARESP is not null)
+    --  when matched then update set MAINTAINER = f.FAMARESP;
+    -- 20) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.TRAILS_LN_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 21) Add LINETYPE = 'Center line' if null/empty in gis.ROADS_LN
+    update gis.TRAILS_LN_evw set LINETYPE = 'Center line' where LINETYPE is null or LINETYPE = '' 
+    -- 22) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    --     Takes about 26 seconds on the base table;  To check for both in/out takes about 51 seconds on base table
+    --merge into gis.TRAILS_LN_evw as t1 using gis.AKR_UNIT as t2
+    --  on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END <> t1.ISOUTPARK)
+    --  when matched then update set ISOUTPARK = CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END;
+    -- Adds a check for both in/out 
+    merge into gis.TRAILS_LN_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+    -- 23) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.TRAILS_LN_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 24) DATAACCESS defaults to No Public Map Display
+    update gis.TRAILS_LN_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 25) UNITCODE is a spatial calc if null
+    -- TODO: Should we first calc from FMSS? would also need to fix qc check.  What if FMSS value is not in spatial extent?
+    merge into gis.TRAILS_LN_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 26) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.TRAILS_LN_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.TRAILS_LN_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 27) if GROUPCODE is an empty string, change to NULL
+    update gis.TRAILS_LN_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 28) GROUPNAME is always calc'd from GROUPCODE
+    update gis.TRAILS_LN_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.TRAILS_LN_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 29) REGIONCODE is always set to AKR
+    update gis.TRAILS_LN_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- 30) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.TRAILS_LN_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 31) if MAPSOURCE is NULL or an empty string, change to Unknown
+    update gis.TRAILS_LN_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 32) SOURCEDATE: Nothing to do.
+    -- 33) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.TRAILS_LN_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 34) if FACLOCID is empty string change to null
+    update gis.TRAILS_LN_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 35) if FACASSETID is empty string change to null
+    update gis.TRAILS_LN_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 36) Add FEATUREID if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.TRAILS_LN_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    -- 37) Add GEOMETRYID if null/empty
+    update gis.TRAILS_LN_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 38) if NOTES is an empty string, change to NULL
+    update gis.TRAILS_LN_evw set NOTES = NULL where NOTES = ''
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
