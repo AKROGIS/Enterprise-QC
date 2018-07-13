@@ -1022,6 +1022,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+
 CREATE VIEW [dbo].[QC_ISSUES_PARKLOTS_PY] AS select I.Issue, D.* from  gis.PARKLOTS_PY_evw AS D
 join (
 
@@ -1111,7 +1112,7 @@ union all
 select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
        left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: FACMAINTAIN does not match FMSS.FAMARESP' as Issue from gis.PARKLOTS_PY_evw as p join 
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue from gis.PARKLOTS_PY_evw as p join 
   dbo.FMSSExport as f on f.Location = p.FACLOCID join dbo.DOM_MAINTAINER as d on f.FAMARESP = d.FMSS where p.MAINTAINER <> d.Code
 union all
 -- 16) ISEXTANT is a required domain value; Default to True with Warning

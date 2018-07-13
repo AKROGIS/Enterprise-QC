@@ -30,5 +30,20 @@ select * from dbo.QC_ISSUES_AKR_BLDG_OTHER_PT
 select * from dbo.QC_ISSUES_AKR_BLDG_CENTER_PT
 -- Create a table of issues
 -- select * into QC_ISSUES_AKR_BLDG_CENTER_PT_for_owner_on_date from dbo.QC_ISSUES_AKR_BLDG_CENTER_PT
+select * from dbo.QC_ISSUES_PARKLOTS_PY
+-- Create a table of issues
+-- select * into QC_ISSUES_PARKLOTS_PY_for_owner_on_date from dbo.QC_ISSUES_PARKLOTS_PY
+select * from dbo.QC_ISSUES_ROADS_LN
+-- Create a table of issues
+-- select * into QC_ISSUES_ROADS_LN_for_owner_on_date from dbo.QC_ISSUES_ROADS_LN
+select * from dbo.QC_ISSUES_TRAILS_LN
+-- Create a table of issues
+-- select * into QC_ISSUES_TRAILS_LN_for_owner_on_date from dbo.QC_ISSUES_TRAILS_LN
+select * from dbo.QC_ISSUES_TRAILS_FEATURE_PT
+-- Create a table of issues
+-- select * into QC_ISSUES_TRAILS_FEATURE_PT_for_owner_on_date from dbo.QC_ISSUES_TRAILS_FEATURE_PT
+select * from dbo.QC_ISSUES_TRAILS_ATTRIBUTE_PT
+-- Create a table of issues
+-- select * into QC_ISSUES_TRAILS_ATTRIBUTE_PT_for_owner_on_date from dbo.QC_ISSUES_TRAILS_ATTRIBUTE_PT
 
 exec sde.set_default
