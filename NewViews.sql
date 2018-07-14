@@ -1239,6 +1239,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+
 CREATE VIEW [dbo].[QC_ISSUES_ROADS_LN] AS select I.Issue, D.* from  gis.ROADS_LN_evw AS D
 join (
 
@@ -1333,6 +1334,7 @@ select t1.OBJECTID, 'Error: RDCLASS does not match the FMSS.Asset_Code' as Issue
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.RDCLASS = 'Parking Lot Road' and t2.Asset_Code <> '1300') or (t1.RDCLASS <> 'Parking Lot Road' and t2.Asset_Code = '1300'))
 union all
 -- 14) RDSURFACE is a required domain value; default is 'Unknown'
+--     TODO: get this from FMSS when FACLOCID is provided
 select OBJECTID, 'Warning: RDSURFACE is not provided, default value of *Unknown* will be used' as Issue from gis.ROADS_LN_evw where RDSURFACE is null or RDSURFACE = ''
 union all
 select t1.OBJECTID, 'Error: RDSURFACE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
@@ -1395,8 +1397,11 @@ union all
 -- 25) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
 --     Error if it doesn't match valid value in FMSS Lookup Location.Park
 --     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
-select t1.OBJECTID, 'Error: UNITCODE is required when the road is not within a unit boundary' as Issue from gis.ROADS_LN_evw as t1
+-- This requirement is relaxed for roads (this is a statewide road dataset, so many roads are not in or related to a park unit)
+--   However any public roads must have a unit code
+select t1.OBJECTID, 'Error: UNITCODE is required when the road is public and not within a unit boundary' as Issue from gis.ROADS_LN_evw as t1
   left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+  and t1.PUBLICDISPLAY = 'Public Map Display'
 union all
 -- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
 --   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1 left join
@@ -1449,13 +1454,13 @@ union all
 -- 29) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
 select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.ROADS_LN_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
--- 30) ROUTEID is optional free text, but if provided it must be unique and match a records in the RIP
+-- 30) ROUTEID is optional free text, but if provided it must match a records in the RIP
+--     All records with the same ROUTEID must have the same FEATUREID
 --     TODO: Get export of RIP, and ensure value is valid.
 --     TODO: Verify format is NPS-UNITCODE-ROUTENUMBER (may be implicit in the RIP foreign key validation)
---     TODO: ROUTEID should be duplicate if featureid is duplicate, i.e. all line segments with the same ROUTEID must have the same featureid and all segements with the same featureid must have the same ROUTEID 
 --     TODO: The ROUTEID is also related to a FMSS Functional Class. i.e. FMSS Functional Class I => Route numbers 1..99, II => 100..199, ...
-select t1.OBJECTID, 'Error: ROUTEID is not unique' as Issue from gis.ROADS_LN_evw as t1 join
-       (select ROUTEID from gis.ROADS_LN_evw where ROUTEID is not null and ROUTEID <> '' group by ROUTEID having count(*) > 1) as t2 on t1.ROUTEID = t2.ROUTEID
+select OBJECTID, 'Error: All records with the same ROUTEID must have the same FEATUREID' as Issue from gis.ROADS_LN_evw where ROUTEID in (
+    select FACLOCID from (select ROUTEID from gis.ROADS_LN_evw where ROUTEID is not null and FEATUREID is not null group by FEATUREID, ROUTEID) as t group by ROUTEID having count(*) > 1)
 union all
 -- 31) FACLOCID is optional free text, but if provided it must match a Location in the FMSS Export
 --     FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
