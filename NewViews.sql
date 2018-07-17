@@ -510,6 +510,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -590,9 +591,12 @@ union all
 select t1.OBJECTID, 'Error: BLDGSTATUS is not a recognized value' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1
        left join dbo.DOM_BLDGSTATUS as t2 on t1.BLDGSTATUS = t2.Code where BLDGSTATUS is not null and BLDGSTATUS <> '' and t2.Code is null
 union all
-select p.OBJECTID, 'Error: BLDGSTATUS does not match FMSS.Status' as Issue from gis.AKR_BLDG_CENTER_PT_evw as p join 
-  (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from dbo.DOM_BLDGSTATUS)) as f
-  on f.Location = p.FACLOCID where p.BLDGSTATUS <> f.Status and p.BLDGSTATUS <> ''
+select t1.OBJECTID, 'Error: BLDGSTATUS does not match the FMSS Status' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1
+       join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+       join dbo.DOM_FMSS_Status as t3 on t3.Code = t2.Status
+       join dbo.DOM_BLDGSTATUS as t4 on t3.Standard = t4.Code where t1.BLDGSTATUS <> t4.Code
+	   and (t1.BLDGSTATUS <> 'Temporarily Closed' or t2.Status <> 'OPERATING') -- Ignore (not an error) Temporarily Closed could mean OPERATING
+	   and (t1.BLDGSTATUS <> 'Temporarily Closed' or t2.Status <> 'INACTIVE') -- Ignore (not an error) Temporarily Closed could mean INACTIVE
 union all
 -- 13) BLDGCODE is an optional domain value; must match valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: BLDGCODE is not a recognized value' as Issue from gis.AKR_BLDG_CENTER_PT_evw as t1
@@ -1022,7 +1026,6 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-
 CREATE VIEW [dbo].[QC_ISSUES_PARKLOTS_PY] AS select I.Issue, D.* from  gis.PARKLOTS_PY_evw AS D
 join (
 
@@ -1222,6 +1225,20 @@ select t1.OBJECTID, 'Error: FACASSETID does not match a Parking Area in FMSS' as
 union all
 select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue from gis.PARKLOTS_PY_evw where FACASSETID in (
     select FACASSETID from (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
+union all
+-- 27) LOTSTATUS is a required domain value; default is 'Existing'
+select OBJECTID, 'Warning: LOTSTATUS is not provided, default value of *Existing* will be used' as Issue from gis.PARKLOTS_PY_evw where LOTSTATUS is null or LOTSTATUS = ''
+union all
+select t1.OBJECTID, 'Error: LOTSTATUS is not a recognized value' as Issue from gis.PARKLOTS_PY_evw as t1
+       left join dbo.DOM_RDSTATUS as t2 on t1.LOTSTATUS = t2.Code where t1.LOTSTATUS is not null and t1.LOTSTATUS <> '' and t2.Code is null
+union all 
+select t1.OBJECTID, 'Error: LOTSTATUS does not match the FMSS Status' as Issue
+  from gis.PARKLOTS_PY_evw as t1
+  join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+  join dbo.DOM_FMSS_Status as t3 on t3.Code = t2.Status
+  where t1.LOTSTATUS <> t3.Standard
+  and (t1.LOTSTATUS <> 'Temporarily Closed' or t2.Status <> 'OPERATING') -- Ignore (not an error) Temporarily Closed could mean OPERATING
+  and (t1.LOTSTATUS <> 'Temporarily Closed' or t2.Status <> 'INACTIVE') -- Ignore (not an error) Temporarily Closed could also mean INACTIVE
 
 
 -- ???????????????????????????????????
@@ -2084,6 +2101,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+
 CREATE VIEW [dbo].[QC_ISSUES_TRAILS_LN] AS select I.Issue, D.* from  gis.TRAILS_LN_evw AS D
 join (
 
@@ -2173,6 +2191,15 @@ select OBJECTID, 'Warning: TRLSTATUS is not provided, default value of *Existing
 union all
 select t1.OBJECTID, 'Error: TRLSTATUS is not a recognized value' as Issue from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_TRLSTATUS as t2 on t1.TRLSTATUS = t2.Code where t1.TRLSTATUS is not null and t1.TRLSTATUS <> '' and t2.Code is null
+union all
+select t1.OBJECTID, 'Error: TRLSTATUS does not match the FMSS Status' as Issue from gis.TRAILS_LN_evw as t1
+       join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+       join dbo.DOM_FMSS_Status as t3 on t3.Code = t2.Status
+       join dbo.DOM_TRLSTATUS as t4 on t3.Standard = t4.Code where t1.TRLSTATUS <> t4.Code
+	   and (t1.TRLSTATUS <> 'Temporarily Closed' or t2.Status <> 'OPERATING') -- Ignore (not an error) Temporarily Closed could mean OPERATING
+	   and (t1.TRLSTATUS <> 'Temporarily Closed' or t2.Status <> 'IACTIVE') -- Ignore (not an error) Temporarily Closed could mean INACTIVE
+	   and (t1.TRLSTATUS <> 'Abandoned' or t2.Status <> 'OPERATING') -- Ignore (not an error) Abandoned could mean OPERATING
+	   and (t1.TRLSTATUS <> 'Abandoned' or t2.Status <> 'IACTIVE') -- Ignore (not an error) Abandoned could mean INACTIVE
 union all
 -- 14) TRLSURFACE is a required domain value; default is 'Unknown'
 --     different parts of a single 'Feature' can have different surface
@@ -2504,9 +2531,9 @@ BEGIN
     update gis.AKR_BLDG_CENTER_PT_evw set MAPLABEL = NULL where MAPLABEL = ''
     -- 12) if BLDGSTATUS; provide default value of Existing if missing
     merge into gis.AKR_BLDG_CENTER_PT_evw as p
-      using (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from DOM_BLDGSTATUS)) as f
-      on f.Location = p.FACLOCID and ((p.BLDGSTATUS is null or BLDGSTATUS = '') and f.Status is not null)
-      when matched then update set BLDGSTATUS = f.Status;
+        using (SELECT t2.Standard as Status, Location FROM dbo.FMSSExport as t1 join dbo.DOM_FMSS_Status as t2 on t2.Code = t1.Status) as f
+        on f.Location = p.FACLOCID and ((p.BLDGSTATUS is null or p.BLDGSTATUS = '' or p.BLDGSTATUS = 'Unknown') and f.Status is not null)
+        when matched then update set BLDGSTATUS = f.Status;
     update gis.AKR_BLDG_CENTER_PT_evw set BLDGSTATUS = 'Existing' where BLDGSTATUS is null or BLDGSTATUS = ''
     -- 13/14) if BLDGCODE or BLDGTYPE is null but not the other replace null with lookup
     --     Be sure to set BLDGCODE from BLDGTYPE before comparing BLDGCODE to FMSS (do not compare BLDGTYPE to FMSS directly)
@@ -2704,6 +2731,12 @@ BEGIN
     update gis.PARKLOTS_PY_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
     -- 26) if NOTES is an empty string, change to NULL
     update gis.PARKLOTS_PY_evw set NOTES = NULL where NOTES = ''
+	-- 27) LOTSTATUS - defaults to FMSSExport.Status or 'Existing'
+    merge into gis.PARKLOTS_PY_evw as p
+        using (SELECT t2.Standard as Status, Location FROM dbo.FMSSExport as t1 join dbo.DOM_FMSS_Status as t2 on t2.Code = t1.Status) as f
+        on f.Location = p.FACLOCID and ((p.LOTSTATUS is null or p.LOTSTATUS = '' or p.LOTSTATUS = 'Unknown') and f.Status is not null)
+        when matched then update set LOTSTATUS = f.Status;
+    update gis.PARKLOTS_PY_evw set LOTSTATUS = 'Existing' where LOTSTATUS is null or LOTSTATUS = ''
 
     -- Stop editing
     exec sde.edit_version @version, 2; -- 2 to stop edits
@@ -2745,9 +2778,9 @@ BEGIN
     update gis.ROADS_LN_evw set MAPLABEL = NULL where MAPLABEL = ''
     -- 4) RDSTATUS - defaults FMSSExport.Status or 'Existing'
     merge into gis.ROADS_LN_evw as p
-      using (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from DOM_RDSTATUS)) as f
-      on f.Location = p.FACLOCID and ((p.RDSTATUS is null or RDSTATUS = '') and f.Status is not null)
-      when matched then update set RDSTATUS = f.Status;
+        using (SELECT t2.Standard as Status, Location FROM dbo.FMSSExport as t1 join dbo.DOM_FMSS_Status as t2 on t2.Code = t1.Status) as f
+        on f.Location = p.FACLOCID and ((p.RDSTATUS is null or p.RDSTATUS = '' or p.RDSTATUS = 'Unknown') and f.Status is not null)
+        when matched then update set RDSTATUS = f.Status;
     update gis.ROADS_LN_evw set RDSTATUS = 'Existing' where RDSTATUS is null or RDSTATUS = ''
     -- 5) RDCLASS defaults to 'Unknown'
     --     TODO: if a feature has a FACLOCID then the FMSS Funtional Class implies a RDCLASS.  See section 4.3 of the standard
@@ -3076,9 +3109,9 @@ BEGIN
     update gis.TRAILS_LN_evw set TRLFEATTYPE = 'Unknown' where TRLFEATTYPE is null or TRLFEATTYPE = ''
     -- 5) TRLSTATUS - defaults to FMSSExport.Status or 'Existing'
     merge into gis.TRAILS_LN_evw as p
-      using (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from DOM_RDSTATUS)) as f
-      on f.Location = p.FACLOCID and ((p.TRLSTATUS is null or p.TRLSTATUS = '') and f.Status is not null)
-      when matched then update set TRLSTATUS = f.Status;
+        using (SELECT t2.Standard as Status, Location FROM dbo.FMSSExport as t1 join dbo.DOM_FMSS_Status as t2 on t2.Code = t1.Status) as f
+        on f.Location = p.FACLOCID and ((p.TRLSTATUS is null or p.TRLSTATUS = '' or p.TRLSTATUS = 'Unknown' or p.TRLSTATUS = 'Not Applicable') and f.Status is not null)
+        when matched then update set TRLSTATUS = f.Status;
     update gis.TRAILS_LN_evw set TRLSTATUS = 'Existing' where TRLSTATUS is null or TRLSTATUS = ''
     -- 6) TRLTRACK: This is an AKR extension; Required domain element; defaults to 'Unknown'
     update gis.TRAILS_LN_evw set TRLTRACK = 'Unknown' where TRLTRACK is null or TRLTRACK = ''
