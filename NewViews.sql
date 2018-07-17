@@ -1239,8 +1239,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-
-CREATE VIEW [dbo].[QC_ISSUES_ROADS_LN] AS select I.Issue, D.* from  gis.ROADS_LN_evw AS D
+CREATE VIEW [dbo].[QC_ISSUES_ROADS_LN] AS select I.Issue, I.Details, D.* from  gis.ROADS_LN_evw AS D
 join (
 
 -------------------------
@@ -1250,17 +1249,19 @@ join (
 -- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
 
 -- 1) LINETYPE must be an recognized value; if it is null/empty, then it will default to 'Arbitrary line' without a warning
---    TODO this is not part of the standard (maybe core after the fact), most is centerline
---    should we do something like bldgs with center being required, and edge or other being optional and linked
---    maybe require that this is a centerline feature class.
-select t1.OBJECTID, 'Error: LINETYPE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+--    This is not part of the road standard but an extension to the core standard.
+--    TODO: Should we make the default be 'center line' as this is the working assumption?
+--      Maybe enforce a center line requirement
+--      Maybe we should we do something like bldgs and enforce Center as being the minimum requirement, and then put edges and all
+--      other optional linetypes in a related feature class.
+select t1.OBJECTID, 'Error: LINETYPE is not a recognized value' as Issue, NULL as Details from gis.ROADS_LN_evw as t1
   left join dbo.DOM_LINETYPE as t2 on t1.LINETYPE = t2.Code where t1.LINETYPE is not null and t1.LINETYPE <> '' and t2.Code is null
 union all 
 -- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
-select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue from gis.ROADS_LN_evw where GEOMETRYID in 
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue, NULL from gis.ROADS_LN_evw where GEOMETRYID in 
        (select GEOMETRYID from gis.ROADS_LN_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
 union all
-select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
 	from gis.ROADS_LN_evw where
 	  -- Will ignore GEOMETRYID = NULL 
 	  len(GEOMETRYID) <> 38 
@@ -1275,7 +1276,7 @@ union all
 --    All records with the same FeatureID must be proximal (in the vicinity of each other)
 --    TODO: consider what attributes, in addition to FMSS attributes, should be the same when FEATUREID is the same
 --    TODO: Query for records with a FEATUREID far away from the average for all features with the FEATUREID
-select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	from gis.ROADS_LN_evw where
 	  -- Will ignore FEATUREID = NULL 
 	  len(FEATUREID) <> 38 
@@ -1284,24 +1285,24 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
-select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue from gis.ROADS_LN_evw where MAPMETHOD is null or MAPMETHOD = ''
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_LN_evw where MAPMETHOD is null or MAPMETHOD = ''
 union all
-select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
   left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
 union all
 -- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
-select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue from gis.ROADS_LN_evw where MAPSOURCE is null or MAPSOURCE = ''
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_LN_evw where MAPSOURCE is null or MAPSOURCE = ''
 union all
 -- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
 --    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
-select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue from gis.ROADS_LN_evw where SOURCEDATE < convert(Datetime2,'1995')
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue, NULL from gis.ROADS_LN_evw where SOURCEDATE < convert(Datetime2,'1995')
 union all
-select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue from gis.ROADS_LN_evw where SOURCEDATE > GETDATE()
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue, NULL from gis.ROADS_LN_evw where SOURCEDATE > GETDATE()
 union all
 -- 7) XYACCURACY is a required domain value; default is 'Unknown'
-select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue from gis.ROADS_LN_evw where XYACCURACY is null or XYACCURACY = ''
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_LN_evw where XYACCURACY is null or XYACCURACY = ''
 union all
-select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
   left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
 union all
 -- 8) NOTES is not required, but if it provided is it should not be an empty string
@@ -1309,89 +1310,142 @@ union all
 -- 9) RDNAME is not required, but if it provided is it should not be an empty string
 --    This can be checked and fixed automatically; no need to alert the user.
 --    Must use proper case - can only check for all upper or all lower case
-select OBJECTID, 'Error: RDNAME must use proper case' as Issue from gis.ROADS_LN_evw where RDNAME = upper(RDNAME) Collate Latin1_General_CS_AI or RDNAME = lower(RDNAME) Collate Latin1_General_CS_AI
+select OBJECTID, 'Error: RDNAME must use proper case' as Issue, NULL from gis.ROADS_LN_evw where RDNAME = upper(RDNAME) Collate Latin1_General_CS_AI or RDNAME = lower(RDNAME) Collate Latin1_General_CS_AI
 union all
 -- 10) RDALTNAME is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
 -- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
 -- 12) RDSTATUS is a required domain value; default is 'Existing'
---     TODO: Compare with FMSS
-select OBJECTID, 'Warning: RDSTATUS is not provided, default value of *Existing* will be used' as Issue from gis.ROADS_LN_evw where RDSTATUS is null or RDSTATUS = ''
+select OBJECTID, 'Warning: RDSTATUS is not provided, default value of *Existing* will be used' as Issue, NULL from gis.ROADS_LN_evw where RDSTATUS is null or RDSTATUS = ''
 union all
-select t1.OBJECTID, 'Error: RDSTATUS is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: RDSTATUS is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_RDSTATUS as t2 on t1.RDSTATUS = t2.Code where t1.RDSTATUS is not null and t1.RDSTATUS <> '' and t2.Code is null
+union all 
+select t1.OBJECTID, 'Error: RDSTATUS does not match the FMSS Status' as Issue,
+  'Location ' + FACLOCID + ' has Status ' + t2.Status + ' (' + t3.Standard + ') when GIS has RDSTATUS = ' + t1.RDSTATUS as Details
+  from gis.ROADS_LN_evw as t1
+  join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+  join dbo.DOM_FMSS_Status as t3 on t3.Code = t2.Status
+  where t1.RDSTATUS <> t3.Standard
+  and (t1.RDSTATUS <> 'Temporarily Closed' or t2.Status <> 'OPERATING') -- Ignore (not an error) Temporarily Closed could mean OPERATING
+  and (t1.RDSTATUS <> 'Temporarily Closed' or t2.Status <> 'INACTIVE') -- Ignore (not an error) Temporarily Closed could also mean INACTIVE
 union all 
 -- 13) RDCLASS is a required domain value; default is 'Unknown'
 --     if a feature has a FACLOCID then RDCLASS = 'Parking Lot Road' implies FMSS.asset_code = '1300' and visa-versa
---     TODO: if a feature has a FACLOCID then the FMSS Funtional Class implies a RDCLASS.  See section 4.3 of the standard
-select OBJECTID, 'Warning: RDCLASS is not provided, default value of *Unknown* will be used' as Issue from gis.ROADS_LN_evw where RDCLASS is null or RDCLASS = ''
+--     if a feature has a FACLOCID then the FMSS Funtional Class implies a RDCLASS.  See section 4.3 of the standard
+select OBJECTID, 'Warning: RDCLASS is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_LN_evw where RDCLASS is null or RDCLASS = ''
 union all
-select t1.OBJECTID, 'Error: RDCLASS is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: RDCLASS is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_RDCLASS as t2 on t1.RDCLASS = t2.Code where t1.RDCLASS is not null and t1.RDCLASS <> '' and t2.Code is null
 union all 
-select t1.OBJECTID, 'Error: RDCLASS does not match the FMSS.Asset_Code' as Issue from gis.ROADS_LN_evw as t1 join
-  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.RDCLASS = 'Parking Lot Road' and t2.Asset_Code <> '1300') or (t1.RDCLASS <> 'Parking Lot Road' and t2.Asset_Code = '1300'))
+select t1.OBJECTID, 'Error: RDCLASS does not match the FMSS.Asset_Code' as Issue, 
+  'Location ' + FACLOCID + ' has Asset Code ' + t2.Asset_Code + ' (' + t3.Description + ') when GIS has RDCLASS = ' + t1.RDCLASS as Details
+  from gis.ROADS_LN_evw as t1 join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location join DOM_FMSS_ASSETCODE as t3 on t2.Asset_Code = t3.Code
+  where t1.FACLOCID is not null and ((t1.RDCLASS = 'Parking Lot Road' and t2.Asset_Code <> '1300') or (t1.RDCLASS <> 'Parking Lot Road' and t2.Asset_Code = '1300'))
+union all
+select t1.OBJECTID, 'Error: RDCLASS does not match the FMSS Functional Class' as Issue,
+       'Location ' + FACLOCID + ' has Functional ' + t2.FCLASS + ' (' + t3.Standard + ') when GIS has RDCLASS = ' + t1.RDCLASS + ' (' + t4.FMSS + ')' as Details
+       from gis.ROADS_LN_evw as t1
+       join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+       join dbo.DOM_FMSS_FunctionalClass as t3 on t3.Code = t2.FClass
+       join dbo.DOM_RDCLASS as t4 on t1.RDCLASS = t4.Code where t1.RDCLASS <> t3.Standard and t2.FCLASS <> t4.FMSS
 union all
 -- 14) RDSURFACE is a required domain value; default is 'Unknown'
---     TODO: get this from FMSS when FACLOCID is provided
-select OBJECTID, 'Warning: RDSURFACE is not provided, default value of *Unknown* will be used' as Issue from gis.ROADS_LN_evw where RDSURFACE is null or RDSURFACE = ''
+--     if facility_type = '1110' then all segments must be paved i.e. in ('Asphalt', 'Concrete', 'Brick/Pavers', 'Cobblestone', 'Other Paved')
+--     if facility_type = '1120' then all segments must be not paved i.e. in ('Gravel', 'Native or Dirt', 'Other Unpaved', 'Sand')
+--     if facility_type = '1130' then it will be a mix
+--     if predominant_use like '%Dirt%' then all segments should be 'Native or Dirt'
+--     if predominant_use like '%Gravel%' then all segments should be 'Gravel'
+--     if predominant_use like '% Paved%' then all segments should be in ('Asphalt', 'Concrete', 'Brick/Pavers', 'Cobblestone', 'Other Paved')
+--     if predominant_use like '% Unpaved%' then all segments should be in ('Gravel', 'Native or Dirt', 'Other Unpaved', 'Sand')
+select OBJECTID, 'Warning: RDSURFACE is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_LN_evw where RDSURFACE is null or RDSURFACE = ''
 union all
-select t1.OBJECTID, 'Error: RDSURFACE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: RDSURFACE is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_RDSURFACE as t2 on t1.RDSURFACE = t2.Code where t1.RDSURFACE is not null and t1.RDSURFACE <> '' and t2.Code is null
-union all 
+union all
+select t1.OBJECTID, 'Error: RDSURFACE does not match the FMSS Facility_Type' as Issue,
+       'Location ' + FACLOCID + ' has Facility Type = ' + t2.Facility_Type + ' (' + t3.Description + ') when GIS has RDSURFACE = ' + t1.RDSURFACE as Details
+       from gis.ROADS_LN_evw as t1
+       join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+       join dbo.DOM_FMSS_FACILITYTYPE as t3 on t3.Code = t2.Facility_Type
+       where (t2.Facility_Type = '1110' and t1.RDSURFACE in ('Gravel', 'Native or Dirt', 'Other Unpaved', 'Sand'))
+	      or (t2.Facility_Type = '1120' and t1.RDSURFACE in ('Asphalt', 'Concrete', 'Brick/Pavers', 'Cobblestone', 'Other Paved'))
+union all
+select t1.OBJECTID, 'Error: RDSURFACE does not match the FMSS Facility_Type' as Issue,
+       'Location ' + FACLOCID + ' has Predominant_Use = ' + t2.Predominant_Use + ' when GIS has RDSURFACE = ' + t1.RDSURFACE as Details
+       from gis.ROADS_LN_evw as t1
+       join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+       join dbo.DOM_FMSS_FACILITYTYPE as t3 on t3.Code = t2.Facility_Type
+       where (t2.Predominant_Use like '% Paved%' and t1.RDSURFACE in ('Gravel', 'Native or Dirt', 'Other Unpaved', 'Sand'))
+	      or (t2.Predominant_Use like '%Gravel%'  and t1.RDSURFACE not in ('Gravel', 'Unknown'))
+	      or (t2.Predominant_Use like '%Dirt%'  and t1.RDSURFACE not in ('Native or Dirt', 'Unknown'))
+	      or (t2.Predominant_Use like '% Unpaved%'  and t1.RDSURFACE in ('Asphalt', 'Concrete', 'Brick/Pavers', 'Cobblestone', 'Other Paved'))
+union all
 -- 15) RDONEWAY is an optional domain value; default is Null
-select t1.OBJECTID, 'Error: RDONEWAY is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: RDONEWAY is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_RDONEWAY as t2 on t1.RDONEWAY = t2.Code where t1.RDONEWAY is not null and t1.RDONEWAY <> '' and t2.Code is null
 union all 
 -- 16) RDLANES is an optional range value 1-8; default is Null
-select OBJECTID, 'Error: RDLANES is not a recognized value' as Issue from gis.ROADS_LN_evw where RDLANES < 1 or RDLANES > 8
-union all 
+select OBJECTID, 'Error: RDLANES is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw where RDLANES < 1 or RDLANES > 8
+union all
+select t1.OBJECTID, 'Error: RDLANES does not match FMSS' as Issue,
+       'Location ' + FACLOCID + ' has ' + convert(nvarchar(200),t2.NOLANE) + ' lanes in FMSS when GIS has RDLANES = ' + convert(nvarchar(200),t1.RDLANES) as Details
+       from gis.ROADS_LN_evw as t1
+       join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.RDLANES <> convert(int,convert(real,t2.NOLANE))
+union all
 -- 17) RDHICLEAR is an optional domain value; default is Null
-select t1.OBJECTID, 'Error: RDHICLEAR is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: RDHICLEAR is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_YES_NO_UNK_OTH as t2 on t1.RDHICLEAR = t2.Code where t1.RDHICLEAR is not null and t1.RDHICLEAR <> '' and t2.Code is null
 union all 
 -- 18) RTENUMBER is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
+--     This attribute has no counterpart in FMSS
 -- 19) SEASONAL is a optional domain value; must match valid value in FMSS Lookup.
-select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue from gis.ROADS_LN_evw as p join 
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + FACLOCID + ' has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.ROADS_LN_evw as p join 
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
   on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
 union all
 -- 20) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
-select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue from gis.ROADS_LN_evw as p
+select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue, NULL from gis.ROADS_LN_evw as p
   left join (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
   on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
 union all
--- 21) RDMAINTAINER is a optional domain value;
---     TODO: if FACLOCID is provided this should match a valid value in FMSS Lookup.
-select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+-- 21) RDMAINTAINER is a optional domain value;  If FACLOCID is provided then it should match FMSS
+select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_RDMAINTAINER as t2 on t1.RDMAINTAINER = t2.Code where t1.RDMAINTAINER is not null and t2.Code is null
 union all
--- 22) ISEXTANT is a required domain value; Default to 'True' with Warning
-select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue from gis.ROADS_LN_evw where ISEXTANT is null
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' (' + d.Code + ') when GIS has RDMAINTAINER = ' + p.RDMAINTAINER as Details
+  from gis.ROADS_LN_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID join dbo.DOM_MAINTAINER as d on f.FAMARESP = d.FMSS where p.RDMAINTAINER <> d.Code
 union all
-select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+-- 22) ISEXTANT is a required domain value; Default to 'True' with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue, NULL from gis.ROADS_LN_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
   left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
 union all
 -- 23) PUBLICDISPLAY is a required Domain Value; Default to 'No Public Map Display' with Warning
 --     TODO: are there requirements of other fields (i.e. RDSTATUS, ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
-select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue from gis.ROADS_LN_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.ROADS_LN_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
 union all
-select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
   left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
 union all
 -- 24) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
-select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue from gis.ROADS_LN_evw where DATAACCESS is null or DATAACCESS = ''
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue, NULL from gis.ROADS_LN_evw where DATAACCESS is null or DATAACCESS = ''
 union all
-select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
   left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
 union all
 -- 23/24) PUBLICDISPLAY and DATAACCESS are related
-select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue from gis.ROADS_LN_evw
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue, NULL from gis.ROADS_LN_evw
   where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
 union all
 -- 25) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
@@ -1399,31 +1453,31 @@ union all
 --     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
 -- This requirement is relaxed for roads (this is a statewide road dataset, so many roads are not in or related to a park unit)
 --   However any public roads must have a unit code
-select t1.OBJECTID, 'Error: UNITCODE is required when the road is public and not within a unit boundary' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: UNITCODE is required when the road is public and not within a unit boundary' as Issue, NULL from gis.ROADS_LN_evw as t1
   left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
   and t1.PUBLICDISPLAY = 'Public Map Display'
 union all
 -- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
---   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1 left join
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1 left join
 --     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
 --   union all
-select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1 left join
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1 left join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
 -- TODO This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
-select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, NULL from gis.ROADS_LN_evw as t1
   left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
 union all
-select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue from gis.ROADS_LN_evw as p join 
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, NULL from gis.ROADS_LN_evw as p join 
   (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
   on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
 -- 26) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
-select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.ROADS_LN_evw as t1 join
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.ROADS_LN_evw as t1 join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
 union all
 -- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
---   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue from gis.ROADS_LN_evw as t1 join
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.ROADS_LN_evw as t1 join
 --     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
 --   union all
 -- 27) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
@@ -1433,84 +1487,104 @@ union all
 -- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
 ---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
 ---- gis.AKR_GROUP does not try to match group and unit
-select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1 left join
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1 left join
   gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
 union all
-select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue from gis.ROADS_LN_evw as t1 left join
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.ROADS_LN_evw as t1 left join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
 union all
 -- TODO: Consider doing a spatial check.  There are several problems with the current approach:
 ----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
 ----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
---select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue from gis.ROADS_LN_evw as t1
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue, NULL from gis.ROADS_LN_evw as t1
 --  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
 --  and t1.OBJECTID not in (select t3.OBJECTID from gis.ROADS_LN_evw as t3 left join 
 --  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
 --union all
 -- 28) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
-select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue from gis.ROADS_LN_evw as t1 join
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue, NULL from gis.ROADS_LN_evw as t1 join
   gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
 union all
 -- 29) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
-select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue from gis.ROADS_LN_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue, NULL from gis.ROADS_LN_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
 -- 30) ROUTEID is optional free text, but if provided it must match a records in the RIP
 --     All records with the same ROUTEID must have the same FEATUREID
---     TODO: Get export of RIP, and ensure value is valid.
---     TODO: Verify format is NPS-UNITCODE-ROUTENUMBER (may be implicit in the RIP foreign key validation)
---     TODO: The ROUTEID is also related to a FMSS Functional Class. i.e. FMSS Functional Class I => Route numbers 1..99, II => 100..199, ...
-select OBJECTID, 'Error: All records with the same ROUTEID must have the same FEATUREID' as Issue from gis.ROADS_LN_evw where ROUTEID in (
+--     We will assume that format of  NPS-UNITCODE-ROUTENUMBER is being enforced by FMSS or RIP lookup.  If routeid is not in one of those assume it is invalid
+--     The ROUTEID is also related to a FMSS Functional Class. i.e. FMSS Functional Class I => Route numbers 1..99, II => 100..199, ...
+--         This should be enforced in FMSS (it's not clear that it is.)  We will only endeavor to make ROUTEID and Functional Class match FMSS
+--     TODO Get export of RIP, and ensure value is valid when FACLOCID is null, or FMSS does not provide a ROUTEID
+select OBJECTID, 'Error: All records with the same ROUTEID must have the same FEATUREID' as Issue, NULL from gis.ROADS_LN_evw where ROUTEID in (
     select FACLOCID from (select ROUTEID from gis.ROADS_LN_evw where ROUTEID is not null and FEATUREID is not null group by FEATUREID, ROUTEID) as t group by ROUTEID having count(*) > 1)
+union all
+select p.OBJECTID, 'Error: ROUTEID does not match FMSS.ROUTEID' as Issue,
+  'Location ' + FACLOCID + ' has ROUTEID = ' + f.ROUTEID + ' when GIS has ROUTEID = ' + p.ROUTEID as Details
+  from gis.ROADS_LN_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.ROUTEID <> p.ROUTEID
 union all
 -- 31) FACLOCID is optional free text, but if provided it must match a Location in the FMSS Export
 --     FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
 --     TODO: A bridge/tunnel in a road will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the road on/in the bridge/tunnel
-select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue from gis.ROADS_LN_evw as t1 left join
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.ROADS_LN_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
-select t1.OBJECTID, 'Error: FACLOCID does not match a Road in FMSS' as Issue from gis.ROADS_LN_evw as t1 join
-  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Asset_Code not in ('1100', '1300', '1700', '1800')
+select t1.OBJECTID, 'Error: FACLOCID does not match a Road in FMSS' as Issue, 
+  'Location ' + FACLOCID + ' has an Asset Code of ' + t2.Asset_Code + ' (' + t3.Description + ')' as Details
+  from gis.ROADS_LN_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location join DOM_FMSS_ASSETCODE as t3 on t2.Asset_Code = t3.Code
+  where t1.FACLOCID is not null and t2.Asset_Code not in ('1100', '1300', '1700', '1800')
 union all
-select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue from gis.ROADS_LN_evw where FACLOCID in (
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue, NULL from gis.ROADS_LN_evw where FACLOCID in (
     select FACLOCID from (select FACLOCID from gis.ROADS_LN_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
 union all
 -- 32) FACASSETID is optional free text, provided it must match a Road Location in the FMSS Assets Export
 --     All records with the same FACASSETID must have the same FEATUREID
-select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue from gis.ROADS_LN_evw as t1 left join
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.ROADS_LN_evw as t1 left join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
 union all
-select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue from gis.ROADS_LN_evw as t1 join
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue, NULL from gis.ROADS_LN_evw as t1 join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
   dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
 union all
-select t1.OBJECTID, 'Error: FACASSETID does not match a road asset in FMSS' as Issue from gis.ROADS_LN_evw as t1 join
-  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+select t1.OBJECTID, 'Error: FACASSETID does not match a road asset in FMSS' as Issue, NULL from gis.ROADS_LN_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join 
   dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code not in ('1100', '1700', '1800')
 union all
-select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue from gis.ROADS_LN_evw where FACASSETID in (
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue, NULL from gis.ROADS_LN_evw where FACASSETID in (
     select FACASSETID from (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
 union all
 -- 33) ISOUTPARK: This is an AKR extension, it is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
 -- 34) ISBRIDGE: This is an AKR extension; it is a required element in the Yes/No domain; it silently defaults to 'No'
 --     if this feature has a FACLOCID then ISBRIDGE = 'Yes' implies FMSS.asset_code = '1700' and visa-versa
-select t1.OBJECTID, 'Error: ISBRIDGE is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: ISBRIDGE is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_YES_NO as t2 on t1.ISBRIDGE = t2.Code where t1.ISBRIDGE is not null and t1.ISBRIDGE <> '' and t2.Code is null
 union all
-select t1.OBJECTID, 'Error: ISBRIDGE does not match the FMSS.Asset_Code' as Issue from gis.ROADS_LN_evw as t1 join
+select t1.OBJECTID, 'Error: ISBRIDGE does not match the FMSS.Asset_Code' as Issue, NULL from gis.ROADS_LN_evw as t1 join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISBRIDGE = 'Yes' and t2.Asset_Code <> '1700') or (t1.ISBRIDGE <> 'Yes' and t2.Asset_Code = '1700'))
 union all
 -- 35) ISTUNNEL: This is an AKR extension; it is a required element in the Yes/No domain; it silently defaults to 'No'
 --     if this feature has a FACLOCID then ISBRIDGE = 'Yes' implies FMSS.asset_code = '1700' and visa-versa
-select t1.OBJECTID, 'Error: ISTUNNEL is not a recognized value' as Issue from gis.ROADS_LN_evw as t1
+select t1.OBJECTID, 'Error: ISTUNNEL is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_YES_NO as t2 on t1.ISTUNNEL = t2.Code where t1.ISTUNNEL is not null and t1.ISTUNNEL <> '' and t2.Code is null
 union all
-select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code' as Issue from gis.ROADS_LN_evw as t1 join
+select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code' as Issue, NULL from gis.ROADS_LN_evw as t1 join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISTUNNEL = 'Yes' and t2.Asset_Code <> '1800') or (t1.ISTUNNEL <> 'Yes' and t2.Asset_Code = '1800'))
---TODO: Shape Checks?
---union all
---select OBJECTID, 'Warning: Road is shorter than 5 meters' as Issue from gis.ROADS_LN_evw where SHAPE.STLength() < 5
---union all
---select OBJECTID, 'Error: Multiline roads are not allowed' as Issue from gis.ROADS_LN_evw where SHAPE.STGeometryType() = 'MultiLineString'
+union all
+---------------
+-- Shape Checks
+---------------
+-- Sum of lengths grouped by faclocid should be close to length FMSS.QTY (in miles)
+select oid, 'Error: Road length in GIS is more than 20% different from FMSS' as Issue,
+'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.miles) + ' miles in GIS, but ' + convert(nvarchar(200),t2.miles) + ' miles in FMSS (' + convert(nvarchar(200),100*(t1.miles - t2.miles)/ t2.miles) + '%)' as Details
+  from (select min(objectid) as oid, FACLOCID, sum(GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) * 0.000621371 as miles from gis.ROADS_LN where faclocid is not null group by FACLOCID) as t1
+  join (select Location, convert(real, Qty) as miles from FMSSExport where UM = 'mi') as t2 on t1.FACLOCID = t2.Location
+  where abs(t1.miles - t2.miles)/ t2.miles > 0.2
+union all
+select OBJECTID, 'Warning: Road segment is shorter than 10 meters' as Issue,
+  'Length = ' + convert(nvarchar(200),GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) + ' meters' as Details
+  from gis.ROADS_LN_evw where GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength() < 10
+union all
+select OBJECTID, 'Error: Multiline roads are not allowed' as Issue, NULL from gis.ROADS_LN_evw where SHAPE.STGeometryType() = 'MultiLineString'
 
 
 -- ???????????????????????????????????
