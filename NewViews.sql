@@ -590,12 +590,14 @@ union all
 select t1.OBJECTID, 'Error: BLDGSTATUS is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
        left join dbo.DOM_BLDGSTATUS as t2 on t1.BLDGSTATUS = t2.Code where BLDGSTATUS is not null and BLDGSTATUS <> '' and t2.Code is null
 union all
-select t1.OBJECTID, 'Error: BLDGSTATUS does not match the FMSS Status' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
-       join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
-       join dbo.DOM_FMSS_Status as t3 on t3.Code = t2.Status
-       join dbo.DOM_BLDGSTATUS as t4 on t3.Standard = t4.Code where t1.BLDGSTATUS <> t4.Code
-	   and (t1.BLDGSTATUS <> 'Temporarily Closed' or t2.Status <> 'OPERATING') -- Ignore (not an error) Temporarily Closed could mean OPERATING
-	   and (t1.BLDGSTATUS <> 'Temporarily Closed' or t2.Status <> 'INACTIVE') -- Ignore (not an error) Temporarily Closed could mean INACTIVE
+select t1.OBJECTID, 'Error: BLDGSTATUS does not match the FMSS Status' as Issue,
+    'Location ' + FACLOCID + ' has Status ' + t2.Status + ' (' + t3.Standard + ') when GIS has BLDGSTATUS = ' + t1.BLDGSTATUS as Details
+    from gis.AKR_BLDG_CENTER_PT_evw as t1
+    join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+    join dbo.DOM_FMSS_Status as t3 on t3.Code = t2.Status
+    join dbo.DOM_BLDGSTATUS as t4 on t3.Standard = t4.Code where t1.BLDGSTATUS <> t4.Code
+    and (t1.BLDGSTATUS <> 'Temporarily Closed' or t2.Status <> 'OPERATING') -- Ignore (not an error) Temporarily Closed could mean OPERATING
+    and (t1.BLDGSTATUS <> 'Temporarily Closed' or t2.Status <> 'INACTIVE') -- Ignore (not an error) Temporarily Closed could mean INACTIVE
 union all
 -- 13) BLDGCODE is an optional domain value; must match valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: BLDGCODE is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
@@ -1231,7 +1233,8 @@ union all
 select t1.OBJECTID, 'Error: LOTSTATUS is not a recognized value' as Issue, NULL from gis.PARKLOTS_PY_evw as t1
        left join dbo.DOM_RDSTATUS as t2 on t1.LOTSTATUS = t2.Code where t1.LOTSTATUS is not null and t1.LOTSTATUS <> '' and t2.Code is null
 union all 
-select t1.OBJECTID, 'Error: LOTSTATUS does not match the FMSS Status' as Issue, NULL
+select t1.OBJECTID, 'Error: LOTSTATUS does not match the FMSS Status' as Issue,
+  'Location ' + FACLOCID + ' has Status ' + t2.Status + ' (' + t3.Standard + ') when GIS has LOTSTATUS = ' + t1.LOTSTATUS as Details
   from gis.PARKLOTS_PY_evw as t1
   join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
   join dbo.DOM_FMSS_Status as t3 on t3.Code = t2.Status
@@ -2185,14 +2188,16 @@ union all
 select t1.OBJECTID, 'Error: TRLSTATUS is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_TRLSTATUS as t2 on t1.TRLSTATUS = t2.Code where t1.TRLSTATUS is not null and t1.TRLSTATUS <> '' and t2.Code is null
 union all
-select t1.OBJECTID, 'Error: TRLSTATUS does not match the FMSS Status'  as Issue, NULL from gis.TRAILS_LN_evw as t1
-       join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
-       join dbo.DOM_FMSS_Status as t3 on t3.Code = t2.Status
-       join dbo.DOM_TRLSTATUS as t4 on t3.Standard = t4.Code where t1.TRLSTATUS <> t4.Code
-	   and (t1.TRLSTATUS <> 'Temporarily Closed' or t2.Status <> 'OPERATING') -- Ignore (not an error) Temporarily Closed could mean OPERATING
-	   and (t1.TRLSTATUS <> 'Temporarily Closed' or t2.Status <> 'IACTIVE') -- Ignore (not an error) Temporarily Closed could mean INACTIVE
-	   and (t1.TRLSTATUS <> 'Abandoned' or t2.Status <> 'OPERATING') -- Ignore (not an error) Abandoned could mean OPERATING
-	   and (t1.TRLSTATUS <> 'Abandoned' or t2.Status <> 'IACTIVE') -- Ignore (not an error) Abandoned could mean INACTIVE
+select t1.OBJECTID, 'Error: TRLSTATUS does not match the FMSS Status'  as Issue,
+    'Location ' + FACLOCID + ' has Status ' + t2.Status + ' (' + t3.Standard + ') when GIS has TRLSTATUS = ' + t1.TRLSTATUS as Details
+    from gis.TRAILS_LN_evw as t1
+    join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+    join dbo.DOM_FMSS_Status as t3 on t3.Code = t2.Status
+    join dbo.DOM_TRLSTATUS as t4 on t3.Standard = t4.Code where t1.TRLSTATUS <> t4.Code
+    and (t1.TRLSTATUS <> 'Temporarily Closed' or t2.Status <> 'OPERATING') -- Ignore (not an error) Temporarily Closed could mean OPERATING
+    and (t1.TRLSTATUS <> 'Temporarily Closed' or t2.Status <> 'IACTIVE') -- Ignore (not an error) Temporarily Closed could mean INACTIVE
+    and (t1.TRLSTATUS <> 'Abandoned' or t2.Status <> 'OPERATING') -- Ignore (not an error) Abandoned could mean OPERATING
+    and (t1.TRLSTATUS <> 'Abandoned' or t2.Status <> 'IACTIVE') -- Ignore (not an error) Abandoned could mean INACTIVE
 union all
 -- 14) TRLSURFACE is a required domain value; default is 'Unknown'
 --     different parts of a single 'Feature' can have different surface
