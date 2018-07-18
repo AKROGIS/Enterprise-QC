@@ -2768,7 +2768,11 @@ BEGIN
 
     -- add/update calculated values
 
-    -- 1) if RDNAME is an empty string, change to NULL
+    -- 1) if RDNAME is an empty string, default to FMSS.Description or NULL
+    merge into gis.ROADS_LN_evw as p
+        using dbo.FMSSExport as f
+        on f.Location = p.FACLOCID and ((p.RDNAME is null or p.RDNAME = '' or p.RDSTATUS = 'Unknown') and f.Description is not null)
+        when matched then update set RDNAME = f.Description;
     update gis.ROADS_LN_evw set RDNAME = NULL where RDNAME = ''
     -- 2) if RDALTNAME is an empty string, change to NULL
     update gis.ROADS_LN_evw set RDALTNAME = NULL where RDALTNAME = ''
@@ -2780,38 +2784,59 @@ BEGIN
         on f.Location = p.FACLOCID and ((p.RDSTATUS is null or p.RDSTATUS = '' or p.RDSTATUS = 'Unknown') and f.Status is not null)
         when matched then update set RDSTATUS = f.Status;
     update gis.ROADS_LN_evw set RDSTATUS = 'Existing' where RDSTATUS is null or RDSTATUS = ''
-    -- 5) RDCLASS defaults to 'Unknown'
-    --     TODO: if a feature has a FACLOCID then the FMSS Funtional Class implies a RDCLASS.  See section 4.3 of the standard
+    -- 5) RDCLASS defaults FMSSExport.FCLASS or 'Unknown'
+    merge into gis.ROADS_LN_evw as p
+        using (SELECT t2.Standard as FCLASS, Location FROM dbo.FMSSExport as t1 join dbo.DOM_FMSS_FunctionalClass as t2 on t2.Code = t1.FCLASS) as f
+        on f.Location = p.FACLOCID and ((p.RDCLASS is null or p.RDCLASS = '' or p.RDCLASS = 'Unknown') and f.FCLASS is not null)
+        when matched then update set RDCLASS = f.FCLASS;
     update gis.ROADS_LN_evw set RDCLASS = 'Unknown' where RDCLASS is null or RDCLASS = ''
-    -- 6) RDSURFACE defaults to 'Unknown'
+    -- 6) RDSURFACE defaults FMSS.Predominant_Use/Facility_Type or 'Unknown'
+    --      Unfortunately, the FMSS attributes provide clues, but not a definitive answer.
+    --      Fortunately in AKR, Paved can be assumed to mean Ashpalt, and Unpaved can be assumed to mean Gravel.
+    merge into gis.ROADS_LN_evw as p
+        using (select Location, CASE WHEN Predominant_Use like '% paved%' or Facility_Type = '1110' THEN 'Ashpalt'
+         WHEN Facility_Type = '1120' and (Predominant_Use like '%unpaved%' or Predominant_Use like '%gravel%' or Predominant_Use is null) THEN 'Gravel' 
+         WHEN Predominant_Use like '%dirt%' THEN 'Native or Dirt' END as Surface from FMSSExport) as f
+        on f.Location = p.FACLOCID and ((p.RDSURFACE is null or p.RDSURFACE = '' or p.RDSURFACE = 'Unknown') and f.Surface is not null)
+        when matched then update set RDSURFACE = f.Surface;
     update gis.ROADS_LN_evw set RDSURFACE = 'Unknown' where RDSURFACE is null or RDSURFACE = ''
     -- 7) RDONEWAY is not required, but if it provided is it should not be an empty string
     update gis.ROADS_LN_evw set RDONEWAY = NULL where RDONEWAY = ''
-    -- 9) RDLANES -- Nothing to do.
+    -- 9) RDLANES defaults to FMSS.NOLANE or NULL.
+    merge into gis.ROADS_LN_evw as p
+        using (SELECT convert(int,convert(real,NOLANE)) as NOLANE, Location FROM dbo.FMSSExport) as f
+        on f.Location = p.FACLOCID and ((p.RDLANES is null or p.RDLANES = 0) and f.NOLANE is not null)
+        when matched then update set RDLANES = f.NOLANE;
     -- 10) RDHICLEAR is not required, but if it provided is it should not be an empty string
     update gis.ROADS_LN_evw set RDHICLEAR = NULL where RDHICLEAR = ''
     -- 11) RTENUMBER is not required, but if it provided is it should not be an empty string
     update gis.ROADS_LN_evw set RTENUMBER = NULL where RTENUMBER = ''
-    -- 12) ISBRIDGE is an AKR extension; it silently defaults to 'No'
+    -- 12) ISBRIDGE is an AKR extension; it defaults to 'Yes' if FMSS.Asset_Code = 1700 otherwise 'No'
+    merge into gis.ROADS_LN_evw as p
+        using dbo.FMSSExport as f
+        on f.Location = p.FACLOCID and ((p.ISBRIDGE is null or p.ISBRIDGE = '') and f.Asset_Code = '1700')
+        when matched then update set ISBRIDGE = 'Yes';
     update gis.ROADS_LN_evw set ISBRIDGE = 'No' where ISBRIDGE is null or ISBRIDGE = ''
-    -- 13) ISTUNNEL  is an AKR extension; it silently defaults to 'No'
+    -- 13) ISTUNNEL is an AKR extension; it defaults to 'Yes' if FMSS.Asset_Code = 1800 otherwise 'No'
+    merge into gis.ROADS_LN_evw as p
+        using dbo.FMSSExport as f
+        on f.Location = p.FACLOCID and ((p.ISTUNNEL is null or p.ISTUNNEL = '') and f.Asset_Code = '1800')
+        when matched then update set ISTUNNEL = 'Yes';
     update gis.ROADS_LN_evw set ISTUNNEL = 'No' where ISTUNNEL is null or ISTUNNEL = ''
-    -- 14) if SEASONAL is null and FACLOCID is non-null use FMSS Lookup.
-    --     TODO: Get GOOD FMSS data
-    --merge into gis.ROADS_LN_evw as p
-    --  using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
-    --  on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
-    --  when matched then update set SEASONAL = f.OPSEAS;
+    -- 14) SEASONAL defaults to FMSS.OPSEAS or Null.
+    merge into gis.ROADS_LN_evw as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else NULL end as OPSEAS, location FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null or p.SEASONAL = '' or p.SEASONAL = 'Unknown') and f.OPSEAS is not null
+      when matched then update set SEASONAL = f.OPSEAS;
     -- 15) if SEASDESC is an empty string, change to NULL
     --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
     update gis.ROADS_LN_evw set SEASDESC = NULL where SEASDESC = ''
     update gis.ROADS_LN_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
-    -- 16) if RDMAINTAINER is null and FACLOCID is non-null use FMSS Lookup.
-    --     TODO: requires changing the domain to match FMSS and then populate from FMSS
-    --merge into gis.ROADS_LN_evw as p
-    --  using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
-    --  on f.Location = p.FACLOCID and (p.RDMAINTAINER is null and f.FAMARESP is not null)
-    --  when matched then update set RDMAINTAINER = f.FAMARESP;
+    -- 16) RDMAINTAINER defaults to FMSSExport.FAMARESP (mapped) or Null
+    merge into gis.ROADS_LN_evw as p
+      using (SELECT d.Code as FAMARESP, location FROM dbo.FMSSExport as t join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.RDMAINTAINER is null or p.RDMAINTAINER = '' or p.RDMAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set RDMAINTAINER = f.FAMARESP;
     -- 17) ISEXTANT defaults to 'True' with a warning (during QC)
     update gis.ROADS_LN_evw set ISEXTANT = 'True' where ISEXTANT is NULL
     -- 18) Add LINETYPE = 'Center line' if null/empty in gis.ROADS_LN
@@ -2853,6 +2878,11 @@ BEGIN
     -- 30) if XYACCURACY is NULL or an empty string, change to Unknown
     update gis.ROADS_LN_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
     -- 31) ROUTEID is not required, but if it provided is it should not be an empty string
+    --     It should also be set to FMSS.ROUTEID if applicable
+    merge into gis.ROADS_LN_evw as p
+        using dbo.FMSSExport as f
+        on f.Location = p.FACLOCID and ((p.ROUTEID is null or p.ROUTEID = '' or p.ROUTEID = 'Unknown') and f.ROUTEID is not null)
+        when matched then update set ROUTEID = f.ROUTEID;
     update gis.ROADS_LN_evw set ROUTEID = NULL where ROUTEID = ''
     -- 32) if FACLOCID is empty string change to null
     update gis.ROADS_LN_evw set FACLOCID = NULL where FACLOCID = ''
