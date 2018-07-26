@@ -4,6 +4,34 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
+CREATE FUNCTION [dbo].[RoadIsFullyConnected](@featureid VARCHAR(255)) RETURNS int
+AS
+BEGIN
+  Declare @segments Table (segment geometry)  -- contains all segments not yet connected
+  DECLARE @shape geometry                     -- The union of the connected segments (starts with one segment and builds)
+  DECLARE @connected_segments geometry        -- A geometry collection of all segments that intersect @Shape, but are not yet unioned
+  DECLARE @count int                          -- How many segments are still unconnected
+   
+  INSERT INTO @segments select Shape from gis.ROADS_LN_evw where FEATUREID = @featureid;
+  Select Top 1 @shape = segment from @segments order by segment.STLength() desc;
+  delete @segments where segment.STEquals(@shape) = 1;
+
+  WHILE @shape IS NOT NULL
+  BEGIN
+	-- if a segment touches @shape, remove from @segments and union with @shape
+    select @connected_segments = geometry::CollectionAggregate(segment) from @segments where segment.STIntersects(@shape) = 1;
+	delete from @segments where segment.STIntersects(@shape) = 1;
+	Set @shape = @shape.STUnion(@connected_segments)  -- will be set to null if there are no connected segments, so we are done
+  END
+  SELECT @count = count(*) from @segments  -- fully connected if there are no segments left unconnected
+  RETURN case when @count = 0 then 1 else 0 end
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 CREATE FUNCTION [dbo].[ToProperCase](@string VARCHAR(255)) RETURNS VARCHAR(255)
 AS
 BEGIN
@@ -39,6 +67,34 @@ BEGIN
   END
 
   RETURN @o
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [dbo].[TrailIsFullyConnected](@featureid VARCHAR(255)) RETURNS int
+AS
+BEGIN
+  Declare @segments Table (segment geometry)  -- contains all segments not yet connected
+  DECLARE @shape geometry                     -- The union of the connected segments (starts with one segment and builds)
+  DECLARE @connected_segments geometry        -- A geometry collection of all segments that intersect @Shape, but are not yet unioned
+  DECLARE @count int                          -- How many segments are still unconnected
+   
+  INSERT INTO @segments select Shape from gis.TRAILS_LN_evw where FEATUREID = @featureid;
+  Select Top 1 @shape = segment from @segments order by segment.STLength() desc;
+  delete @segments where segment.STEquals(@shape) = 1;
+
+  WHILE @shape IS NOT NULL
+  BEGIN
+	-- if a segment touches @shape, remove from @segments and union with @shape
+    select @connected_segments = geometry::CollectionAggregate(segment) from @segments where segment.STIntersects(@shape) = 1;
+	delete from @segments where segment.STIntersects(@shape) = 1;
+	Set @shape = @shape.STUnion(@connected_segments)  -- will be set to null if there are no connected segments, so we are done
+  END
+  SELECT @count = count(*) from @segments  -- fully connected if there are no segments left unconnected
+  RETURN case when @count = 0 then 1 else 0 end
 END
 GO
 SET ANSI_NULLS ON
@@ -1058,7 +1114,11 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	  OR left(FEATUREID,1) <> '{'
 	  OR right(FEATUREID,1) <> '}'
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
---    TODO: Query for records with a FEATUREID far away from the average for all features with the FEATUREID
+union all
+select OBJECTID, 'Error: Features with the same FEATUREID are not close to each other' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+  from gis.PARKLOTS_PY_evw where featureid in 
+  (select FEATUREID from gis.PARKLOTS_PY group by FEATUREID having count(*) > 1 and
+   geometry::ConvexHullAggregate(Shape).STArea()/geometry::CollectionAggregate(Shape).STArea() > 10)
 union all
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.PARKLOTS_PY_evw where MAPMETHOD is null or MAPMETHOD = ''
@@ -1291,7 +1351,6 @@ union all
 --       however, it also allows errors like two different (by geography or attributes) trails having the same featureid (common copy/paste error)
 --    All records with the same FeatureID must be proximal (in the vicinity of each other)
 --    TODO: consider what attributes, in addition to FMSS attributes, should be the same when FEATUREID is the same
---    TODO: Query for records with a FEATUREID far away from the average for all features with the FEATUREID
 select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	from gis.ROADS_LN_evw where
 	  -- Will ignore FEATUREID = NULL 
@@ -1299,6 +1358,20 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	  OR left(FEATUREID,1) <> '{'
 	  OR right(FEATUREID,1) <> '}'
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+--  Easy check to see if two segments are connected
+select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+  from gis.ROADS_LN_evw where FEATUREID in 
+    (select t1.Featureid from (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN group by FEATUREID having count(*) = 2)) as t1
+     join (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN group by FEATUREID having count(*) = 2)) as t2
+     on t1.FEATUREID = t2.FEATUREID and t1.GEOMETRYID < t2.GEOMETRYID and t1.Shape.STIntersects(t2.Shape) = 0)
+union all
+-- Harder check to see if more than two segments are all connected
+--  RoadIsContiguous() is slow, I only want to call it once on each featureid that has more than 2 segments
+--  SQL does not guarantee the order of evaulation in a where clause, so I need to use sub-queries
+select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+  from gis.ROADS_LN_evw where FEATUREID in 
+    (select FEATUREID from (select FEATUREID, dbo.RoadIsFullyConnected(FEATUREID) as contig from gis.ROADS_LN_evw group by FEATUREID having count(*) > 2) as t where contig = 0)
 union all
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_LN_evw where MAPMETHOD is null or MAPMETHOD = ''
@@ -2132,7 +2205,6 @@ union all
 --       however, it also allows errors like two different (by geography or attributes) trails having the same featureid (common copy/paste error)
 --    All records with the same FeatureID must be proximal (in the vicinity of each other)
 --    TODO: consider what attributes, in addition to FMSS attributes, should be the same when FEATUREID is the same
---    TODO: Query for records with a FEATUREID far away from the average for all features with the FEATUREID
 select OBJECTID, 'Error: FEATUREID is not well-formed'  as Issue, NULL 
 	from gis.TRAILS_LN_evw where
 	  -- Will ignore FEATUREID = NULL 
@@ -2140,6 +2212,19 @@ select OBJECTID, 'Error: FEATUREID is not well-formed'  as Issue, NULL
 	  OR left(FEATUREID,1) <> '{'
 	  OR right(FEATUREID,1) <> '}'
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+  from gis.TRAILS_LN_evw where FEATUREID in 
+    (select t1.Featureid from (select FEATUREID, Shape, geometryid from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN group by FEATUREID having count(*) = 2)) as t1
+     join (select FEATUREID, Shape, geometryid from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN group by FEATUREID having count(*) = 2)) as t2
+     on t1.FEATUREID = t2.FEATUREID and t1.GEOMETRYID < t2.GEOMETRYID and t1.Shape.STIntersects(t2.Shape) = 0)
+union all
+-- Harder check to see if more than two segments are all connected
+--  TrailIsFullyConnected() is slow, I only want to call it once on each featureid that has more than 2 segments
+--  SQL does not guarantee the order of evaulation in a where clause, so I need to use sub-queries
+select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+  from gis.TRAILS_LN_evw where FEATUREID in 
+    (select FEATUREID from (select FEATUREID, dbo.TrailIsFullyConnected(FEATUREID) as contig from gis.TRAILS_LN_evw group by FEATUREID having count(*) > 2) as t where contig = 0)
 union all
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where MAPMETHOD is null or MAPMETHOD = ''
