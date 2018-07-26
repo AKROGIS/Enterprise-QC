@@ -825,13 +825,12 @@ select p.OBJECTID, 'Error: PARKBLDGID does not match FMSS.PARKNUMB' as Issue, NU
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_BLDG_CENTER_PT'
-WHERE E.Explanation IS NULL
+WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_FOOTPRINT_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_FOOTPRINT_PY_evw AS D
 join (
@@ -904,13 +903,12 @@ select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from 
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_BLDG_FOOTPRINT_PY'
-WHERE E.Explanation IS NULL
+WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_OTHER_PT] AS select I.Issue, D.* from  gis.AKR_BLDG_OTHER_PT_EVW AS D
 join (
@@ -963,13 +961,12 @@ select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from 
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_BLDG_OTHER_PT'
-WHERE E.Explanation IS NULL
+WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_OTHER_PY] AS select I.Issue, D.* from  gis.AKR_BLDG_OTHER_PY_EVW AS D
 join (
@@ -1020,7 +1017,7 @@ select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from 
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_BLDG_OTHER_PY'
-WHERE E.Explanation IS NULL
+WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
 SET ANSI_NULLS ON
 GO
@@ -1251,7 +1248,7 @@ select t1.OBJECTID, 'Error: LOTSTATUS does not match the FMSS Status' as Issue,
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'PARKLOTS_PY'
-WHERE E.Explanation IS NULL
+WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
 SET ANSI_NULLS ON
 GO
@@ -1391,15 +1388,18 @@ select t1.OBJECTID, 'Error: RDSURFACE does not match the FMSS Facility_Type' as 
        where (t2.Facility_Type = '1110' and t1.RDSURFACE in ('Gravel', 'Native or Dirt', 'Other Unpaved', 'Sand'))
 	      or (t2.Facility_Type = '1120' and t1.RDSURFACE in ('Asphalt', 'Concrete', 'Brick/Pavers', 'Cobblestone', 'Other Paved'))
 union all
-select t1.OBJECTID, 'Error: RDSURFACE does not match the FMSS Facility_Type' as Issue,
+select t1.OBJECTID, 'Error: RDSURFACE does not match the FMSS Predominant Use' as Issue,
        'Location ' + FACLOCID + ' has Predominant_Use = ' + t2.Predominant_Use + ' when GIS has RDSURFACE = ' + t1.RDSURFACE as Details
        from gis.ROADS_LN_evw as t1
        join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
        join dbo.DOM_FMSS_FACILITYTYPE as t3 on t3.Code = t2.Facility_Type
-       where (t2.Predominant_Use like '% Paved%' and t1.RDSURFACE in ('Gravel', 'Native or Dirt', 'Other Unpaved', 'Sand'))
+       where ((t2.Predominant_Use like '% Paved%' and t1.RDSURFACE in ('Gravel', 'Native or Dirt', 'Other Unpaved', 'Sand'))
 	      or (t2.Predominant_Use like '%Gravel%'  and t1.RDSURFACE not in ('Gravel', 'Unknown'))
 	      or (t2.Predominant_Use like '%Dirt%'  and t1.RDSURFACE not in ('Native or Dirt', 'Unknown'))
-	      or (t2.Predominant_Use like '% Unpaved%'  and t1.RDSURFACE in ('Asphalt', 'Concrete', 'Brick/Pavers', 'Cobblestone', 'Other Paved'))
+	      or (t2.Predominant_Use like '% Unpaved%'  and t1.RDSURFACE in ('Asphalt', 'Concrete', 'Brick/Pavers', 'Cobblestone', 'Other Paved')))
+		  and not -- ignore the duplicate (RDSURFACE <> Facility type errors)
+		  ((t2.Facility_Type = '1110' and t1.RDSURFACE in ('Gravel', 'Native or Dirt', 'Other Unpaved', 'Sand'))
+	      or (t2.Facility_Type = '1120' and t1.RDSURFACE in ('Asphalt', 'Concrete', 'Brick/Pavers', 'Cobblestone', 'Other Paved')))
 union all
 -- 15) RDONEWAY is an optional domain value; default is Null
 select t1.OBJECTID, 'Error: RDONEWAY is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
@@ -1595,7 +1595,7 @@ union all
 -- Sum of lengths grouped by faclocid should be close to length FMSS.QTY (in miles)
 select oid, 'Error: Road length in GIS is more than 20% different from FMSS' as Issue,
 'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.miles) + ' miles in GIS, but ' + convert(nvarchar(200),t2.miles) + ' miles in FMSS (' + convert(nvarchar(200),100*(t1.miles - t2.miles)/ t2.miles) + '%)' as Details
-  from (select min(objectid) as oid, FACLOCID, sum(GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) * 0.000621371 as miles from gis.ROADS_LN where faclocid is not null group by FACLOCID) as t1
+  from (select min(objectid) as oid, FACLOCID, sum(GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) * 0.000621371 as miles from gis.ROADS_LN_evw where faclocid is not null group by FACLOCID) as t1
   join (select Location, convert(real, Qty) as miles from FMSSExport where UM = 'mi') as t2 on t1.FACLOCID = t2.Location
   where abs(t1.miles - t2.miles)/ t2.miles > 0.2
 union all
@@ -1614,7 +1614,7 @@ select OBJECTID, 'Error: Multiline roads are not allowed' as Issue, NULL from gi
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'ROADS_LN'
-WHERE E.Explanation IS NULL
+WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
 SET ANSI_NULLS ON
 GO
@@ -1837,7 +1837,7 @@ select OBJECTID, 'Error: All records with the same FACASSETID must have the same
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_ATTRIBUTE_PT'
-WHERE E.Explanation IS NULL
+WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
 SET ANSI_NULLS ON
 GO
@@ -2091,7 +2091,7 @@ select OBJECTID, 'Error: All records with the same FACASSETID must have the same
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_FEATURE_PT'
-WHERE E.Explanation IS NULL
+WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
 SET ANSI_NULLS ON
 GO
@@ -2460,7 +2460,7 @@ select t1.OBJECTID, 'Error: TRLUSE_CANOE is not a recognized value'  as Issue, N
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_LN'
-WHERE E.Explanation IS NULL
+WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
 SET ANSI_NULLS ON
 GO
@@ -2794,7 +2794,7 @@ BEGIN
     --      Unfortunately, the FMSS attributes provide clues, but not a definitive answer.
     --      Fortunately in AKR, Paved can be assumed to mean Ashpalt, and Unpaved can be assumed to mean Gravel.
     merge into gis.ROADS_LN_evw as p
-        using (select Location, CASE WHEN Predominant_Use like '% paved%' or Facility_Type = '1110' THEN 'Ashpalt'
+        using (select Location, CASE WHEN Predominant_Use like '% paved%' or Facility_Type = '1110' THEN 'Asphalt'
          WHEN Facility_Type = '1120' and (Predominant_Use like '%unpaved%' or Predominant_Use like '%gravel%' or Predominant_Use is null) THEN 'Gravel' 
          WHEN Predominant_Use like '%dirt%' THEN 'Native or Dirt' END as Surface from FMSSExport) as f
         on f.Location = p.FACLOCID and ((p.RDSURFACE is null or p.RDSURFACE = '' or p.RDSURFACE = 'Unknown') and f.Surface is not null)
