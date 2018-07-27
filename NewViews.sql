@@ -2307,6 +2307,7 @@ select t1.OBJECTID, 'Error: TRLFEATTYPE is not a recognized value'  as Issue, NU
 union all 
 -- 13) TRLSTATUS is a required domain value; default is 'Existing'
 --     different parts of a single 'Feature' can have different status
+--     TODO: removed 'Not Applicable' from Domain; consider removing Abandoned (use decomissioned) to match domain of roads/bldgs
 --     TODO: Compare with FMSS; all parts of the feature with same FACLOCID will have the same status 
 select OBJECTID, 'Warning: TRLSTATUS is not provided, default value of *Existing* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where TRLSTATUS is null or TRLSTATUS = ''
 union all
@@ -2813,30 +2814,27 @@ BEGIN
     -- 4) Add LOTTYPE = 'Parking Lot' if null in gis.PARKLOTS_PY
     update gis.PARKLOTS_PY_evw set LOTTYPE = 'Parking Lot' where LOTTYPE is null or LOTTYPE = '' 
     -- 5) if SEASONAL is null and FACLOCID is non-null use FMSS Lookup.
-    --    TODO: requires a complete and correct FMSS Extract
-    --merge into gis.PARKLOTS_PY_evw as p
-    --  using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
-    --  on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
-    --  when matched then update set SEASONAL = f.OPSEAS;
+    merge into gis.PARKLOTS_PY_evw as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
     -- 6) if SEASDESC is an empty string, change to NULL
     --    Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
     update gis.PARKLOTS_PY_evw set SEASDESC = NULL where SEASDESC = ''
     update gis.PARKLOTS_PY_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
     -- 7) if MAINTAINER is null and FACLOCID is non-null use FMSS Lookup.
-    --    TODO: requires changing the domain to match FMSS and then populate from FMSS
-    --merge into gis.PARKLOTS_PY_evw as p
-    --  using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
-    --  on f.Location = p.FACLOCID and (p.MAINTAINER is null and f.FAMARESP is not null)
-    --  when matched then update set MAINTAINER = f.FAMARESP;
+    merge into gis.PARKLOTS_PY_evw as p
+      using (SELECT d.Code as FAMARESP, location FROM dbo.FMSSExport as t join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
     -- 8) ISEXTANT defaults to 'True' with a warning (during QC)
     update gis.PARKLOTS_PY_evw set ISEXTANT = 'True' where ISEXTANT is NULL
     -- 9) Add POLYGONTYPE = 'Perimeter polygon' if null/empty in gis.PARKLOTS_PY
     update gis.PARKLOTS_PY_evw set POLYGONTYPE = 'Perimeter polygon' where POLYGONTYPE is null or POLYGONTYPE = '' 
     -- 10) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
-    --     TODO: set to BOTH if the parking lot straddles a boundary (currently set to YES if any part of a parking lot is within the boundary)
     merge into gis.PARKLOTS_PY_evw as t1 using gis.AKR_UNIT as t2
-      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END <> t1.ISOUTPARK)
-      when matched then update set ISOUTPARK = CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END;
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
     -- 11) PUBLICDISPLAY defaults to No Public Map Display
     update gis.PARKLOTS_PY_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
     -- 12) DATAACCESS defaults to No Public Map Display
