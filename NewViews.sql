@@ -729,10 +729,33 @@ union all
 select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
   left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
 union all
--- 12/21 ISEXTANT must align with BLDGSTATUS. Status: Existing requires Extant not False (other combinations are acceptable)
-select t1.OBJECTID, 'Error: ISEXTANT does not match BLDGSTATUS' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
-  left join (SELECT Status, Location FROM dbo.FMSSExport where Status in (select Code from dbo.DOM_BLDGSTATUS)) as f
-  on f.Location = t1.FACLOCID where t1.ISEXTANT = 'False' and (t1.BLDGSTATUS = 'Existing' or (t1.BLDGSTATUS is null and f.Status = 'Existing'))
+-- 12/21 ISEXTANT must align with BLDGSTATUS.
+-- Extant       => Status
+-- True or NULL => All status are valid (i.e. status indicates occupancy)
+-- False        => not Existing or Temp Closed (must be decom/aban, prop, or planned)
+-- Unknown      => ?? can't enforce anything on status
+-- Partial      => same as existing
+-- Other        => ?? can't enforce anything on status (ignore this should be removed)
+-- *            => Error (in different check)
+
+-- Status     => Extant
+-- Existing   => must be True or Partial or NULL (=True) cannot be False, Unknown (what about Other)
+-- NULL, '',  => see FMSS or Existing
+-- Decom/Aban => any are valid
+-- Plan/Prop  => any are valid
+-- Closed     => must be True or NULL (=True)
+-- Unknown    => ?? can't enforce anything on Extant
+-- *          => Error (in different check)
+
+-- Summary: if Extant = False then Status = Exist or Closed is an error
+--          equivalently if Status = Existing or Closed then Extant = False is an error (seems unknown should also be an error)
+--          Status Planned/Proposed and Extant = True is suspect; maybe issue a warning
+select t1.OBJECTID, 'Error: ISEXTANT does not match BLDGSTATUS' as Issue,
+  'ISEXTANT = ' + ISNULL(t1.ISEXTANT, 'True') + ' while BLDGSTATUS = ' + ISNULL(t1.BLDGSTATUS, 'NULL') + '(FMSS Status is ' + ISNULL(d.Standard, 'NULL') + ')' as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as t1
+  left join dbo.FMSSExport as f on f.Location = t1.FACLOCID
+  left join dbo.DOM_FMSS_Status as d on f.Status = d.Code  -- Use d.Standard (= the standardized version of the FMSS Status, could be NULL)
+  where t1.ISEXTANT = 'False' and (t1.BLDGSTATUS = 'Existing' or t1.BLDGSTATUS = 'Temporarily Closed' or ((t1.BLDGSTATUS is null or t1.BLDGSTATUS = '') and (d.Standard is null or d.Standard = 'Existing')))
 union all
 -- 22) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
 --     TODO: are there requirements of other fields (i.e. BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE) when PUBLICDISPLAY is true?
@@ -1522,6 +1545,14 @@ select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* w
 union all
 select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
   left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 12/22 ISEXTANT must align with RDSTATUS. (See BLDGSTATUS for analysis)
+select t1.OBJECTID, 'Error: ISEXTANT does not match RDSTATUS' as Issue,
+  'ISEXTANT = ' + ISNULL(t1.ISEXTANT, 'True') + ' while RDSTATUS = ' + ISNULL(t1.RDSTATUS, 'NULL') + '(FMSS Status is ' + ISNULL(d.Standard, 'NULL') + ')' as Details
+  from gis.ROADS_LN_evw as t1
+  left join dbo.FMSSExport as f on f.Location = t1.FACLOCID
+  left join dbo.DOM_FMSS_Status as d on f.Status = d.Code  -- Use d.Standard (= the standardized version of the FMSS Status, could be NULL)
+  where t1.ISEXTANT = 'False' and (t1.RDSTATUS = 'Existing' or t1.RDSTATUS = 'Temporarily Closed' or ((t1.RDSTATUS is null or t1.RDSTATUS = '') and (d.Standard is null or d.Standard = 'Existing')))
 union all
 -- 23) PUBLICDISPLAY is a required Domain Value; Default to 'No Public Map Display' with Warning
 --     TODO: are there requirements of other fields (i.e. RDSTATUS, ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
@@ -2330,6 +2361,15 @@ select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* w
 union all
 select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
   left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 13/21 ISEXTANT must align with TRLSTATUS. (See BLDGSTATUS for analysis)
+-- NOTE for trails it is acceptable to be existing and not extant if it is a route
+select t1.OBJECTID, 'Error: ISEXTANT does not match TRLSTATUS' as Issue,
+  'ISEXTANT = ' + ISNULL(t1.ISEXTANT, 'True') + ' while TRLSTATUS = ' + ISNULL(t1.TRLSTATUS, 'NULL') + '(FMSS Status is ' + ISNULL(d.Standard, 'NULL') + ')' as Details
+  from gis.TRAILS_LN_evw as t1
+  left join dbo.FMSSExport as f on f.Location = t1.FACLOCID
+  left join dbo.DOM_FMSS_Status as d on f.Status = d.Code  -- Use d.Standard (= the standardized version of the FMSS Status, could be NULL)
+  where t1.ISEXTANT = 'False' and t1.TRLFEATTYPE <> 'Route Path' and (t1.TRLSTATUS = 'Existing' or t1.TRLSTATUS = 'Temporarily Closed' or ((t1.TRLSTATUS is null or t1.TRLSTATUS = '') and (d.Standard is null or d.Standard = 'Existing')))
 union all
 -- 22) PUBLICDISPLAY is a required Domain Value; Default to 'No Public Map Display' with Warning
 --     TODO: are there requirements of other fields (i.e. TRLSTATUS, ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
