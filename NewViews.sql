@@ -1140,7 +1140,7 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 union all
 select OBJECTID, 'Error: Features with the same FEATUREID are not close to each other' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
   from gis.PARKLOTS_PY_evw where featureid in 
-  (select FEATUREID from gis.PARKLOTS_PY group by FEATUREID having count(*) > 1 and
+  (select FEATUREID from gis.PARKLOTS_PY_evw group by FEATUREID having count(*) > 1 and
    geometry::ConvexHullAggregate(Shape).STArea()/geometry::CollectionAggregate(Shape).STArea() > 10)
 union all
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
@@ -1391,8 +1391,8 @@ union all
 --  Easy check to see if two segments are connected
 select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
   from gis.ROADS_LN_evw where FEATUREID in 
-    (select t1.Featureid from (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN group by FEATUREID having count(*) = 2)) as t1
-     join (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN group by FEATUREID having count(*) = 2)) as t2
+    (select t1.Featureid from (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN_evw group by FEATUREID having count(*) = 2)) as t1
+     join (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN_evw group by FEATUREID having count(*) = 2)) as t2
      on t1.FEATUREID = t2.FEATUREID and t1.GEOMETRYID < t2.GEOMETRYID and t1.Shape.STIntersects(t2.Shape) = 0)
 union all
 -- Harder check to see if more than two segments are all connected
@@ -2255,8 +2255,8 @@ select OBJECTID, 'Error: FEATUREID is not well-formed'  as Issue, NULL
 union all
 select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
   from gis.TRAILS_LN_evw where FEATUREID in 
-    (select t1.Featureid from (select FEATUREID, Shape, geometryid from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN group by FEATUREID having count(*) = 2)) as t1
-     join (select FEATUREID, Shape, geometryid from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN group by FEATUREID having count(*) = 2)) as t2
+    (select t1.Featureid from (select FEATUREID, Shape, geometryid from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.TRAILS_LN_evw group by FEATUREID having count(*) = 2)) as t1
+     join (select FEATUREID, Shape, geometryid from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.TRAILS_LN_evw group by FEATUREID having count(*) = 2)) as t2
      on t1.FEATUREID = t2.FEATUREID and t1.GEOMETRYID < t2.GEOMETRYID and t1.Shape.STIntersects(t2.Shape) = 0)
 union all
 -- Harder check to see if more than two segments are all connected
