@@ -1321,6 +1321,12 @@ select t1.OBJECTID, 'Error: LOTSTATUS does not match the FMSS Status' as Issue,
   where t1.LOTSTATUS <> t3.Standard
   and (t1.LOTSTATUS <> 'Temporarily Closed' or t2.Status <> 'OPERATING') -- Ignore (not an error) Temporarily Closed could mean OPERATING
   and (t1.LOTSTATUS <> 'Temporarily Closed' or t2.Status <> 'INACTIVE') -- Ignore (not an error) Temporarily Closed could also mean INACTIVE
+union all
+---------------
+-- Shape Checks
+---------------
+select p1.OBJECTID, 'Error: Overlapping polygons are not allowed' as Issue, 'Overlaps with OBJECTID = ' + convert(nvarchar(20), p2.OBJECTID) as Details
+from gis.PARKLOTS_PY_evw as p1 join gis.PARKLOTS_PY_evw as p2 on p1.shape.Filter(p2.shape) = 1 and p1.OBJECTID < p2.OBJECTID where p1.Shape.STOverlaps(p2.Shape) = 1
 
 
 -- ???????????????????????????????????
@@ -1708,7 +1714,10 @@ select OBJECTID, 'Warning: Road segment is shorter than 10 meters' as Issue,
   from gis.ROADS_LN_evw where GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength() < 10
 union all
 select OBJECTID, 'Error: Multiline roads are not allowed' as Issue, NULL from gis.ROADS_LN_evw where SHAPE.STGeometryType() = 'MultiLineString'
-
+union all
+-- Overlapping road segments:  Takes about 30 seconds
+select r1.OBJECTID, 'Error: Overlapping road segments are not allowed' as Issue, 'Overlaps with OBJECTID = ' + convert(nvarchar(20), r2.OBJECTID) as Details
+from gis.ROADS_LN_evw as r1 join gis.ROADS_LN_evw as r2 on r1.shape.Filter(r2.shape) = 1 and r1.OBJECTID < r2.OBJECTID where r1.Shape.STOverlaps(r2.Shape) = 1
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -2569,11 +2578,27 @@ union all
 select t1.OBJECTID, 'Error: TRLUSE_CANOE is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_YES_NO as t2 on t1.TRLUSE_CANOE = t2.Code where t1.TRLUSE_CANOE is not null and t2.Code is null
 --TODO: Look for illogical combinations of TRLTYPE and TRLUSE_*
---TODO: Shape Checks?
---union all
---select OBJECTID, 'Warning: Trail shorter than 5 meters'  as Issue, NULL from gis.TRAILS_LN_evw where SHAPE.STLength() < 5
---union all
---select OBJECTID, 'Error: Multiline trails are not allowed'  as Issue, NULL from gis.TRAILS_LN_evw  where SHAPE.STGeometryType() = 'MultiLineString'
+union all
+---------------
+-- Shape Checks
+---------------
+-- Sum of lengths grouped by faclocid should be close to length FMSS.QTY (in miles)
+select oid, 'Error: Trail length in GIS is more than 20% different from FMSS' as Issue,
+'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.miles) + ' miles in GIS, but ' + convert(nvarchar(200),t2.miles) + ' miles in FMSS (' + convert(nvarchar(200),100*(t1.miles - t2.miles)/ t2.miles) + '%)' as Details
+  from (select min(objectid) as oid, FACLOCID, sum(GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) * 0.000621371 as miles from gis.TRAILS_LN_evw where faclocid is not null group by FACLOCID) as t1
+  join (select Location, convert(real, Qty) as miles from FMSSExport where UM = 'mi') as t2 on t1.FACLOCID = t2.Location
+  where abs(t1.miles - t2.miles)/ t2.miles > 0.2
+union all
+select OBJECTID, 'Warning: Trail segment is shorter than 5 meters' as Issue,
+  'Length = ' + convert(nvarchar(200),GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) + ' meters' as Details
+  from gis.TRAILS_LN_evw where GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength() < 5
+union all
+select OBJECTID, 'Error: Multiline roads are not allowed' as Issue, NULL from gis.TRAILS_LN_evw where SHAPE.STGeometryType() = 'MultiLineString'
+union all
+-- Overlapping segments:  Takes about 15 seconds
+select r1.OBJECTID, 'Error: Overlapping segments are not allowed' as Issue, 'Overlaps with OBJECTID = ' + convert(nvarchar(20), r2.OBJECTID) as Details
+from gis.TRAILS_LN_evw as r1 join gis.TRAILS_LN_evw as r2 on r1.shape.Filter(r2.shape) = 1 and r1.OBJECTID < r2.OBJECTID where r1.Shape.STOverlaps(r2.Shape) = 1
+
 
 
 
