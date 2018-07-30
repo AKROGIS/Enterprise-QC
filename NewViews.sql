@@ -2769,9 +2769,10 @@ BEGIN
     update gis.AKR_BLDG_CENTER_PT_evw set PARKBLDGID = NULL where PARKBLDGID = ''
     -- 37) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
     --     TODO: for more accuracy, use the building footprint (some footprints in Skagway straddle the boundary)
-    merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_UNIT as t2
-      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END <> t1.ISOUTPARK)
-      when matched then update set ISOUTPARK = CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END;
+    merge into gis.AKR_BLDG_CENTER_PT_evw as t1
+      using (select c.GeometryID, u.Unit_Code, u.Shape as uShape, ISNULL(f.Shape, c.Shape) as fShape from gis.AKR_BLDG_CENTER_PT_evw as c join gis.AKR_UNIT as u on c.UNITCODE = u.Unit_Code left join gis.AKR_BLDG_FOOTPRINT_PY_evw as f on f.FEATUREID = c.FEATUREID) as t2
+      on t1.GEOMETRYID = t2.GEOMETRYID and (t1.ISOUTPARK is null or CASE WHEN t2.uShape.STContains(fShape) = 1 THEN  'No' ELSE CASE WHEN t2.fShape.STIntersects(t2.uShape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.uShape.STContains(fShape) = 1 THEN  'No' ELSE CASE WHEN t2.fShape.STIntersects(t2.uShape) = 1 THEN 'Both' ELSE 'Yes' END END;
 
     -- Stop editing
     exec sde.edit_version @version, 2; -- 2 to stop edits
