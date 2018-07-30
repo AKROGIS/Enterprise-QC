@@ -787,9 +787,9 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1 left join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
--- TODO This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
-select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
-  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.AKR_BLDG_CENTER_PT_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
 union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
@@ -1236,9 +1236,9 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.PARKLOTS_PY_evw as t1 left join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
--- TODO This query is very slow with versioning when the dataset gets larger.  Figure it out, live with it, or run as separate check occasionally
-select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, NULL from gis.PARKLOTS_PY_evw as t1
-  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.PARKLOTS_PY_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
 union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, NULL from gis.PARKLOTS_PY_evw as p join 
   (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
@@ -1593,9 +1593,9 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1 left join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
--- TODO This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
-select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, NULL from gis.ROADS_LN_evw as t1
-  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.ROADS_LN_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
 union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, NULL from gis.ROADS_LN_evw as p join 
   (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
@@ -1864,9 +1864,9 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
--- TODO: This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
-select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as t1
-  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.TRAILS_ATTRIBUTE_PT_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
 union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as p join 
   (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
@@ -2114,9 +2114,9 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1 left join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
--- TODO: This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
-select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1
-  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.TRAILS_FEATURE_PT_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
 union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as p join 
   (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
@@ -2411,9 +2411,9 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1 left join
   dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
--- TODO This query is very slow (~30-60sec) with versioning.  Figure it out, live with it, or run as separate check occasionally
-select t1.OBJECTID, 'Error: UNITCODE does not match the boundary it is within'  as Issue, NULL from gis.TRAILS_LN_evw as t1
-  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE <> t2.Unit_Code
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.TRAILS_LN_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
 union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park'  as Issue, NULL from gis.TRAILS_LN_evw as p join 
   (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
