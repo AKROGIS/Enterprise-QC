@@ -973,6 +973,21 @@ select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from 
   left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
 -- 8) NOTES is not required, but if it provided is it should not be an empty string
 --    This can be checked and fixed automatically; no need to alert the user.
+---------------
+-- Shape Checks
+---------------
+-- Sum of Areas grouped by faclocid should be close to Area FMSS.QTY (in SquareFeet)
+-- TODO: Reassess this query
+-- There are a lot of issues: 1) GIS SF is based on roof edge; not interior size; 2) GIS does not know about multiple floors; 3) footprint from GPS maybe a rectangular approximation.
+/*
+union all
+select oid, 'Error: Building Area in GIS is more than 20% different from FMSS' as Issue,
+  'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.sf) + ' SF in GIS, but ' + convert(nvarchar(200),t2.sf) + ' SF in FMSS (' + convert(nvarchar(200),100*(t1.sf - t2.sf)/ t2.sf) + '%)' as Details
+  from (select min(f.objectid) as oid, c.FACLOCID, sum(GEOGRAPHY::STGeomFromText(f.shape.STAsText(),4269).STArea()) * 3.28084 * 3.28084 as sf from gis.AKR_BLDG_FOOTPRINT_PY_evw as f 
+        join gis.AKR_BLDG_CENTER_PT_evw as c on c.FEATUREID = f.FEATUREID where c.faclocid is not null group by c.FACLOCID) as t1
+  join (select Location, convert(real, replace(Qty,',','')) as sf from FMSSExport where UM = 'GSF') as t2 on t1.FACLOCID = t2.Location
+  where abs(t1.sf - t2.sf)/ t2.sf > 0.2
+*/
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -1328,7 +1343,19 @@ union all
 ---------------
 select p1.OBJECTID, 'Error: Overlapping polygons are not allowed' as Issue, 'Overlaps with OBJECTID = ' + convert(nvarchar(20), p2.OBJECTID) as Details
 from gis.PARKLOTS_PY_evw as p1 join gis.PARKLOTS_PY_evw as p2 on p1.shape.Filter(p2.shape) = 1 and p1.OBJECTID < p2.OBJECTID where p1.Shape.STOverlaps(p2.Shape) = 1
-
+-- Sum of Areas grouped by faclocid should be close to Area FMSS.QTY (in SquareFeet)
+-- TODO: Skip this check for now (there are significant errors that I don't have time to review/fix now)
+-- One issue seems to be that GIS may only include the parking spaces, while FMSS may includes all the improved area (access road)
+-- The issue may also be reversed
+/*
+union all
+select oid, 'Error: Parking Area in GIS is more than 20% different from FMSS' as Issue,
+  'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.sf) + ' SF in GIS, but ' + convert(nvarchar(200),t2.sf) + ' SF in FMSS (' + convert(nvarchar(200),100*(t1.sf - t2.sf)/ t2.sf) + '%)' as Details
+  from (select min(objectid) as oid, FACLOCID, sum(GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STArea()) * 3.28084 * 3.28084 as sf from gis.PARKLOTS_PY_evw where faclocid is not null group by FACLOCID) as t1
+  join (select Location, convert(real, replace(Qty,',','')) as sf from FMSSExport where UM = 'SF') as t2 on t1.FACLOCID = t2.Location
+  where abs(t1.sf - t2.sf)/ t2.sf > 0.2
+  order by abs(t1.sf - t2.sf)
+*/
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
