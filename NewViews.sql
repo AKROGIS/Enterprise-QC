@@ -1208,6 +1208,7 @@ union all
 -- 17) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
 -- 18) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
 --     TODO: are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
+--           select ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.PARKLOTS_PY_evw where PUBLICDISPLAY = 'Public Map Display' group by ISEXTANT, ISOUTPARK, UNITCODE
 select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.PARKLOTS_PY_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
 union all
 select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.PARKLOTS_PY_evw as t1
@@ -1562,6 +1563,7 @@ select t1.OBJECTID, 'Error: ISEXTANT does not match RDSTATUS' as Issue,
 union all
 -- 23) PUBLICDISPLAY is a required Domain Value; Default to 'No Public Map Display' with Warning
 --     TODO: are there requirements of other fields (i.e. RDSTATUS, ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
+--           select RDSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.ROADS_LN_evw where PUBLICDISPLAY = 'Public Map Display' group by RDSTATUS, ISEXTANT, ISOUTPARK, UNITCODE
 select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.ROADS_LN_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
 union all
 select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
@@ -1836,6 +1838,7 @@ union all
 -- 16) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
 -- 17) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
 --     TODO: Are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE, ??) when PUBLICDISPLAY is true?
+--           select ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.TRAILS_ATTRIBUTE_PT_evw where PUBLICDISPLAY = 'Public Map Display' group by ISEXTANT, ISOUTPARK, UNITCODE
 select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
 union all
 select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as t1
@@ -2086,6 +2089,7 @@ union all
 -- 20) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
 -- 21) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
 --     TODO: Are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE, ??) when PUBLICDISPLAY is true?
+--           select ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.TRAILS_FEATURE_PT_evw where PUBLICDISPLAY = 'Public Map Display' group by ISEXTANT, ISOUTPARK, UNITCODE
 select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
 union all
 select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1
@@ -2383,6 +2387,7 @@ select t1.OBJECTID, 'Error: ISEXTANT does not match TRLSTATUS' as Issue,
 union all
 -- 22) PUBLICDISPLAY is a required Domain Value; Default to 'No Public Map Display' with Warning
 --     TODO: are there requirements of other fields (i.e. TRLSTATUS, ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
+--           select TRLSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.TRAILS_LN_evw where PUBLICDISPLAY = 'Public Map Display' group by TRLSTATUS, ISEXTANT, ISOUTPARK, UNITCODE
 select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
 union all
 select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
@@ -2732,7 +2737,6 @@ BEGIN
     -- 23) DATAACCESS defaults to No Public Map Display
     update gis.AKR_BLDG_CENTER_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
     -- 24) UNITCODE is a spatial calc if null
-    -- TODO: Should we first calc from FMSS? would also need to fix qc check.  What if FMSS value is not in spatial extent?
     merge into gis.AKR_BLDG_CENTER_PT_evw as t1 using gis.AKR_UNIT as t2
       on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
       when matched then update set UNITCODE = t2.Unit_Code;
@@ -2841,7 +2845,6 @@ BEGIN
     -- 12) DATAACCESS defaults to No Public Map Display
     update gis.PARKLOTS_PY_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
     -- 13) UNITCODE is a spatial calc if null
-    -- TODO: Should we first calc from FMSS? would also need to fix qc check.  What if FMSS value is not in spatial extent?
     merge into gis.PARKLOTS_PY_evw as t1 using gis.AKR_UNIT as t2
       on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
       when matched then update set UNITCODE = t2.Unit_Code;
@@ -2999,7 +3002,6 @@ BEGIN
     -- 21) DATAACCESS defaults to No Public Map Display
     update gis.ROADS_LN_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
     -- 22) UNITCODE is a spatial calc if null
-    -- TODO: Should we first calc from FMSS? would also need to fix qc check.  What if FMSS value is not in spatial extent?
     merge into gis.ROADS_LN_evw as t1 using gis.AKR_UNIT as t2
       on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
       when matched then update set UNITCODE = t2.Unit_Code;
@@ -3353,7 +3355,6 @@ BEGIN
     -- 24) DATAACCESS defaults to No Public Map Display
     update gis.TRAILS_LN_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
     -- 25) UNITCODE is a spatial calc if null
-    -- TODO: Should we first calc from FMSS? would also need to fix qc check.  What if FMSS value is not in spatial extent?
     merge into gis.TRAILS_LN_evw as t1 using gis.AKR_UNIT as t2
       on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
       when matched then update set UNITCODE = t2.Unit_Code;
