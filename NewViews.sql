@@ -717,9 +717,12 @@ union all
 select t1.OBJECTID, 'Error: BLDGCODE is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
        left join dbo.DOM_BLDGCODETYPE as t2 on t1.BLDGCODE = t2.Code where t1.BLDGCODE is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: BLDGCODE does not match FMSS.DOI_Code' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
-  (SELECT DOI_Code, Location FROM dbo.FMSSExport where DOI_Code in (select Code from dbo.DOM_BLDGCODETYPE)) as f
-  on f.Location = p.FACLOCID where p.BLDGCODE <> f.DOI_Code
+select p.OBJECTID, 'Error: BLDGCODE does not match FMSS.DOI_Code' as Issue,
+  'Location ' + FACLOCID + ' has DOI_Code ' + f.DOI_Code + ' (' + d.Type + ') when GIS has BLDGCODE = ' + p.BLDGCODE + ' (' + p.BLDGTYPE + ')' as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p
+  join dbo.FMSSExport as f on f.Location = p.FACLOCID
+  join dbo.DOM_BLDGCODETYPE as d on f.DOI_Code = d.Code
+  where p.BLDGCODE <> f.DOI_Code
 union all
 -- 14) BLDGTYPE is an optional domain value
 select t1.OBJECTID, 'Error: BLDGTYPE is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
@@ -732,7 +735,9 @@ select t1.OBJECTID, 'Error: BLDGCODE does not match BLDGTYPE' as Issue, NULL fro
 	   where (t1.BLDGTYPE <> t2.Type and t3.Type is not null)
 	      or (t1.BLDGCODE <> t3.Code and t2.Code is not null)
 union all
-select p.OBJECTID, 'Error: BLDGTYPE does not match type related to FMSS.DOI_Code' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: BLDGTYPE does not match type related to FMSS.DOI_Code' as Issue,
+  'Location ' + FACLOCID + ' has DOI_Code ' + f.DOI_Code + ' when GIS has BLDGTYPE = ' + p.BLDGTYPE as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT DOI_Code, Location FROM dbo.FMSSExport where DOI_Code in (select Code from dbo.DOM_BLDGCODETYPE)) as f on f.Location = p.FACLOCID 
   join dbo.DOM_BLDGCODETYPE as d on p.BLDGTYPE = d.Type where p.BLDGCODE is null and d.Code <> f.DOI_Code
 union all
@@ -740,7 +745,9 @@ union all
 select t1.OBJECTID, 'Error: FACOWNER is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
        left join dbo.DOM_FACOWNER as t2 on t1.FACOWNER = t2.Code where t1.FACOWNER is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: FACOWNER does not match FMSS.Asset_Ownership' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: FACOWNER does not match FMSS.Asset_Ownership' as Issue,
+  'Location ' + FACLOCID + ' has Asset_Ownership ' + f.Asset_Ownership + ' when GIS has FACOWNER = ' + p.FACOWNER as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT Asset_Ownership, Location FROM dbo.FMSSExport where Asset_Ownership in (select Code from dbo.DOM_FACOWNER)) as f
   on f.Location = p.FACLOCID where p.FACOWNER <> f.Asset_Ownership
 union all
@@ -748,7 +755,9 @@ union all
 select t1.OBJECTID, 'Error: FACOCCUPANT is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
        left join dbo.DOM_FACOCCUMAINT as t2 on t1.FACOCCUPANT = t2.Code where t1.FACOCCUPANT is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: FACOCCUPANT does not match FMSS.Occupant' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: FACOCCUPANT does not match FMSS.Occupant' as Issue,
+  'Location ' + FACLOCID + ' has Occupant ' + f.Occupant + ' when GIS has FACOCCUPANT = ' + p.FACOCCUPANT as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT Occupant, Location FROM dbo.FMSSExport where Occupant in (select Code from dbo.DOM_FACOCCUMAINT)) as f
   on f.Location = p.FACLOCID where p.FACOCCUPANT <> f.Occupant
 union all
@@ -756,7 +765,9 @@ union all
 select t1.OBJECTID, 'Error: FACMAINTAIN is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
        left join dbo.DOM_FACOCCUMAINT as t2 on t1.FACMAINTAIN = t2.Code where t1.FACMAINTAIN is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: FACMAINTAIN does not match FMSS.FAMARESP' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: FACMAINTAIN does not match FMSS.FAMARESP' as Issue,
+  'Location ' + FACLOCID + ' has FAMARESP ' + f.FAMARESP + ' when GIS has FACMAINTAIN = ' + p.FACMAINTAIN as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
   on f.Location = p.FACLOCID where p.FACMAINTAIN <> f.FAMARESP
 union all
@@ -764,7 +775,9 @@ union all
 select t1.OBJECTID, 'Error: FACUSE is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
        left join dbo.DOM_FACUSE as t2 on t1.FACUSE = t2.Code where FACUSE is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: FACUSE does not match FMSS.PRIMUSE' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: FACUSE does not match FMSS.PRIMUSE' as Issue,
+  'Location ' + FACLOCID + ' has PRIMUSE ' + f.PRIMUSE + ' when GIS has FACUSE = ' + p.FACUSE as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT PRIMUSE, Location FROM dbo.FMSSExport where PRIMUSE in (select Code from dbo.DOM_FACUSE)) as f
   on f.Location = p.FACLOCID where p.FACUSE <> f.PRIMUSE
 union all
@@ -772,7 +785,9 @@ union all
 select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
        left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + FACLOCID + ' has OPSEAS ' + f.OPSEAS + ' when GIS has SEASONAL = ' + p.SEASONAL as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
   on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
 union all
@@ -849,7 +864,9 @@ select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' a
   'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
   left join gis.AKR_BLDG_CENTER_PT_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
 union all
-select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue,
+  'Location ' + FACLOCID + ' has Park ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
   on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
@@ -893,8 +910,11 @@ union all
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
-select t1.OBJECTID, 'Error: FACLOCID is not a Building (4100) asset' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1 join
-  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t2.Asset_Code <> '4100'
+select t1.OBJECTID, 'Error: FACLOCID is not a Building (4100) asset' as Issue,
+  'Location ' + FACLOCID + ' has an Asset Code of ' + t2.Asset_Code + ' (' + t3.Description + ')' as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location join DOM_FMSS_ASSETCODE as t3 on t2.Asset_Code = t3.Code
+  where t2.Asset_Code <> '4100'
 union all
 select t1.OBJECTID, 'Error: FACLOCID is not unique' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1 join
        (select FACLOCID from gis.AKR_BLDG_CENTER_PT_evw where FACLOCID is not null and FACLOCID <> '' group by FACLOCID having count(*) > 1) as t2 on t1.FACLOCID = t2.FACLOCID
@@ -903,13 +923,18 @@ union all
 select t1.OBJECTID, 'Error: FACASSETID is not unique' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1 join
        (select FACASSETID from gis.AKR_BLDG_CENTER_PT_evw where FACASSETID is not null and FACASSETID <> '' group by FACASSETID having count(*) > 1) as t2 on t1.FACASSETID = t2.FACASSETID
 union all
-select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1 join
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue,
+  'FACASSETID ' + t1.FACASSETID + ' has an Location of ' + t3.Location +  ' when GIS has FACLOCID = ' + t1.FACLOCID as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as t1 join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
   dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
 union all
-select t1.OBJECTID, 'Error: FACASSETID does not match a Building (4100) asset in FMSS' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1 join
+select t1.OBJECTID, 'Error: FACASSETID does not match a Building (4100) asset in FMSS' as Issue,
+  'FACASSETID ' + FACASSETID + ' has an Asset Code of ' + t3.Asset_Code + ' (' + t4.Description + ')' as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as t1 join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
-  dbo.FMSSExport as t3 on t2.Location = t3.Location where (t1.FACLOCID is null or t1.FACLOCID = t3.Location) and t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code <> '4100'
+  dbo.FMSSExport as t3 on t2.Location = t3.Location join DOM_FMSS_ASSETCODE as t4 on t3.Asset_Code = t4.Code
+  where (t1.FACLOCID is null or t1.FACLOCID = t3.Location) and t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code <> '4100'
 union all
 -- 31) CRID is optional free text, but if provided it must be unique and match an CR_ID in the Cultural Resource Database
 --     TODO:  Get a link to the Cultural Resource Database and compare
@@ -926,7 +951,9 @@ union all
 select t1.OBJECTID, 'Error: CLIID is not unique' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1 join
        (select CLIID from gis.AKR_BLDG_CENTER_PT_evw where CLIID is not null and CLIID <> '' group by CLIID having count(*) > 1) as t2 on t1.CLIID = t2.CLIID
 union all
-select p.OBJECTID, 'Error: CLIID does not match FMSS.CLINO' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: CLIID does not match FMSS.CLINO' as Issue,
+  'Location ' + FACLOCID + ' has CLINO ' + f.CLINO + ' when GIS has CLIID = ' + p.CLIID as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (select CLINO, Location FROM dbo.FMSSExport where CLINO not in ('', 'NONE', 'N', 'NA', 'N/A')) as f
   on f.Location = p.FACLOCID where p.CLIID <> f.CLINO
 union all
@@ -935,7 +962,9 @@ union all
 select t1.OBJECTID, 'Error: LCSID is not unique' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1 join
        (select LCSID from gis.AKR_BLDG_CENTER_PT_evw where LCSID is not null and LCSID <> '' group by LCSID having count(*) > 1) as t2 on t1.LCSID = t2.LCSID
 union all
-select p.OBJECTID, 'Error: LCSID does not match FMSS.CLASSSTR' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: LCSID does not match FMSS.CLASSSTR' as Issue,
+  'Location ' + FACLOCID + ' has CLASSSTR ' + f.CLASSSTR + ' when GIS has LCSID = ' + p.LCSID as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (select CLASSSTR, Location FROM dbo.FMSSExport where CLASSSTR not in ('', 'NONE', 'N', 'NA', 'N/A', 'LCS')) as f
   on f.Location = p.FACLOCID where p.LCSID <> f.CLASSSTR
 union all
@@ -949,7 +978,9 @@ select t1.OBJECTID, 'Error: PARKBLDGID is not unique in the unit' as Issue, NULL
        (select PARKBLDGID, UNITCODE from gis.AKR_BLDG_CENTER_PT_evw where PARKBLDGID is not null and PARKBLDGID <> '' group by PARKBLDGID, UNITCODE having count(*) > 1) as t2
 	    on t1.PARKBLDGID = t2.PARKBLDGID and t1.UNITCODE = t2.UNITCODE
 union all
-select p.OBJECTID, 'Error: PARKBLDGID does not match FMSS.PARKNUMB' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p join 
+select p.OBJECTID, 'Error: PARKBLDGID does not match FMSS.PARKNUMB' as Issue,
+  'Location ' + FACLOCID + ' has PARKNUMB ' + f.PARKNUMB + ' when GIS has PARKBLDGID = ' + p.PARKBLDGID as Details
+  from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT PARKNUMB, Location FROM dbo.FMSSExport where PARKNUMB not in ('', 'n', 'n/a', 'na', 'none')) as f
   on f.Location = p.FACLOCID where p.PARKBLDGID <> f.PARKNUMB
 -- 37) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
@@ -1273,7 +1304,9 @@ union all
 select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue, NULL from gis.PARKLOTS_PY_evw as t1
        left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue, NULL from gis.PARKLOTS_PY_evw as p join 
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + FACLOCID + ' has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.PARKLOTS_PY_evw as p join 
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
   on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
 union all
@@ -1496,18 +1529,15 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
 --  Easy check to see if two segments are connected
-select OBJECTID, 'Error: Segments with the same FEATUREID are not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
-  from gis.ROADS_LN_evw where FEATUREID in 
-    (select t1.Featureid from (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN_evw group by FEATUREID having count(*) = 2)) as t1
-     join (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN_evw group by FEATUREID having count(*) = 2)) as t2
-     on t1.FEATUREID = t2.FEATUREID and t1.GEOMETRYID < t2.GEOMETRYID and t1.Shape.STIntersects(t2.Shape) = 0)
+select t1.OBJECTID, 'Error: Segments with the same FEATUREID are not connected' as Issue, '2 segments with FEATUREID = ''' + t1.FEATUREID + '''' as Details
+  from (select FEATUREID, Shape, OBJECTID from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN_evw group by FEATUREID having count(*) = 2)) as t1
+  join (select FEATUREID, Shape, OBJECTID from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN_evw group by FEATUREID having count(*) = 2)) as t2
+  on t1.FEATUREID = t2.FEATUREID and t1.OBJECTID < t2.OBJECTID and t1.Shape.STIntersects(t2.Shape) = 0
 union all
 -- Harder check to see if more than two segments are all connected
---  RoadIsContiguous() is slow, I only want to call it once on each featureid that has more than 2 segments
---  SQL does not guarantee the order of evaulation in a where clause, so I need to use sub-queries
-select OBJECTID, 'Error: Segments with the same FEATUREID are not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
-  from gis.ROADS_LN_evw where FEATUREID in 
-    (select FEATUREID from (select FEATUREID, dbo.RoadIsFullyConnected(FEATUREID) as contig from gis.ROADS_LN_evw group by FEATUREID having count(*) > 2) as t where contig = 0)
+--  RoadIsFullyConnected() is slow, I only want to call it once on each featureid that has more than 2 segments
+select OBJECTID, 'Error: Segments with the same FEATUREID are not connected' as Issue, convert(NVARCHAR(10),cnt) + ' segments with FEATUREID = ''' + FEATUREID + '''' as Details
+  from (select min(objectid) as OBJECTID, FEATUREID, dbo.RoadIsFullyConnected(FEATUREID) as contig, count(*) as cnt from gis.ROADS_LN_evw group by FEATUREID having count(*) > 2) as t where contig = 0
 union all
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_LN_evw where MAPMETHOD is null or MAPMETHOD = ''
@@ -2438,7 +2468,6 @@ select t1.OBJECTID, 'Error: Segments with the same FEATUREID are not connected' 
 union all
 -- Harder check to see if more than two segments are all connected
 --  TrailIsFullyConnected() is slow, I only want to call it once on each featureid that has more than 2 segments
---  SQL does not guarantee the order of evaulation in a where clause, so I need to use sub-queries
 select OBJECTID, 'Error: Segments with the same FEATUREID are not connected' as Issue, convert(NVARCHAR(10),cnt) + ' segments with FEATUREID = ''' + FEATUREID + '''' as Details
   from (select min(objectid) as OBJECTID, FEATUREID, dbo.TrailIsFullyConnected(FEATUREID) as contig, count(*) as cnt from gis.TRAILS_LN_evw group by FEATUREID having count(*) > 2) as t where contig = 0
 union all

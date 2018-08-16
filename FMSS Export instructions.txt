@@ -57,7 +57,7 @@ make sure all data is formatted as text
 Save as CSV
 Open in VS Code or Atom and change CRLF to LF and make sure there are leading zeros on some locations
 Import to SQL Server as FMSSExport_Location1
-  - allow null on all, no PK, all nvarchar(50) except FCI = float, Long_Description = nvarchar(400), Description = nvarchar(250)
+  - allow null on all, no PK, all nvarchar(50) except FCI = float, Long_Description = nvarchar(4000), Description = nvarchar(250)
 
 
 Expand the FRP folder
@@ -73,7 +73,7 @@ make sure all data is formatted as text
 Save as CSV
 Open in VS Code or Atom and change CRLF to LF and make sure there are leading zeros on some locations
 Import to SQL Server as FMSSExport_FRP
-  - allow null on all, no PK, all nvarchar(50+) 4000 char for long desc
+  - allow null on all, no PK, all nvarchar(50) except FRP_Long_Description = nvarchar(4000)
 
 Build final table:
 SELECT l1.*, 
@@ -87,10 +87,10 @@ left join FMSSExport_Location3 as l3 on l1.Location = l3.Location
 left join FMSSExport_FRP as l4  on l1.Location = l4.Location;
 alter table FMSSExport alter column Location NVARCHAR(50) not null
 alter table FMSSExport add primary key (Location)
-drop FMSSExport_Location1
-drop FMSSExport_Location2
-drop FMSSExport_Location3
-drop FMSSExport_FRP
+drop table FMSSExport_Location1
+drop table FMSSExport_Location2
+drop table FMSSExport_Location3
+drop table FMSSExport_FRP
 
 
 For Assets
