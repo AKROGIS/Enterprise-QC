@@ -101,6 +101,64 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
+CREATE FUNCTION [dbo].[TrailNotConnected](@featureid VARCHAR(255)) RETURNS geometry
+AS
+BEGIN
+  Declare @segments Table (segment geometry)  -- contains all segments not yet connected
+  DECLARE @shape geometry                     -- The union of the connected segments (starts with one segment and builds)
+  DECLARE @connected_segments geometry        -- A geometry collection of all segments that intersect @Shape, but are not yet unioned
+  DECLARE @count int                          -- How many segments are still unconnected
+   
+  INSERT INTO @segments select Shape from gis.TRAILS_LN_evw where FEATUREID = @featureid;
+  Select Top 1 @shape = segment from @segments order by segment.STLength() desc;
+  delete @segments where segment.STEquals(@shape) = 1;
+
+  WHILE @shape IS NOT NULL
+  BEGIN
+	-- if a segment touches @shape, remove from @segments and union with @shape
+    select @connected_segments = geometry::CollectionAggregate(segment) from @segments where segment.STIntersects(@shape) = 1;
+	delete from @segments where segment.STIntersects(@shape) = 1;
+	Set @shape = @shape.STUnion(@connected_segments)  -- will be set to null if there are no connected segments, so we are done
+  END
+  --SELECT @count = count(*) from @segments  -- fully connected if there are no segments left unconnected
+  Select Top 1 @shape = segment from @segments
+  RETURN @shape
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [dbo].[TrailsNotConnected](@featureid VARCHAR(255)) RETURNS int
+AS
+BEGIN
+  Declare @segments Table (segment geometry)  -- contains all segments not yet connected
+  DECLARE @shape geometry                     -- The union of the connected segments (starts with one segment and builds)
+  DECLARE @connected_segments geometry        -- A geometry collection of all segments that intersect @Shape, but are not yet unioned
+  DECLARE @count int                          -- How many segments are still unconnected
+   
+  INSERT INTO @segments select Shape from gis.TRAILS_LN_evw where FEATUREID = @featureid;
+  Select Top 1 @shape = segment from @segments order by segment.STLength() desc;
+  delete @segments where segment.STEquals(@shape) = 1;
+
+  WHILE @shape IS NOT NULL
+  BEGIN
+	-- if a segment touches @shape, remove from @segments and union with @shape
+    select @connected_segments = geometry::CollectionAggregate(segment) from @segments where segment.STIntersects(@shape) = 1;
+	delete from @segments where segment.STIntersects(@shape) = 1;
+	Set @shape = @shape.STUnion(@connected_segments)  -- will be set to null if there are no connected segments, so we are done
+  END
+  SELECT @count = count(*) from @segments  -- fully connected if there are no segments left unconnected
+  --Select Top 1 @shape = segment from @segments
+  RETURN @count
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 CREATE FUNCTION [dbo].[TrailUse](
      @a nvarchar(10), -- Foot
      @b nvarchar(10), -- Bike
@@ -895,6 +953,11 @@ select p.OBJECTID, 'Error: PARKBLDGID does not match FMSS.PARKNUMB' as Issue, NU
   (SELECT PARKNUMB, Location FROM dbo.FMSSExport where PARKNUMB not in ('', 'n', 'n/a', 'na', 'none')) as f
   on f.Location = p.FACLOCID where p.PARKBLDGID <> f.PARKNUMB
 -- 37) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 38) SHAPE
+union all
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw where shape.STIsEmpty() = 1
+
+
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -976,6 +1039,10 @@ select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from 
 ---------------
 -- Shape Checks
 ---------------
+union all
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where shape.STIsEmpty() = 1
+union all
+select OBJECTID, 'Error: SHAPE must be valid' as Issue from gis.AKR_BLDG_FOOTPRINT_PY_evw where shape.STIsValid() = 0
 -- Sum of Areas grouped by faclocid should be close to Area FMSS.QTY (in SquareFeet)
 -- TODO: Reassess this query
 -- There are a lot of issues: 1) GIS SF is based on roof edge; not interior size; 2) GIS does not know about multiple floors; 3) footprint from GPS maybe a rectangular approximation.
@@ -988,6 +1055,7 @@ select oid, 'Error: Building Area in GIS is more than 20% different from FMSS' a
   join (select Location, convert(real, replace(Qty,',','')) as sf from FMSSExport where UM = 'GSF') as t2 on t1.FACLOCID = t2.Location
   where abs(t1.sf - t2.sf)/ t2.sf > 0.2
 */
+
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -1106,6 +1174,13 @@ select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown
 union all
 select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PY_evw as t1
   left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+---------------
+-- Shape Checks
+---------------
+union all
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue from gis.AKR_BLDG_OTHER_PY_evw where shape.STIsEmpty() = 1
+union all
+select OBJECTID, 'Error: SHAPE must be valid' as Issue from gis.AKR_BLDG_OTHER_PY_evw where shape.STIsValid() = 0
 
 ) AS I
 on D.OBJECTID = I.OBJECTID
@@ -1341,6 +1416,10 @@ union all
 ---------------
 -- Shape Checks
 ---------------
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.PARKLOTS_PY_evw where shape.STIsEmpty() = 1
+union all
+select OBJECTID, 'Error: SHAPE must be valid' as Issue, NULL from gis.PARKLOTS_PY_evw where shape.STIsValid() = 0
+union all
 select p1.OBJECTID, 'Error: Overlapping polygons are not allowed' as Issue, 'Overlaps with OBJECTID = ' + convert(nvarchar(20), p2.OBJECTID) as Details
 from gis.PARKLOTS_PY_evw as p1 join gis.PARKLOTS_PY_evw as p2 on p1.shape.Filter(p2.shape) = 1 and p1.OBJECTID < p2.OBJECTID where p1.Shape.STOverlaps(p2.Shape) = 1
 -- Sum of Areas grouped by faclocid should be close to Area FMSS.QTY (in SquareFeet)
@@ -1417,7 +1496,7 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
 --  Easy check to see if two segments are connected
-select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+select OBJECTID, 'Error: Segments with the same FEATUREID are not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
   from gis.ROADS_LN_evw where FEATUREID in 
     (select t1.Featureid from (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN_evw group by FEATUREID having count(*) = 2)) as t1
      join (select FEATUREID, Shape, geometryid from gis.ROADS_LN_evw where FEATUREID in (select FEATUREID from gis.ROADS_LN_evw group by FEATUREID having count(*) = 2)) as t2
@@ -1426,7 +1505,7 @@ union all
 -- Harder check to see if more than two segments are all connected
 --  RoadIsContiguous() is slow, I only want to call it once on each featureid that has more than 2 segments
 --  SQL does not guarantee the order of evaulation in a where clause, so I need to use sub-queries
-select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+select OBJECTID, 'Error: Segments with the same FEATUREID are not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
   from gis.ROADS_LN_evw where FEATUREID in 
     (select FEATUREID from (select FEATUREID, dbo.RoadIsFullyConnected(FEATUREID) as contig from gis.ROADS_LN_evw group by FEATUREID having count(*) > 2) as t where contig = 0)
 union all
@@ -1717,20 +1796,28 @@ union all
 select t1.OBJECTID, 'Error: ISBRIDGE is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_YES_NO as t2 on t1.ISBRIDGE = t2.Code where t1.ISBRIDGE is not null and t1.ISBRIDGE <> '' and t2.Code is null
 union all
-select t1.OBJECTID, 'Error: ISBRIDGE does not match the FMSS.Asset_Code' as Issue, NULL from gis.ROADS_LN_evw as t1 join
-  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISBRIDGE = 'Yes' and t2.Asset_Code <> '1700') or (t1.ISBRIDGE <> 'Yes' and t2.Asset_Code = '1700'))
+select t1.OBJECTID, 'Error: ISBRIDGE does not match the FMSS.Asset_Code' as Issue,
+  'GIS has ISBRIDGE = ' + t1.ISBRIDGE + ' while FMSS has Asset Code = ' + t2.Asset_Code + ' (' + d.Description + ')' as Details
+  from gis.ROADS_LN_evw as t1 join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location join DOM_FMSS_ASSETCODE as d on t2.Asset_Code = d.Code 
+  where t1.FACLOCID is not null and ((t1.ISBRIDGE = 'Yes' and t2.Asset_Code <> '1700') or (t1.ISBRIDGE <> 'Yes' and t2.Asset_Code = '1700'))
 union all
 -- 35) ISTUNNEL: This is an AKR extension; it is a required element in the Yes/No domain; it silently defaults to 'No'
 --     if this feature has a FACLOCID then ISBRIDGE = 'Yes' implies FMSS.asset_code = '1700' and visa-versa
 select t1.OBJECTID, 'Error: ISTUNNEL is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_YES_NO as t2 on t1.ISTUNNEL = t2.Code where t1.ISTUNNEL is not null and t1.ISTUNNEL <> '' and t2.Code is null
 union all
-select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code' as Issue, NULL from gis.ROADS_LN_evw as t1 join
-  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISTUNNEL = 'Yes' and t2.Asset_Code <> '1800') or (t1.ISTUNNEL <> 'Yes' and t2.Asset_Code = '1800'))
+select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code' as Issue,
+  'GIS has ISTUNNEL = ' + t1.ISTUNNEL + ' while FMSS has Asset Code = ' + t2.Asset_Code + ' (' + d.Description + ')' as Details
+  from gis.ROADS_LN_evw as t1 join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location join DOM_FMSS_ASSETCODE as d on t2.Asset_Code = d.Code 
+  where t1.FACLOCID is not null and ((t1.ISTUNNEL = 'Yes' and t2.Asset_Code <> '1800') or (t1.ISTUNNEL <> 'Yes' and t2.Asset_Code = '1800'))
 union all
 ---------------
 -- Shape Checks
 ---------------
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.ROADS_LN_evw where shape.STIsEmpty() = 1
+union all
+select OBJECTID, 'Error: SHAPE must be valid' as Issue, NULL from gis.ROADS_LN_evw where shape.STIsValid() = 0
+union all
 -- Sum of lengths grouped by faclocid should be close to length FMSS.QTY (in miles)
 select oid, 'Error: Road length in GIS is more than 20% different from FMSS' as Issue,
 'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.miles) + ' miles in GIS, but ' + convert(nvarchar(200),t2.miles) + ' miles in FMSS (' + convert(nvarchar(200),100*(t1.miles - t2.miles)/ t2.miles) + '%)' as Details
@@ -1948,11 +2035,12 @@ select t1.OBJECTID, 'Error: FACLOCID is not approriate for this kind of trail fe
   where (t2.Asset_Code <> '2100' and t2.Asset_Code <> '2200' and t2.Asset_Code <> '2300')
 union all
 -- FACLOCID must be the same as the parent trail
--- TODO: This needs to be fixed; since featureid is not unique, this is a many to many relation,
---       so it will report a lot of false positives until the data is cleaned up.
---select t1.OBJECTID, 'Error: FACLOCID does not match the parent trail' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
---       gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t2.FEATUREID is not null and (t1.FACLOCID <> t2.FACLOCID or (t1.FACLOCID is null and t2.FACLOCID is not null) or (t2.FACLOCID is null and t1.FACLOCID is not null))
---union all
+select t1.OBJECTID, 'Error: FACLOCID does not match the parent trail' as Issue,
+  'Attribute point has FACLOCID = ' + t1.FACLOCID + ' but the trail it touches has FACLOCID = ' + t2.FACLOCID as Details
+  from gis.TRAILS_ATTRIBUTE_PT_evw as t1
+  --left join gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t2.FEATUREID is not null and (t1.FACLOCID <> t2.FACLOCID or (t1.FACLOCID is null and t2.FACLOCID is not null) or (t2.FACLOCID is null and t1.FACLOCID is not null))
+  join gis.TRAILS_LN_evw as t2 on t1.SEGMENTID = t2.GEOMETRYID where t1.FACLOCID <> t2.FACLOCID
+union all
 select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw where FACLOCID in (
     select FACLOCID from (select FACLOCID from gis.TRAILS_ATTRIBUTE_PT_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
 union all
@@ -1961,7 +2049,9 @@ union all
 select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as t1 left join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
 union all
-select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue,
+  'FACASSETID = ' + t1.FACASSETID + ' with Location = ' + t2.Location + ' however FACLOCID = ' + t1.FACLOCID as Details
+  from gis.TRAILS_ATTRIBUTE_PT_evw as t1 join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
   dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
 union all
@@ -1971,6 +2061,26 @@ select t1.OBJECTID, 'Error: FACASSETID does not match a trail asset in FMSS' as 
 union all
 select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw where FACASSETID in (
     select FACASSETID from (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
+union all
+-- SEGMENTID is the GEOMETRYID in TRAILS_LN which this attribute applies to
+-- ideally it is coincident with the first vertex, but it is sufficient that it touches
+-- this attribute will apply to the rest of the feature (all segments with the same featureid) in the digitized direction
+-- until the end of the trail, or changed by a new attribute value.
+select OBJECTID, 'Error: SEGMENTID must not be NULL' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw where SEGMENTID is null
+union all
+select a.OBJECTID, 'Error: SEGMENTID must match a GEOMETRYID in TRAILS_LN' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as a
+  left join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID where a.SEGMENTID is not null and t.GEOMETRYID is null
+union all
+select a.OBJECTID, 'Error: FEATUREID must match the FEATUREID of SEGMENTID in TRAILS_LN' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as a
+  join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID where a.FEATUREID <> t.FEATUREID
+union all
+select a.OBJECTID, 'Error: SHAPE must touch the SEGMENTID in TRAILS_LN' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as a
+  join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID where a.Shape.STIntersects(t.Shape) = 0
+--select a.OBJECTID, 'Error: SHAPE must touch the first vertex of SEGMENTID in TRAILS_LN' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw as a
+--  join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID where a.Shape.STIntersects(t.Shape.STPointN(1)) = 0
+union all
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.TRAILS_ATTRIBUTE_PT_evw where shape.STIsEmpty() = 1
+
 
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
@@ -2194,36 +2304,73 @@ select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
 -- A trail feature must be a 2100 (Trail) or a 2200 (Trail Bridge). A 2200 can be a TRLFEATTYPE Bridge or Walkable Structure. A TRLFEATTYPE Bridge must be a 2200, but a Walkable Structure can be a 2100 or a 2200
-select t1.OBJECTID, 'Error: FACLOCID is not approriate for this kind of trail feature (based on the Asset Code)' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1 join
+select t1.OBJECTID, 'Error: FACLOCID is not approriate for this kind of trail feature (based on the Asset Code)' as Issue,
+  'TRLFEATTYPE = ' + t1.TRLFEATTYPE + ' but Asset Code for ' + t2.Location + ' = ' + t2.Asset_Code + ' (' + d.Description + ')' as Details
+  from gis.TRAILS_FEATURE_PT_evw as t1 join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+  join DOM_FMSS_ASSETCODE as d on t2.Asset_Code = d.Code
   where (t2.Asset_Code <> '2100' and t2.Asset_Code <> '2200')
-     or (t2.Asset_Code = '2200' and t1.TRLFEATTYPE <> 'Bridge' and t1.TRLFEATTYPE <> 'Walkable Structure')
+     or (t2.Asset_Code = '2200' and t1.TRLFEATTYPE <> 'Bridge' and t1.TRLFEATTYPE <> 'Walkable Structure' and t1.TRLFEATTYPE <> 'Trail Head'and t1.TRLFEATTYPE <> 'Trail End')
      or (t1.TRLFEATTYPE = 'Bridge' and t2.Asset_Code <> '2200')
      or (t1.TRLFEATTYPE = 'Walkable Structure' and t2.Asset_Code <> '2200' and t2.Asset_Code <> '2100')
 union all
 -- FACLOCID does not need to be unique (a single trail can have several features) 
 -- FACLOCID must be the same as the parent trail
-select t1.OBJECTID, 'Error: FACLOCID does not match the parent trail' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1 join
-       gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t2.FACLOCID is null or t1.FACLOCID <> t2.FACLOCID
+select t1.OBJECTID, 'Error: FACLOCID does not match the nearest trail' as Issue,
+  'Feature point has FACLOCID = ' + ISNULL(t1.FACLOCID,'NULL') + ' but the trail it is near has FACLOCID = ' + ISNULL(t2.FACLOCID,'NULL') as Details
+  from gis.TRAILS_FEATURE_PT_evw as t1 join
+  --gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID  --(doesn't work well because it is a many to many join)
+  gis.TRAILS_LN_evw as t2 on t1.SEGMENTID = t2.GEOMETRYID
+  where (t1.FACLOCID is null and t2.FACLOCID is not null) or (t2.FACLOCID is null and t1.FACLOCID is not null) or t1.FACLOCID <> t2.FACLOCID
 union all
 select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where FACLOCID in (
     select FACLOCID from (select FACLOCID from gis.TRAILS_FEATURE_PT_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
 union all
 -- 29) FACASSETID is optional free text, provided it must match a Trail Location in the FMSS Assets Export
 --     All records with the same FACASSETID must have the same FEATUREID
-select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1 left join
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue,
+  'FACASSETID = ' + t1.FACASSETID + ' and FACLOCID = ' + t1.FACLOCID as Details
+  from gis.TRAILS_FEATURE_PT_evw as t1 left join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
 union all
-select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1 join
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue,
+  'FACASSETID = ' + t1.FACASSETID + ' belonging to Location = ' + t2.Location + ' however FACLOCID = ' + t1.FACLOCID as Details
+  from gis.TRAILS_FEATURE_PT_evw as t1 join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
   dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
 union all
-select t1.OBJECTID, 'Error: FACASSETID does not match a trail asset in FMSS' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1 join
+select t1.OBJECTID, 'Error: FACASSETID does not match a trail asset in FMSS' as Issue,
+  'FACASSETID = ' + t1.FACASSETID + ' belonging to Location = ' + t2.Location + ' Asset_Code = ' + t3.Asset_Code + ' (' + d.Description + ')' as Details
+  from gis.TRAILS_FEATURE_PT_evw as t1 join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
-  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code not in ('2100', '2200', '2300')
+  dbo.FMSSExport as t3 on t2.Location = t3.Location join DOM_FMSS_ASSETCODE as d on t3.Asset_Code = d.Code
+  where t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code not in ('2100', '2200', '2300')
 union all
 select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where FACASSETID in (
     select FACASSETID from (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
+union all
+-- SEGMENTID is the GEOMETRYID in TRAILS_LN which this attribute applies to
+-- ideally it is coincident with the first vertex, but it is sufficient that it touches
+-- this attribute will apply to the rest of the feature (all segments with the same featureid) in the digitized direction
+-- until the end of the trail, or changed by a new attribute value.
+select OBJECTID, 'Error: SEGMENTID must not be NULL' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where SEGMENTID is null
+union all
+select a.OBJECTID, 'Error: SEGMENTID must match a GEOMETRYID in TRAILS_LN' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as a
+  left join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID where a.SEGMENTID is not null and t.GEOMETRYID is null
+union all
+select a.OBJECTID, 'Error: FEATUREID must match the FEATUREID of SEGMENTID in TRAILS_LN' as Issue,
+  'Feature point has FEATUREID = ' + a.FEATUREID + ' but the trail it is near has FEATUREID = ' + t.FEATUREID as Details
+  from gis.TRAILS_FEATURE_PT_evw as a join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID where a.FEATUREID <> t.FEATUREID
+--union all
+-- TODO: Skip until trail issues are resolved.
+--       Operation fails due to some trails that are invalid when converted to geography
+--select a.OBJECTID, 'Error: SHAPE is more than 20m from SEGMENTID in TRAILS_LN' as Issue,
+--  'Point is ' + convert(nvarchar(50),round(GEOGRAPHY::STGeomFromText(a.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(t.shape.STAsText(),4269)),1)) + ' meters from ' + a.SEGMENTID as Details
+--  from gis.TRAILS_FEATURE_PT_evw as a
+--  join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID
+--  where GEOGRAPHY::STGeomFromText(a.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(t.shape.STAsText(),4269)) > 20
+union all
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where shape.STIsEmpty() = 1
 
 
 
@@ -2284,18 +2431,16 @@ select OBJECTID, 'Error: FEATUREID is not well-formed'  as Issue, NULL
 	  OR right(FEATUREID,1) <> '}'
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
-select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
-  from gis.TRAILS_LN_evw where FEATUREID in 
-    (select t1.Featureid from (select FEATUREID, Shape, geometryid from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.TRAILS_LN_evw group by FEATUREID having count(*) = 2)) as t1
-     join (select FEATUREID, Shape, geometryid from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.TRAILS_LN_evw group by FEATUREID having count(*) = 2)) as t2
-     on t1.FEATUREID = t2.FEATUREID and t1.GEOMETRYID < t2.GEOMETRYID and t1.Shape.STIntersects(t2.Shape) = 0)
+select t1.OBJECTID, 'Error: Segments with the same FEATUREID are not connected' as Issue, '2 segments with FEATUREID = ''' + t1.FEATUREID + '''' as Details
+  from (select FEATUREID, Shape, OBJECTID from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.TRAILS_LN_evw group by FEATUREID having count(*) = 2)) as t1
+  join (select FEATUREID, Shape, OBJECTID from gis.TRAILS_LN_evw where FEATUREID in (select FEATUREID from gis.TRAILS_LN_evw group by FEATUREID having count(*) = 2)) as t2
+  on t1.FEATUREID = t2.FEATUREID and t1.OBJECTID < t2.OBJECTID and t1.Shape.STIntersects(t2.Shape) = 0
 union all
 -- Harder check to see if more than two segments are all connected
 --  TrailIsFullyConnected() is slow, I only want to call it once on each featureid that has more than 2 segments
 --  SQL does not guarantee the order of evaulation in a where clause, so I need to use sub-queries
-select OBJECTID, 'Error: Segments with the same FEATUREID is not connected' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
-  from gis.TRAILS_LN_evw where FEATUREID in 
-    (select FEATUREID from (select FEATUREID, dbo.TrailIsFullyConnected(FEATUREID) as contig from gis.TRAILS_LN_evw group by FEATUREID having count(*) > 2) as t where contig = 0)
+select OBJECTID, 'Error: Segments with the same FEATUREID are not connected' as Issue, convert(NVARCHAR(10),cnt) + ' segments with FEATUREID = ''' + FEATUREID + '''' as Details
+  from (select min(objectid) as OBJECTID, FEATUREID, dbo.TrailIsFullyConnected(FEATUREID) as contig, count(*) as cnt from gis.TRAILS_LN_evw group by FEATUREID having count(*) > 2) as t where contig = 0
 union all
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where MAPMETHOD is null or MAPMETHOD = ''
@@ -2339,7 +2484,6 @@ union all
 -- 13) TRLSTATUS is a required domain value; default is 'Existing'
 --     different parts of a single 'Feature' can have different status
 --     TODO: removed 'Not Applicable' from Domain; consider removing Abandoned (use decomissioned) to match domain of roads/bldgs
---     TODO: Compare with FMSS; all parts of the feature with same FACLOCID will have the same status 
 select OBJECTID, 'Warning: TRLSTATUS is not provided, default value of *Existing* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where TRLSTATUS is null or TRLSTATUS = ''
 union all
 select t1.OBJECTID, 'Error: TRLSTATUS is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
@@ -2383,7 +2527,8 @@ union all
 select t1.OBJECTID, 'Error: SEASONAL is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS'  as Issue, NULL from gis.TRAILS_LN_evw as p join 
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS'  as Issue,
+  'SEASONAL = ' + p.SEASONAL + ' while FMSS.OPSEAS = ' + f.OPSEAS as Details from gis.TRAILS_LN_evw as p join 
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
   on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
 union all
@@ -2525,16 +2670,20 @@ union all
 select t1.OBJECTID, 'Error: ISBRIDGE is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_YES_NO as t2 on t1.ISBRIDGE = t2.Code where t1.ISBRIDGE is not null and t1.ISBRIDGE <> '' and t2.Code is null
 union all
-select t1.OBJECTID, 'Error: ISBRIDGE does not match the FMSS.Asset_Code'  as Issue, NULL from gis.TRAILS_LN_evw as t1 join
-  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISBRIDGE = 'Yes' and t2.Asset_Code <> '2200') or (t1.ISBRIDGE <> 'Yes' and t2.Asset_Code = '2200'))
+select t1.OBJECTID, 'Error: ISBRIDGE does not match the FMSS.Asset_Code' as Issue, 
+  'GIS has ISBRIDGE = ' + t1.ISBRIDGE + ' while FMSS has Asset Code = ' + t2.Asset_Code + ' (' + d.Description + ')' as Details
+  from gis.TRAILS_LN_evw as t1 join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location join DOM_FMSS_ASSETCODE as d on t2.Asset_Code = d.Code 
+  where t1.FACLOCID is not null and ((t1.ISBRIDGE = 'Yes' and t2.Asset_Code <> '2200') or (t1.ISBRIDGE <> 'Yes' and t2.Asset_Code = '2200'))
 union all
 -- 33) ISTUNNEL: This is an AKR extension; it is a required element in the Yes/No domain; it silently defaults to 'No'
 --     if this feature has a FACLOCID then ISBRIDGE = 'Yes' implies FMSS.asset_code = '1700' and visa-versa
 select t1.OBJECTID, 'Error: ISTUNNEL is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_YES_NO as t2 on t1.ISTUNNEL = t2.Code where t1.ISTUNNEL is not null and t1.ISTUNNEL <> '' and t2.Code is null
 union all
-select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code'  as Issue, NULL from gis.TRAILS_LN_evw as t1 join
-  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and ((t1.ISTUNNEL = 'Yes' and t2.Asset_Code <> '2300') or (t1.ISTUNNEL <> 'Yes' and t2.Asset_Code = '2300'))
+select t1.OBJECTID, 'Error: ISTUNNEL does not match the FMSS.Asset_Code' as Issue,
+  'GIS has ISTUNNEL = ' + t1.ISTUNNEL + ' while FMSS has Asset Code = ' + t2.Asset_Code + ' (' + d.Description + ')' as Details
+  from gis.TRAILS_LN_evw as t1 join dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location join DOM_FMSS_ASSETCODE as d on t2.Asset_Code = d.Code 
+  where t1.FACLOCID is not null and ((t1.ISTUNNEL = 'Yes' and t2.Asset_Code <> '2300') or (t1.ISTUNNEL <> 'Yes' and t2.Asset_Code = '2300'))
 union all 
 -- 34) TRLTRACK: This is an AKR extension; it is a required domain element; defaults to 'Unknown' with warning
 select OBJECTID, 'Warning: TRLTRACK is not provided, default value of *Unknown* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where TRLTRACK is null or TRLTRACK = ''
@@ -2615,17 +2764,32 @@ union all
 ---------------
 -- Shape Checks
 ---------------
--- Sum of lengths grouped by faclocid should be close to length FMSS.QTY (in miles)
-select oid, 'Error: Trail length in GIS is more than 20% different from FMSS' as Issue,
-'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.miles) + ' miles in GIS, but ' + convert(nvarchar(200),t2.miles) + ' miles in FMSS (' + convert(nvarchar(200),100*(t1.miles - t2.miles)/ t2.miles) + '%)' as Details
-  from (select min(objectid) as oid, FACLOCID, sum(GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) * 0.000621371 as miles from gis.TRAILS_LN_evw where faclocid is not null group by FACLOCID) as t1
-  join (select Location, convert(real, Qty) as miles from FMSSExport where UM = 'mi') as t2 on t1.FACLOCID = t2.Location
-  where abs(t1.miles - t2.miles)/ t2.miles > 0.2
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.TRAILS_LN_evw where shape.STIsEmpty() = 1
 union all
+select OBJECTID, 'Error: SHAPE must be valid' as Issue, NULL from gis.TRAILS_LN_evw where shape.STIsValid() = 0
+union all
+select OBJECTID, 'Error: SHAPE is invalid (when converted to a geography)', shape.STAsText()
+  from gis.TRAILS_LN_evw where GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STIsValid() = 0
+union all
+-- Sum of lengths grouped by faclocid should be close to length FMSS.QTY (in miles)
+/*
+-- Remove this query for now; These will take some research to resolve
+-- TODO: Use this query for data cleanup in the future
+select oid, 'Error: Trail length in GIS is more than 20% different from FMSS' as Issue,
+  'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.feet) + ' feet in GIS, but ' + convert(nvarchar(200),t2.feet) + ' feet in FMSS (' + convert(nvarchar(200),100*(t1.feet - t2.feet)/ t2.feet) + '%)' as Details
+  from (select min(objectid) as oid, FACLOCID, sum(GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) * 3.28084 as feet from gis.TRAILS_LN_evw where faclocid is not null group by FACLOCID) as t1
+  join (select Location, convert(real, replace(Qty,',','')) as feet from FMSSExport where UM = 'LF') as t2 on t1.FACLOCID = t2.Location
+  where abs(t1.feet - t2.feet)/ t2.feet > 0.2
+union all
+*/
+/*
+-- Remove this query for now; too many short connectors that are valid
+-- TODO: Use this query for data cleanup in the future
 select OBJECTID, 'Warning: Trail segment is shorter than 5 meters' as Issue,
   'Length = ' + convert(nvarchar(200),GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) + ' meters' as Details
   from gis.TRAILS_LN_evw where GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength() < 5
 union all
+*/
 select OBJECTID, 'Error: Multiline roads are not allowed' as Issue, NULL from gis.TRAILS_LN_evw where SHAPE.STGeometryType() = 'MultiLineString'
 union all
 -- Overlapping segments:  Takes about 15 seconds
@@ -3167,6 +3331,12 @@ BEGIN
     merge into gis.TRAILS_ATTRIBUTE_PT_evw as t1 using gis.AKR_UNIT as t2
       on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
       when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+	-- 26) SEGMENTID is the GEOMETRYID of the TRAILS_LN that this point touches
+    merge into gis.TRAILS_ATTRIBUTE_PT_evw as a
+      using gis.TRAILS_LN_evw as t
+      on a.SEGMENTID is null and a.Shape.STIntersects(t.Shape) = 1
+      and (a.FACLOCID = t.FACLOCID or a.FACLOCID is NULL) and (a.FEATUREID = t.FEATUREID or a.FEATUREID is NULL)
+      when matched then update set SEGMENTID = t.GEOMETRYID;
 
     -- Stop editing
     exec sde.edit_version @version, 2; -- 2 to stop edits
@@ -3304,6 +3474,7 @@ BEGIN
 
     -- TODO: Coordinate with FMSS.  Per the standard, Possible TSDS fields that can be populated using FMSS data are: 
     --       TRLNAME, TRLALTNAME, TRLSTATUS, TRLCLASS, TRLSURFACE, TRLTYPE, TRLUSE, SEASONAL, SEADESC, MAINTAINER, ISEXTENT, RESTRICTIION and ASSETID.
+	--       DONE: SEASONAL, MAINTAINER
 
     -- 1) if TRLNAME is an empty string, change to NULL
     update gis.TRAILS_LN_evw set TRLNAME = NULL where TRLNAME = ''
@@ -3349,30 +3520,28 @@ BEGIN
     -- 16) ISTUNNEL  is an AKR extension; it silently defaults to 'No'
     update gis.TRAILS_LN_evw set ISTUNNEL = 'No' where ISTUNNEL is null or ISTUNNEL = ''
     -- 17) if SEASONAL is null and FACLOCID is non-null use FMSS Lookup.
-    --     TODO: Get GOOD FMSS data
-    --merge into gis.TRAILS_LN_evw as p
-    --  using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
-    --  on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
-    --  when matched then update set SEASONAL = f.OPSEAS;
+    merge into gis.TRAILS_LN_evw as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else NULL end as OPSEAS, location FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null or p.SEASONAL = '' or p.SEASONAL = 'Unknown') and f.OPSEAS is not null
+      when matched then update set SEASONAL = f.OPSEAS;
     -- 18) if SEASDESC is an empty string, change to NULL
     --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
     update gis.TRAILS_LN_evw set SEASDESC = NULL where SEASDESC = ''
     update gis.TRAILS_LN_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
     -- 19) if MAINTAINER is null and FACLOCID is non-null use FMSS Lookup.
-    --     TODO: requires changing the domain to match FMSS and then populate from FMSS
-    --merge into gis.TRAILS_LN_evw as p
-    --  using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM dbo.FMSSExport) as f
-    --  on f.Location = p.FACLOCID and (p.MAINTAINER is null and f.FAMARESP is not null)
-    --  when matched then update set MAINTAINER = f.FAMARESP;
+    merge into gis.TRAILS_LN_evw as p
+      using (SELECT d.Code as FAMARESP, location FROM dbo.FMSSExport as t join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
     -- 20) ISEXTANT defaults to 'True' with a warning (during QC)
     update gis.TRAILS_LN_evw set ISEXTANT = 'True' where ISEXTANT is NULL
     -- 21) Add LINETYPE = 'Center line' if null/empty in gis.ROADS_LN
     update gis.TRAILS_LN_evw set LINETYPE = 'Center line' where LINETYPE is null or LINETYPE = '' 
     -- 22) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
     --     Takes about 26 seconds on the base table;  To check for both in/out takes about 51 seconds on base table
-    --merge into gis.TRAILS_LN_evw as t1 using gis.AKR_UNIT as t2
-    --  on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END <> t1.ISOUTPARK)
-    --  when matched then update set ISOUTPARK = CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'No' ELSE 'Yes' END;
+    merge into gis.TRAILS_LN_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
     -- Adds a check for both in/out 
     merge into gis.TRAILS_LN_evw as t1 using gis.AKR_UNIT as t2
       on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)

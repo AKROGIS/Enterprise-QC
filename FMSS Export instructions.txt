@@ -37,17 +37,27 @@ In the Crystal report configuration:
       called Location Specification Attributes Detail.xls in your downloads Folder
       Do not select CSV, this creates a 220MB file which includes a lot of header
       info on each line (and no column names)
-  - import to SQL Server as FMSSExport_Location2 and 3
-  - allow null on all, all nvarchar(50+) except FCI, 4000 char for long desc.  254 char for Description
-  - Make sure leading zeros are not missing on Location, ParkNUM, and CLASSSTR columns
+Open in Excel, delete top 11 rows (everything above the column names)
+Delete all the columns between Location and ASMISID in the first report
+Delete all the columns between Location and NOLANE in the first report
+make sure all data is formatted as text
+Save as CSV
+Open in VS Code or Atom and change CRLF to LF and make sure there are leading zeros on some locations
+Import to SQL Server as FMSSExport_Location2 and 3
+  - allow null on all, no PK, all nvarchar(50) except PARKNAME and RTENAME = nvarchar(150)
 
 open the Location Detail Information report
   - Select AKR under region
   - Select Excel under Format
   - Select Yes for Long Description
-  - OK, export to Excel
-  - import to SQL Server as FMSSExport_Location1
-  - allow null on all, all nvarchar(50+) except FCI, 4000 char for long desc.  254 char for Description
+  - OK, export to Microsoft Excel (97-2003) Data-only
+Open in Excel, delete top 19 rows (everything above the column names)
+Delete the extra columns; keep Location, DOI Code, Predominant Use, Asset Ownership, Occupant, Street Address, City, County, Primary Latitude (NAD 83), Primary Longitude (NAD 83), FRP Long Description
+make sure all data is formatted as text
+Save as CSV
+Open in VS Code or Atom and change CRLF to LF and make sure there are leading zeros on some locations
+Import to SQL Server as FMSSExport_Location1
+  - allow null on all, no PK, all nvarchar(50) except FCI = float, Long_Description = nvarchar(400), Description = nvarchar(250)
 
 
 Expand the FRP folder
@@ -55,11 +65,15 @@ open FRP Related Data Information
   - Region = AKR
   - Operating (this is for status of record, not feature)
   - Yes to include long Description
-  - Export to Excel (data only)
-open in Excel, delete top 16 rows (everything above the column names)
-Delete the extra columns; keep Location, DOI Code, Predominant Use, Asset Ownership, Occupant, Street Address, City, County, lat, long, Long Description
-  - import to SQL Server as FMSSExport_FRP
-  - allow null on all, all nvarchar(50+) 4000 char for long desc
+  - Export to Microsoft Excel (97-2003) Data-only
+Open in Excel, delete top 16 rows (everything above the column names)
+Delete the extra columns; keep Location, DOI Code, Predominant Use, Asset Ownership, Occupant, Street Address, City, County, Primary Latitude (NAD 83), Primary Longitude (NAD 83), FRP Long Description
+Delete at least two "empty" columns on the right (there are some empty cell values that will create two bad columns on the right)
+make sure all data is formatted as text
+Save as CSV
+Open in VS Code or Atom and change CRLF to LF and make sure there are leading zeros on some locations
+Import to SQL Server as FMSSExport_FRP
+  - allow null on all, no PK, all nvarchar(50+) 4000 char for long desc
 
 Build final table:
 SELECT l1.*, 
@@ -82,14 +96,16 @@ drop FMSSExport_FRP
 For Assets
     - Open the Asset Folder, and select the Asset Inventory List
     - Select AKR for Region, then click OK, wait
-    - export to Excel (data only)
-    - open in excel, delete junk at top, but not column names, sort by asset, and delete junk rows at bottom
-      delete all columns but the Asset, Location and Description
+    - export to Microsoft Excel (97-2003) Data-only
+    - open in excel
+    - delete junk at top (top 4 rows), but not column names (row 5), sort by asset, and delete junk rows at bottom
+    - delete all columns except Asset, Description and Location
+    - make sure all data is formatted as text
     - save as CSV
-    - open in atom and change CRLF to LF
+    - Open in VS Code or Atom and change CRLF to LF and make sure there are leading zeros on some locations
     - import into SQLServer
       - database -> tasks -> import as flatfile...
-      - into table FMSSExport_Assets, int -> nvarchar(10), Allow nulls, no PK 
+      - into table FMSSExport_Assets, nvarchar(50) for all except Description = nvarchar(250), Allow nulls on all, no PK 
       - remove null records, create index (no PK on Asset because it isn't unique ??)
           - select * from FMSSExport_Asset where asset in (select asset from FMSSExport_Asset group by asset having count(*) > 1) order by asset, location
         - delete FMSSExport_Asset where Asset is null
