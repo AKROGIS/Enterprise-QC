@@ -168,13 +168,13 @@ CREATE FUNCTION [dbo].[TrailUse](
      @f nvarchar(10), -- Motorbike
      @g nvarchar(10), -- snowmachine
      @h nvarchar(10), -- snowshoe
-     @i nvarchar(10), -- ski (back country ski tour)
+     @i nvarchar(10), -- nordic (groomed nordic ski trails)
      @j nvarchar(10), -- Dogsled
-     @k nvarchar(10), -- boat
+     @k nvarchar(10), -- motorboat
      @l nvarchar(10), -- canoe
 	 	 -- AKR Additions (listed as Other)
      @m nvarchar(10) = NULL, -- OHVSUB
-     @n nvarchar(10) = NULL, -- nordic (groomed nordic ski trails)
+     @n nvarchar(10) = NULL, -- skitour (back country ski tour)
      @o nvarchar(10) = NULL, -- downhill (groomed alpine skiing)
      @p nvarchar(10) = NULL, -- canyoneer
      @q nvarchar(10) = NULL, -- climb	 
@@ -227,11 +227,11 @@ CREATE FUNCTION [dbo].[TrailUseAKR](
      @h nvarchar(10), -- snowshoe
      @i nvarchar(10), -- nordic (groomed nordic ski trails)
      @j nvarchar(10), -- Dogsled
-     @k nvarchar(10), -- boat
+     @k nvarchar(10), -- motorboat
      @l nvarchar(10), -- canoe
 	 -- AKR Additions
      @m nvarchar(10), -- OHVSUB (other)
-     @n nvarchar(10), -- ski (back country ski tour)
+     @n nvarchar(10), -- skitour (back country ski tour)
      @o nvarchar(10), -- downhill (groomed alpine skiing)
      @p nvarchar(10), -- canyoneer
      @q nvarchar(10), -- climb	 
@@ -295,8 +295,6 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-
-
 CREATE VIEW [dbo].[QC_ALL_QC_DOMAIN_VALUES] as SELECT * FROM (
 -- Union the different QC domains into a table for comparison with ArcGIS Domains
 select 'DOM_ATCHTYPE' as TableName, 'DOM_ATCHTYPE_NPS2017' as DomainName, Code, Code as Value from DOM_ATCHTYPE
@@ -321,7 +319,7 @@ select 'DOM_LINETYPE' as TableName, 'DOM_LINETYPE_NPS2016' as DomainName, Code, 
 union all
 select 'DOM_LOTTYPE' as TableName, 'DOM_LOTTYPE_NPSAKR2016' as DomainName, Code, Code as Value from DOM_LOTTYPE
 union all
-select 'DOM_MAINTAINER' as TableName, 'DOM_MAINTAINER_NPS2016A' as DomainName, Code, Code as Value from DOM_MAINTAINER
+select 'DOM_MAINTAINER' as TableName, 'DOM_MAINTAINER_NPS2018' as DomainName, Code, Code as Value from DOM_MAINTAINER
 union all
 select 'DOM_MAPMETHOD' as TableName, 'DOM_MAPMETHOD_NPSAKR2016' as DomainName, Code, Code as Value from DOM_MAPMETHOD
 union all
@@ -333,7 +331,7 @@ select 'DOM_PUBLICDISPLAY' as TableName, 'DOM_PUBLICDISPLAY_NPS2016' as DomainNa
 union all
 select 'DOM_RDCLASS' as TableName, 'DOM_RDCLASS_NPS2016' as DomainName, Code, Code as Value from DOM_RDCLASS
 union all
-select 'DOM_RDMAINTAINER' as TableName, 'DOM_RDMAINTAINER_NPS2016' as DomainName, Code, Code as Value from DOM_RDMAINTAINER
+select 'DOM_RDMAINTAINER' as TableName, 'DOM_RDMAINTAINER_NPS2018' as DomainName, Code, Code as Value from DOM_RDMAINTAINER
 union all
 select 'DOM_RDONEWAY' as TableName, 'DOM_RDONEWAY_NPS2016' as DomainName, Code, Code as Value from DOM_RDONEWAY
 union all
@@ -341,9 +339,13 @@ select 'DOM_RDSTATUS' as TableName, 'DOM_RDSTATUS_NPS2016' as DomainName, Code, 
 union all
 select 'DOM_RDSURFACE' as TableName, 'DOM_RDSURFACE_NPS2016' as DomainName, Code, Code as Value from DOM_RDSURFACE
 union all
+select 'DOM_TRLATTRTYPE' as TableName, 'DOM_TRLATTRTYPE' as DomainName, Code, Code as Value from DOM_TRLATTRTYPE
+union all
 select 'DOM_TRLCLASS' as TableName, 'DOM_TRLCLASS_NPS2016' as DomainName, Code, Code as Value from DOM_TRLCLASS
 union all
-select 'DOM_TRLFEATTYPE' as TableName, 'DOM_TRLFEATTYPE_NPSAKR2016' as DomainName, Code, Code as Value from DOM_TRLFEATTYPE
+select 'DOM_TRLFEATFEATTYPE' as TableName, 'DOM_TRLFEATFEATTYPE' as DomainName, Code, Code as Value from DOM_TRLFEATFEATTYPE
+union all
+select 'DOM_TRLFEATTYPE' as TableName, 'DOM_TRLFEATTYPE_NPSAKR2018' as DomainName, Code, Code as Value from DOM_TRLFEATTYPE
 union all
 select 'DOM_TRLSTATUS' as TableName, 'DOM_TRLSTATUS_NPSAKR2016' as DomainName, Code, Code as Value from DOM_TRLSTATUS
 union all
@@ -356,8 +358,6 @@ union all
 select 'DOM_UNITCODE' as TableName, 'DOM_UNITCODE_NPSAKR2016' as DomainName, Code, Code as Value from DOM_UNITCODE
 union all
 select 'DOM_UOM' as TableName, 'DOM_UOM_NPSAKR2015' as DomainName, Code, Code as Value from DOM_UOM
-union all
-select 'DOM_WAYSIDE_FEAT' as TableName, 'DOM_WAYSIDE_FEAT_NPSAKR2015' as DomainName, Code, Code as Value from DOM_WAYSIDE_FEAT
 union all
 select 'DOM_XYACCURACY' as TableName, 'DOM_XYACCURACY_NPS2016' as DomainName, Code, Code as Value from DOM_XYACCURACY
 union all
@@ -1675,6 +1675,7 @@ select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a def
   on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
 union all
 -- 21) RDMAINTAINER is a optional domain value;  If FACLOCID is provided then it should match FMSS
+--     TODO: We are using DOM_MAINTAINER not DOM_RDMAINTAINER for the FMSS values.  This should be integrated into one list of maintainers
 select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.ROADS_LN_evw as t1
        left join dbo.DOM_RDMAINTAINER as t2 on t1.RDMAINTAINER = t2.Code where t1.RDMAINTAINER is not null and t2.Code is null
 union all
@@ -1791,7 +1792,6 @@ select p.OBJECTID, 'Error: ROUTEID does not match FMSS.ROUTEID' as Issue,
 union all
 -- 31) FACLOCID is optional free text, but if provided it must match a Location in the FMSS Export
 --     FACLOCID should be duplicate if featureid is duplicate, i.e. all line segments with the same FACLOCID must have the same featureid and all segements with the same featureid must have the same FACLOCID 
---     TODO: A bridge/tunnel in a road will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the road on/in the bridge/tunnel
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.ROADS_LN_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
@@ -2537,8 +2537,8 @@ union all
 select t1.OBJECTID, 'Error: TRLSURFACE is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_TRLSURFACE as t2 on t1.TRLSURFACE = t2.Code where t1.TRLSURFACE is not null and t1.TRLSURFACE <> '' and t2.Code is null
 union all 
--- 15) TRLTYPE is a required domain value; default is Unknown
-select OBJECTID, 'Warning: TRLTYPE is not provided, default value of *Unknown* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where TRLTYPE is null or TRLTYPE = ''
+-- 15) TRLTYPE is a required domain value; default is 'Standard Terra Trail'
+select OBJECTID, 'Warning: TRLTYPE is not provided, default value of *Standard Terra Trail* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where TRLTYPE is null or TRLTYPE = ''
 union all
 select t1.OBJECTID, 'Error: TRLTYPE is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_TRLTYPE as t2 on t1.TRLTYPE = t2.Code where t1.TRLTYPE is not null and t1.TRLTYPE <> '' and t2.Code is null
@@ -2567,9 +2567,14 @@ select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a def
   on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
 union all
 -- 20) MAINTAINER is a optional domain value;
---     TODO: if FACLOCID is provided this should match a valid value in FMSS Lookup.
+--     If FACLOCID is provided MAINTAINER should match a valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' (' + d.Code + ') when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.TRAILS_LN_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID join dbo.DOM_MAINTAINER as d on f.FAMARESP = d.FMSS where p.MAINTAINER <> d.Code
 union all
 -- 21) ISEXTANT is a required domain value; Default to 'True' with Warning
 select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where ISEXTANT is null
@@ -2664,7 +2669,7 @@ union all
 -- 29) FACLOCID is optional free text, but if provided it must be unique and match a Location in the FMSS Export
 --     all line segments with the same FACLOCID must have the same featureid
 --     NOTE: not all segements with the same featureid must have the same FACLOCID (we may associated spurs, etc with a trail network (one feature) that are not maintained in FMSS)
---     TODO: A bridge/tunnel in a trail will have the feature id, however the FACLOCID (and asset type) for the bridge/tunnel is different from the trail on/in the bridge/tunnel
+--     NOTE: A bridge/tunnel in a trail will have the same FEATUREID as the trail, however the FACLOCID (and asset type) for the bridge/tunnel is typically different from the trail
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID'  as Issue, NULL from gis.TRAILS_LN_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
@@ -2992,7 +2997,6 @@ BEGIN
     -- 36) if PARKBLDGID is empty string change to null
     update gis.AKR_BLDG_CENTER_PT_evw set PARKBLDGID = NULL where PARKBLDGID = ''
     -- 37) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
-    --     TODO: for more accuracy, use the building footprint (some footprints in Skagway straddle the boundary)
     merge into gis.AKR_BLDG_CENTER_PT_evw as t1
       using (select c.GeometryID, u.Unit_Code, u.Shape as uShape, ISNULL(f.Shape, c.Shape) as fShape from gis.AKR_BLDG_CENTER_PT_evw as c join gis.AKR_UNIT as u on c.UNITCODE = u.Unit_Code left join gis.AKR_BLDG_FOOTPRINT_PY_evw as f on f.FEATUREID = c.FEATUREID) as t2
       on t1.GEOMETRYID = t2.GEOMETRYID and (t1.ISOUTPARK is null or CASE WHEN t2.uShape.STContains(fShape) = 1 THEN  'No' ELSE CASE WHEN t2.fShape.STIntersects(t2.uShape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
@@ -3501,9 +3505,11 @@ BEGIN
 
     -- add/update calculated values
 
-    -- TODO: Coordinate with FMSS.  Per the standard, Possible TSDS fields that can be populated using FMSS data are: 
-    --       TRLNAME, TRLALTNAME, TRLSTATUS, TRLCLASS, TRLSURFACE, TRLTYPE, TRLUSE, SEASONAL, SEADESC, MAINTAINER, ISEXTENT, RESTRICTIION and ASSETID.
-	--       DONE: SEASONAL, MAINTAINER
+    -- Per the standard, Possible TSDS fields that can be populated using FMSS data are: 
+    --     TRLNAME, TRLALTNAME, TRLSTATUS, TRLCLASS, TRLSURFACE, TRLTYPE, TRLUSE, SEASONAL, SEADESC, MAINTAINER, ISEXTENT, RESTRICTIION and ASSETID.
+	--   DONE: TRLSTATUS, SEASONAL, MAINTAINER
+	--   SKIP: TRLNAME, TRLALTNAME, TRLTYPE, TRLUSE, SEADESC, ISEXTENT, RESTRICTIION and ASSETID
+	--   TODO: TRLCLASS, TRLSURFACE
 
     -- 1) if TRLNAME is an empty string, change to NULL
     update gis.TRAILS_LN_evw set TRLNAME = NULL where TRLNAME = ''
@@ -3519,13 +3525,15 @@ BEGIN
         on f.Location = p.FACLOCID and ((p.TRLSTATUS is null or p.TRLSTATUS = '' or p.TRLSTATUS = 'Unknown' or p.TRLSTATUS = 'Not Applicable') and f.Status is not null)
         when matched then update set TRLSTATUS = f.Status;
     update gis.TRAILS_LN_evw set TRLSTATUS = 'Existing' where TRLSTATUS is null or TRLSTATUS = ''
+    -- 5a) TRLTYPE - Required Domain Value; defaults to 'Standard Terra Trail' with a warning
+    update gis.TRAILS_LN_evw set TRLTYPE = 'Standard Terra Trail' where TRLTYPE is null or TRLTYPE = ''
     -- 6) TRLTRACK: This is an AKR extension; Required domain element; defaults to 'Unknown'
     update gis.TRAILS_LN_evw set TRLTRACK = 'Unknown' where TRLTRACK is null or TRLTRACK = ''
-    -- 7) TRLCLASS defaults to 'Unknown'
-    --     TODO: if a feature has a FACLOCID then the FMSS Funtional Class implies a TRLCLASS.  See section 4.3 of the standard
+    -- 7) TRLCLASS defaults to FMSSExport.FeatureType (via transformation) or to 'Unknown'
+    --     TODO: if a feature has a FACLOCID then the FMSS.Facility_type implies a class (see DOM_FMSS_FACILITYTYPE and DOM_TRLCLASS)
     update gis.TRAILS_LN_evw set TRLCLASS = 'Unknown' where TRLCLASS is null or TRLCLASS = ''
     -- 8) TRLUSE_* -- Nothing to do, invalid values (including empty string) will generate an error
-    -- 8) Create function to Calc TRLUSE from TRL_USE_*
+    -- 8) TRLUSE: Calculate from TRLUSE_*
     --    TODO decide if we want TRLUSE to be non-compliant, or if we want to add another field for AKR custom uses;  dbo.TrailUse() is compliant, dbo.TrailUseAKR() is not
     update gis.TRAILS_LN_evw set TRLUSE =
       dbo.TrailUse(TRLUSE_FOOT,TRLUSE_BICYCLE,TRLUSE_HORSE,TRLUSE_ATV,TRLUSE_4WD,TRLUSE_MOTORCYCLE,TRLUSE_SNOWMOBILE,TRLUSE_SNOWSHOE,TRLUSE_NORDIC,
@@ -3537,8 +3545,10 @@ BEGIN
     -- 10) TRLISANIMAL  is an AKR extension; it silently defaults to 'No'
     update gis.TRAILS_LN_evw set TRLISANIMAL = 'No' where TRLISANIMAL is null or TRLISANIMAL = ''
     -- 11) TRLISADMIN is an AKR extension; it silently defaults to 'No'
+	--     TODO must match FMSS.PRIMUSE
     update gis.TRAILS_LN_evw set TRLISADMIN = 'No' where TRLISADMIN is null or TRLISADMIN = ''
-    -- 12) TRLSURFACE defaults to 'Unknown'
+    -- 12) TRLSURFACE defaults to FMSS.TREADTYP (via transform) or 'Unknown'
+    --     TODO: if a feature has a FACLOCID then the FMSS.TREADTYP has the surface type (see DOM_TRLSURFACE)
     update gis.TRAILS_LN_evw set TRLSURFACE = 'Unknown' where TRLSURFACE is null or TRLSURFACE = ''
     -- 13) WHLENGTH_FT: This is an AKR extension; it is an optional numerical value > Zero. If zero is provided convert to Null.
     update gis.TRAILS_LN_evw set WHLENGTH_FT = NULL where WHLENGTH_FT = 0
