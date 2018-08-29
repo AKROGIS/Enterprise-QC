@@ -82,6 +82,14 @@ are typically not tied to any specific facility, but are used to document all th
 facilities in the field of view at a specific time.  They are also useful for
 explicitly documenting what part of a facility is in a photo.
 
+For photos, the SHAPE is the camera's location (x, y and z) when the photo was
+taken. For other attachment types, the location is not well defined.  AKR
+recommends that AKR_ATTACH_PT is only used for geotagged (or equivalent) photos.
+Any other type of attachment should be stored in AKR_ATTACH.
+
+Typically the **GeoTagged Photos to Points** tool should be used to create 3D locations,
+with date/time and heading attributes from photos collected on a modern mobile device.
+
 ## Usage of select columns
 
 * FACLOCID - Typically not used. A hint about a facility that might be in the photo.
@@ -135,4 +143,6 @@ Alaska region will also use these additional columns
    EXIF.
 9. ALTITUDE - The altitude of the camera as reported by the GPS sensor in the camera. This will
    typically be in meters above the reference ellipsoid.  If null, it is assumed that the camera
-   is about 1.5 meters above ground at the horizontal location.
+   is about 1.5 meters above ground at the horizontal location.  Geotagged photos will create 3D
+   points, so this attribute can typically be calculated from the Z value in the SHAPE.  
+   This attribute is helpful when the photos are used in a 2D GIS system like ArcMap.
