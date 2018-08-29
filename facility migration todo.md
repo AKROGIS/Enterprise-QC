@@ -3,8 +3,6 @@ Facilities Database Upgrade
 
 Immediate Todo (Regan, UNO):
 ----------------------------
-* Remove TRLUSE_UNKNOWN
-* Make sure TRLUSE domains are YES/NO only; no UNKNOWN
 * Fix trail qc/calculations: TRLISADMIN should match FMSS.PRIMUSE
 * Fix trail qc/calculations: TRLCLASS, TRLSURFACE
 * Import photos
@@ -47,6 +45,7 @@ Data Quality Improvements (Team):
 * Try and compare Building footprint with FMSS Square footage? - lots of issues
 * Connect (by FEATUREID) all roads/trails with the same name
 * Fix inconsistencies in trails between ISEXTANT, TRLSTATUS, and TRLFEATTYPE
+  - `select TRLFEATTYPE, ISEXTANT, TRLSTATUS, count(*) from gis.TRAILS_LN_evw group by ISEXTANT, TRLSTATUS, TRLFEATTYPE`
 * Compare FMSS Description/ParkName with TRLNAME, RDNAME, LOTNAME, BLDGNAME
 * TRLFEATTYPE: Compare with FMSS/Status i.e. if it is an existing FMSS trail,
   then it can't be a 'Unofficial Trail' or 'Non-NPS Trail'
@@ -67,19 +66,21 @@ Issues to discuss (Team):
 * Should we enforce any requirements on STATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE,
   or others when PUBLICDISPLAY = 'Public Map Display'?
 * Should Roads and Trails default to LINETYPE = 'Center line'?  This is an assumption by
-  users; what good is 'Arbitary line'?. Regardless, we should filter for 'Center line' in
+  users; what good is 'Arbitrary line'?. Regardless, we should filter for 'Center line' in
   the layer definition query, or create a separate dataset for LINETYPE != 'Center line'
 * Review schema changes to TRAILS_LN
-  - TRLSTATUS: removed 'Not Applicable' from Domain; consider removing 'Abandoned'
+  - TRLSTATUS: remove 'Not Applicable' from Domain; consider removing 'Abandoned'
     (use decommissioned instead) to match domain of roads/buildings
-  - Renamed: TRLUSE_SOCIALTRL, TRLUSE_ANIMALTRL  to: TRLISSOCIAL, TRLISANIMAL
+  - Renamed: TRLUSE_SOCIALTRL, TRLUSE_ANIMALTRL to TRLISSOCIAL, TRLISANIMAL
   - Removed: TRLUSE_OTHER (Y/N), TRLUSE_UNKNOWN (Y/N)
-  - For TRAILS_LN.TRLUSE_* 'Yes' means specifically design for, 'No' means specifically
-    prohibited; NULL (default) means use is unspecified, unknown, or N/A
-  - For TRAILS_LN.TRLUSE should we augment the standard by adding AKR types and prohibitions?
-    (review SQL function)
+  - For TRAILS_LN.TRLUSE_* 'Yes' means specifically built for, 'No' means specifically
+    prohibited; NULL (default) means this use is unspecified, unknown, or N/A
+  - For TRAILS_LN.TRLUSE should we augment the standard by adding AKR uses and prohibitions?
+    (review SQL function); We could add new column TRLUSE_AKR
 * Review schema changes to TRAILS_FEATURE_PT
   - TRLFEATTYPE is now a text domain and no longer an integer *subtype*, so we cannot
     use different domains for TRLFEATSUBTYPE.  Is this ok?
 * Are there illogical combinations of TRLFEATTYPE and TRLIS*?
+  - `select TRLFEATTYPE, TRLISADMIN, TRLISSOCIAL, TRLISANIMAL, count(*) from gis.TRAILS_LN_evw group by TRLFEATTYPE, TRLISADMIN, TRLISSOCIAL, TRLISANIMAL`
 * Are there illogical combinations of TRLTYPE and TRLUSE_*?
+  - `select TRLTYPE, TRLUSE, count(*) from gis.TRAILS_LN_evw group by TRLTYPE, TRLUSE`
