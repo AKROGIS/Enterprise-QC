@@ -56,7 +56,7 @@ Data Quality Improvements (Team):
 
 Issues to discuss (Team):
 -------------------------
-(See notes in SQL for additional details on these issues)
+(See 'TODO's in [SQL code](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/NewViews.sql) for additional details on these issues)
 * Define FEATUREID (What is a feature? Can this be a foriegn key?)
 * Are there any attributes that should be consistent for all segments of a feature?
 * Review UNITCODE QC/calculations: Spatial v. DOM v. FMSS?
