@@ -4,9 +4,9 @@ This information is supplemental to the Appendix in the NPS Building Spatial Dat
 
 AKR_ATTACH
 ----------
-This non-spatial table is for supplemental information (photos, pdfs, web pages, etc)
+This non-spatial table is for supplemental information (photos, pdfs, web pages, etc.)
 documenting other spatial facility records.  These attachments do not have an explicit
-location of thier own, rather they can be used with any (or all) location(s) of any
+location of their own, rather they can be used with any (or all) location(s) of any
 facility in the database.
 
 ## Relation to spatial data
@@ -22,7 +22,7 @@ can link to a non-spatial attachment via one of the four following columns:
 These four columns in AKR_ATTACH are foreign keys to the equivalent column in any of
 the spatial tables in the facilities database. These columns specify
 which facility this attachment supplements.  It is legal to leave all 4 columns
-null, but this attachment will never be represented spatially in GIS. 
+null, but this attachment will never be represented spatially in GIS.
 Typically only one of the columns will be used, but it is legal to use more than
 one.  There is no attempt to ensure that there is consistency between these columns.
 Indeed they can used to link the attachment to 4 different facilities.
@@ -47,7 +47,7 @@ however failing this check would be a warning, not an error, as discussed above.
 The data standard requires "at least one of the following attributes must be
 populated for each feature [attachment]: FEATUREID, FACLOCID, or FACASSETID."
 However this is not enforced by AKR.  If a user requires strict conformance,
-then they can filter out all attachements where all three are null.
+then they can filter out all attachments where all three are null.
 
 ## Supplemental columns
 
@@ -56,9 +56,9 @@ Alaska region will also use these additional columns
 1. ATCHID - an immutable, non-null, unique, calculated GUID for permanent reference
    to this attachment.
 2. ATCHDATE - Required. The date/time when this attachment was created (photo) or
-   published (pdf).  The date/time is needed to access the currency/relevance of the
+   published (pdf).  The date/time is needed to assess the currency/relevance of the
    attachment, particularly in relation to other attachments for the same facility.
-   The timezone is not recorded, so times will be ambiguous.
+   The time zone is not recorded, so times will be ambiguous.
    As this field is informational, a local time is the AKR assumption and preference.
    However an implementation could standardize on UTC.  The date/time is usually stored
    in the EXIF data of a photo.  You can also use the file creation date if the
@@ -103,9 +103,9 @@ could be used to find the closest facility (within the field of view for photos)
 Alaska region will also use these additional columns
 
 1. ATCHDATE - Required. The date/time when this attachment was created (photo) or
-   published (pdf).  The date/time is needed to access the currency/relevance of the
+   published (pdf).  The date/time is needed to assess the currency/relevance of the
    attachment, particularly in relation to other attachments for the same facility.
-   The timezone is not recorded, so times will be ambiguous.
+   The time zone is not recorded, so times will be ambiguous.
    As this field is informational, a local time is the AKR assumption and preference.
    However an implementation could standardize on UTC.  The date/time is usually stored
    in the EXIF data of a photo.  You can also use the file creation date if the
@@ -136,6 +136,3 @@ Alaska region will also use these additional columns
 9. ALTITUDE - The altitude of the camera as reported by the GPS sensor in the camera. This will
    typically be in meters above the reference ellipsoid.  If null, it is assumed that the camera
    is about 1.5 meters above ground at the horizontal location.
-
-
-   
