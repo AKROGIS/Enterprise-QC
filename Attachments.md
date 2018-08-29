@@ -79,8 +79,10 @@ AKR_ATTACH_PT
 This spatial table is for supplemental information (typically a photo) that has
 a specific location (and optionally direction and field-of-view).  These attachments
 are typically not tied to any specific facility, but are used to document all the
-facilities in the field of view at a specific time.  They are also useful for
-explicitly documenting what part of a facility is in a photo.
+facilities in the field of view at a specific time.  It can be very helpful to know
+the camera's perspective when trying to understand the contents of a photo, and how
+the subjects of the photo relate spatially to each other, especially if there are
+multiple photos of multiple facilities in a given area.
 
 For photos, the SHAPE is the camera's location (x, y and z) when the photo was
 taken. For other attachment types, the location is not well defined.  AKR
