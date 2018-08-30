@@ -124,8 +124,11 @@ Alaska region will also use these additional columns
 2. ATCHSOURCE - an optional informational text field with a path, URL or description
    of the source of this attachment.  This can be useful metadata for validating
    or updating the data at ATCHLINK.
-3. POINTTYPE - from the core data standard.  This must be 'Photo point' when ATCHTYPE = 'Photo'
-   It can be 'Photo point' or 'Arbitrary point' for ATCHTYPE <> 'Photo'.
+3. POINTTYPE - from the core data standard.  This must be 'Arbitrary point' (default).
+   Since this describes the location of the attachment, not a physical feature, all other
+   point types are inappropriate. Something like 'Photo point' would be more appropriate,
+   but it is not available in the standard. (As this attribute will always have
+   a constant calculated value, it could be deleted with no loss of information).
 4. ISOUTPARK - a spatially calculated text field. One of 'Yes', 'No', or 'Both' in the unusual
    case that the point is on the border of the park.
 5. HEADING - The angle (in clockwise degrees) that the camera is pointed.  Looking north is 0,
