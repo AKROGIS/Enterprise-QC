@@ -129,7 +129,7 @@ Alaska region will also use these additional columns
 4. ISOUTPARK - a spatially calculated text field. One of 'Yes', 'No', or 'Both' in the unusual
    case that the point is on the border of the park.
 5. HEADING - The angle (in clockwise degrees) that the camera is pointed.  Looking north is 0,
-   west is 90, etc. This is an optional numeric field. It is typically in EXIF data provide by
+   east is 90, etc. This is an optional numeric field. It is typically in EXIF data provide by
    photos taken on mobile devices. If present, it can be used to assign the
    rotation on a directional symbol in a map.
 6. HFOV - The horizontal field of view in degrees.  This describes the horizontal extents of
