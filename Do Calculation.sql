@@ -32,5 +32,6 @@ exec dbo.Calc_Roads @version
 exec dbo.Calc_Trails @version
 exec dbo.Calc_Trail_Features @version
 exec dbo.Calc_Trail_Attributes @version
+exec dbo.Calc_AtCalc_Attachments @version
 
 exec sde.set_default

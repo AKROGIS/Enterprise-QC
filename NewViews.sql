@@ -624,6 +624,393 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+CREATE VIEW [dbo].[QC_ISSUES_AKR_ATTACH] AS select I.Issue, I.Details, D.* from  gis.AKR_ATTACH_evw AS D
+join (
+
+-----------------
+-- gis.AKR_ATTACH
+-----------------
+
+-- 1) OBJECTID: managed by ArcGIS no QC required
+-- 2) ATCHNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: ATCHNAME must use proper case' as Issue, NULL as Details from gis.AKR_ATTACH_evw where ATCHNAME = upper(ATCHNAME) Collate Latin1_General_CS_AI or ATCHNAME = lower(ATCHNAME) Collate Latin1_General_CS_AI
+union all
+-- 3) ATCHALTNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 4) MAPLABEL is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 5) ATCHTYPE is a required domain value; default is 'Photo'
+select OBJECTID, 'Warning: ATCHTYPE is not provided, default value of *Photo* will be used' as Issue, NULL from gis.AKR_ATTACH_evw where ATCHTYPE is null or ATCHTYPE = ''
+union all
+select t1.OBJECTID, 'Error: ATCHTYPE is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_evw as t1
+  left join dbo.DOM_ATCHTYPE as t2 on t1.ATCHTYPE = t2.code where t1.ATCHTYPE is not null and t1.ATCHTYPE <> '' and t2.code is null
+union all
+-- 6) ATCHLINK is required free text
+select OBJECTID, 'Error: ATCHLINK is not provided' as Issue, NULL from gis.AKR_ATTACH_evw where ATCHLINK is null or ATCHLINK = ''
+union all
+-- 7) ATCHDATE is a required date; data type is guaranteed by database.  Check for null, and invalid values (after now or before 1995)
+select OBJECTID, 'Error: ATCHDATE is not provided' as Issue, NULL from gis.AKR_ATTACH_evw where ATCHDATE is null
+union all
+select OBJECTID, 'Warning: ATCHDATE is unexpectedly old (before 2000)' as Issue, NULL from gis.AKR_ATTACH_evw where ATCHDATE < convert(Datetime2,'2000')
+union all
+select OBJECTID, 'Error: ATCHDATE is in the future' as Issue, NULL from gis.AKR_ATTACH_evw where ATCHDATE > GETDATE()
+union all
+-- 8) ATCHSOURCE is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) ATCHDESC is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 10) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: are there requirements of other fields (i.e. BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE) when PUBLICDISPLAY is true?
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.AKR_ATTACH_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 11) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue, NULL from gis.AKR_ATTACH_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 10/11) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue, NULL from gis.AKR_ATTACH
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 12) UNITCODE is a required domain value.  Since this is not a spatial table, UNITCODE cannot be infered from the location
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select OBJECTID, 'Error: UNITCODE is required' as Issue, NULL from gis.AKR_ATTACH_evw where UNITCODE is null or UNITCODE = ''
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+/*
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_evw as t1 left join
+  gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+union all
+*/
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+-- 13) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ATTACH_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+/*
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ATTACH_evw as t1 join
+  gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+union all
+*/
+-- 14) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.AKR_ATTACH_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- 15) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ATTACH_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 16) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue, NULL from gis.AKR_ATTACH_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 17) CREATEDATE: managed by ArcGIS no QC required
+-- 18) CREATEUSER: managed by ArcGIS no QC required
+-- 19) EDITDATE: managed by ArcGIS no QC required
+-- 20) EDITUSER: managed by ArcGIS no QC required
+-- 21) FACLOCID is optional free text, but if provided it must match a Location in the FMSS Export
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.AKR_ATTACH_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Location is null
+union all
+-- 22) FACASSETID is optional free text, but if provided it must match an Asset in the FMSS Assets Export
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.AKR_ATTACH_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t2.Asset is null
+union all
+-- 23) FEATUREID must be well-formed or null
+--    TODO: if provided it should (warning) match a FEATUREID in one of the other spatial tables (including archives)
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
+	from gis.AKR_ATTACH_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 24) GEOMETRYID must be well-formed or null
+--    TODO: if provided it should (warning) match a GEOMETRYID in one of the other spatial tables (including archives)
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
+	from gis.AKR_ATTACH_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 21-24) Foreign key checks: Check for no or multiple foreign keys
+/*
+select OBJECTID, 'Warning: No foreign key, attachment will not be linked to a feature' as Issue, NULL
+  from gis.AKR_ATTACH_evw where FACASSETID is null and FACLOCID is null and FEATUREID is null and GEOMETRYID is null and ATCHNAME not like 'Photo of GPS%'
+union all
+*/
+/*
+select OBJECTID, 'Warning: Multiple foreign keys may indicate an error' as Issue, NULL from gis.AKR_ATTACH_evw where 
+  (FACASSETID is not null and not (FACLOCID is null and FEATUREID is null and GEOMETRYID is null)) or
+  (FACLOCID is not null and not (FACASSETID is null and FEATUREID is null and GEOMETRYID is null)) or
+  (FEATUREID is not null and not (FACLOCID is null and FACASSETID is null and GEOMETRYID is null)) or
+  (GEOMETRYID is not null and not (FACLOCID is null and FEATUREID is null and FACASSETID is null))
+union all
+*/ 
+-- 25) ATCHID must be unique and well-formed or null (in which case a unique GUID will be generated)
+select OBJECTID, 'Error: ATCHID is not unique' as Issue, NULL from gis.AKR_ATTACH_evw where ATCHID in
+       (select ATCHID from gis.AKR_ATTACH_evw where ATCHID is not null and ATCHID <> '' group by ATCHID having count(*) > 1)
+union all
+select OBJECTID, 'Error: ATCHID is not well-formed' as Issue, NULL
+	from gis.AKR_ATTACH_evw where
+	  -- Will ignore ATCHID = NULL 
+	  len(ATCHID) <> 38 
+	  OR left(ATCHID,1) <> '{'
+	  OR right(ATCHID,1) <> '}'
+	  OR ATCHID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+-- 26) NOTES is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 27) WEBEDITUSER: nothing to check; will likely be deleted
+-- 28) WEBCOMMENT: nothing to check; will likely be deleted
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_ATTACH'
+WHERE E.Explanation IS NULL or E.Explanation = ''
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+CREATE VIEW [dbo].[QC_ISSUES_AKR_ATTACH_PT] AS select I.Issue, I.Details, D.* from  gis.AKR_ATTACH_PT AS D
+join (
+
+--------------------
+-- gis.AKR_ATTACH_PT
+--------------------
+
+-- 1) OBJECTID: managed by ArcGIS no QC required
+-- 2) ATCHNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: ATCHNAME must use proper case' as Issue, NULL as Details from gis.AKR_ATTACH_PT where ATCHNAME = upper(ATCHNAME) Collate Latin1_General_CS_AI or ATCHNAME = lower(ATCHNAME) Collate Latin1_General_CS_AI
+union all
+-- 3) ATCHALTNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 4) MAPLABEL is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 5) ATCHTYPE is a required domain value; default is 'Photo'
+select OBJECTID, 'Warning: ATCHTYPE is not provided, default value of *Photo* will be used' as Issue, NULL from gis.AKR_ATTACH_PT where ATCHTYPE is null or ATCHTYPE = ''
+union all
+select t1.OBJECTID, 'Error: ATCHTYPE is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_PT as t1
+  left join dbo.DOM_ATCHTYPE as t2 on t1.ATCHTYPE = t2.code where t1.ATCHTYPE is not null and t1.ATCHTYPE <> '' and t2.code is null
+union all
+-- 6) ATCHLINK is required free text
+select OBJECTID, 'Error: ATCHLINK is not provided' as Issue, NULL from gis.AKR_ATTACH_PT where ATCHLINK is null or ATCHLINK = ''
+union all
+-- 7) ATCHDATE is a required date; data type is guaranteed by database.  Check for null, and invalid values (after now or before 1995)
+select OBJECTID, 'Error: ATCHDATE is not provided' as Issue, NULL from gis.AKR_ATTACH_PT where ATCHDATE is null
+union all
+select OBJECTID, 'Warning: ATCHDATE is unexpectedly old (before 1995)' as Issue, NULL from gis.AKR_ATTACH_PT where ATCHDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: ATCHDATE is in the future' as Issue, NULL from gis.AKR_ATTACH_PT where ATCHDATE > GETDATE()
+union all
+-- 8) ATCHSOURCE is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) ATCHDESC is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 10) POINTTYPE must be 'Arbitrary point' (if NULL or '' assumed to be 'Arbitrary point' - no warning)
+select OBJECTID, 'Error: POINTTYPE is not a Arbitrary point' as Issue, NULL from gis.AKR_ATTACH_PT where POINTTYPE is not null and POINTTYPE <> '' and POINTTYPE <> 'Arbitrary point'
+union all
+-- 11) ISOUTPARK: This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+
+-- 12) HEADING: This is an optional number < 360 and >= 0
+select OBJECTID, 'Error: HEADING is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ATTACH_PT where HEADING < 0
+union all
+select OBJECTID, 'Error: HEADING is not allowed to be 360 or larger'  as Issue, NULL from gis.AKR_ATTACH_PT where HEADING >= 360
+union all
+-- 13) HFOV: This is an optional number <= 360 and > 0; if zero it is silently converted to NULL
+select OBJECTID, 'Error: HFOV is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ATTACH_PT where HFOV < 0
+union all
+select OBJECTID, 'Error: HFOV is not allowed to be 360 or larger'  as Issue, NULL from gis.AKR_ATTACH_PT where HFOV >= 360
+union all
+-- 14) PITCH: This is an optional number <= 90 and >= -90
+select OBJECTID, 'Error: PITCH is not allowed to be less than -90'  as Issue, NULL from gis.AKR_ATTACH_PT where PITCH < -90
+union all
+select OBJECTID, 'Error: PITCH is not allowed to greater than 90'  as Issue, NULL from gis.AKR_ATTACH_PT where PITCH > 90
+union all
+-- 15) VFOV: This is an optional number <= 360 and > 0; if zero it is silently converted to NULL
+select OBJECTID, 'Error: VFOV is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ATTACH_PT where VFOV < 0
+union all
+select OBJECTID, 'Error: VFOV is not allowed to be 360 or larger'  as Issue, NULL from gis.AKR_ATTACH_PT where VFOV >= 360
+union all
+-- 16) ALTITUDE: This must be null (will be derived from the shape) or match the shape
+select OBJECTID, 'Error: ALTITUDE must match the Z value of the shape'  as Issue, 
+       'SHAPE.Z = ' + ltrim(str(shape.Z, 15,9)) + ' while ALTITUDE = ' + ltrim(str(ALTITUDE, 15,9)) as Details
+	   from gis.AKR_ATTACH_PT where shape.Z <> 0 and ABS(shape.Z - Altitude) > 0.0000001
+union all
+-- 17) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: are there requirements of other fields (i.e. BLDGSTATUS, ISEXTANT, ISOUTPARK, UNITCODE, FACUSE) when PUBLICDISPLAY is true?
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.AKR_ATTACH_PT where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_PT as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 18) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue, NULL from gis.AKR_ATTACH_PT where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_PT as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 17/18) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue, NULL from gis.AKR_ATTACH_PT
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 19) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue, NULL from gis.AKR_ATTACH_PT as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_PT as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_PT as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.AKR_ATTACH_PT as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue,
+  'Location ' + FACLOCID + ' has Park ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_ATTACH_PT as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 20) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ATTACH_PT as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ATTACH_PT as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 21) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_PT as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.AKR_ATTACH_PT as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue, NULL from gis.AKR_ATTACH_PT as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.AKR_ATTACH_PT as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 22) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ATTACH_PT as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 23) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue, NULL from gis.AKR_ATTACH_PT where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 24) CREATEDATE: managed by ArcGIS no QC required
+-- 25) CREATEUSER: managed by ArcGIS no QC required
+-- 26) EDITDATE: managed by ArcGIS no QC required
+-- 27) EDITUSER: managed by ArcGIS no QC required
+-- 28) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ATTACH_PT where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_PT as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 29) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ATTACH_PT where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 30) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue, NULL from gis.AKR_ATTACH_PT where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue, NULL from gis.AKR_ATTACH_PT where SOURCEDATE > GETDATE()
+union all
+-- 31) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ATTACH_PT where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue, NULL from gis.AKR_ATTACH_PT as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 32) FACLOCID is optional free text, but if provided it must match a Location in the FMSS Export
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.AKR_ATTACH_PT as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t2.Location is null
+union all
+-- 33) FACASSETID is optional free text, but if provided it must match an Asset in the FMSS Assets Export
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.AKR_ATTACH_PT as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t2.Asset is null
+union all
+-- 34) FEATUREID must be well-formed or null
+--    TODO: if provided it should (warning) match a FEATUREID in one of the other spatial tables (including archives)
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
+	from gis.AKR_ATTACH_PT where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 35) GEOMETRYID must be unique and well-formed or null (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue, NULL from gis.AKR_ATTACH_PT where GEOMETRYID in
+       (select GEOMETRYID from gis.AKR_ATTACH_PT where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
+	from gis.AKR_ATTACH_PT where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 36) NOTES is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 37) WEBEDITUSER: nothing to check; will likely be deleted
+-- 38) WEBCOMMENT: nothing to check; will likely be deleted
+-- 39) SHAPE: must not be empty
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.AKR_ATTACH_PT where shape.STIsEmpty() = 1
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_ATTACH_PT'
+WHERE E.Explanation IS NULL or E.Explanation = ''
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_BLDG_CENTER_PT] AS select I.Issue, I.Details, D.* from  gis.AKR_BLDG_CENTER_PT_evw AS D
 join (
 
@@ -2842,6 +3229,178 @@ on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_LN'
 WHERE E.Explanation IS NULL or E.Explanation = ''
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2018-08-30
+-- Description:	Calculated properties for Attachments
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Attachments] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+	-- ATTACH_PT
+	------------
+	-- 1) OBJECTID: nothing to do
+    -- 2) if BLDGNAME is an empty string, change to NULL
+    update gis.AKR_ATTACH_PT_evw set ATCHNAME = NULL where ATCHNAME = ''
+    -- 3) if BLDGALTNAME is an empty string, change to NULL
+    update gis.AKR_ATTACH_PT_evw set ATCHALTNAME = NULL where ATCHALTNAME = ''
+    -- 4) if MAPLABEL is an empty string, change to NULL
+    update gis.AKR_ATTACH_PT_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 5) Add ATCHTYPE = 'Photo' if null/empty
+    update gis.AKR_ATTACH_PT_evw set ATCHTYPE = 'Photo' where ATCHTYPE is null or ATCHTYPE = '' 
+	-- 6) ATCHLINK: nothing to do
+	-- 7) ATCHDATE: nothing to do
+	-- 8) if ATCHSOURCE is an empty string, change to NULL
+    update gis.AKR_ATTACH_PT_evw set ATCHSOURCE = NULL where ATCHSOURCE = ''
+	-- 9) if ATCHDESC is an empty string, change to NULL
+    update gis.AKR_ATTACH_PT_evw set ATCHDESC = NULL where ATCHDESC = ''
+    -- 10) Add POINTYPE = 'Arbitrary point' if null/empty
+    update gis.AKR_ATTACH_PT_evw set POINTTYPE = 'Arbitrary point' where POINTTYPE is null or POINTTYPE = ''
+	-- 11) ISOUTPARK must be calc'd after UNITCODE is calc'd (and QC'd) - See end of this procedure
+	-- 12) HEADING: nothing to do
+	-- 13) HFOV: if zero, set to NULL
+    update gis.AKR_ATTACH_PT_evw set HFOV = NULL where HFOV = 0
+	-- 14) PITCH: nothing to do
+	-- 15) VFOV: if zero, set to NULL
+    update gis.AKR_ATTACH_PT_evw set VFOV = NULL where VFOV = 0
+	-- 16) Fix Altitude (if doesn't match shape Z)
+    update gis.AKR_ATTACH_PT_evw set ALTITUDE = shape.Z where shape.Z <> 0 and (ALTITUDE is null or ABS(shape.Z - Altitude) > 0.0000001)
+    -- 17) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.AKR_ATTACH_PT_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 18) DATAACCESS defaults to No Public Map Display
+    update gis.AKR_ATTACH_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 19) UNITCODE is a spatial calc if null
+    merge into gis.AKR_ATTACH_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 20) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.AKR_ATTACH_PT_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.AKR_ATTACH_PT_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 21) if GROUPCODE is an empty string, change to NULL
+    update gis.AKR_ATTACH_PT_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 22) GROUPNAME is always calc'd from GROUPCODE
+    update gis.AKR_ATTACH_PT_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.AKR_ATTACH_PT_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 23) REGIONCODE is always set to AKR
+    update gis.AKR_ATTACH_PT_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+	-- 24) CREATEDATE: nothing to do
+	-- 25) CREATEUSER: nothing to do
+	-- 26) EDITDATE: nothing to do
+	-- 27) EDITUSER: nothing to do
+    -- 28) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.AKR_ATTACH_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 29) if MAPSOURCE is NULL or an empty string, change to Unknown
+    update gis.AKR_ATTACH_PT_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 30) SOURCEDATE: Nothing to do.
+    -- 31) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.AKR_ATTACH_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 32) if FACLOCID is empty string change to null
+    update gis.AKR_ATTACH_PT_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 33) if FACASSETID is empty string change to null
+    update gis.AKR_ATTACH_PT_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 34) if FEATUREID is empty string change to null
+    update gis.AKR_ATTACH_PT_evw set FEATUREID = NULL where FEATUREID = ''
+    -- 35) Add GEOMETRYID if null/empty
+    update gis.AKR_ATTACH_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 36) if NOTES is an empty string, change to NULL
+    update gis.AKR_ATTACH_PT_evw set NOTES = NULL where NOTES = ''
+    -- 37) WEBEDITUSER: Nothing to do.
+    -- 38) WEBCOMMENT: Nothing to do.
+    -- 39) SHAPE: Update the Z value based on Altitude if Z value is missing
+	update gis.AKR_ATTACH_PT_evw 
+      set shape = geometry::STGeomFromText('POINT('+ltrim(str(shape.STX, 15,9))+' '+ltrim(str(shape.STY, 15,9))+' '+ltrim(str(ALTITUDE, 15,6))+')', 4269)
+      where shape.Z = 0 and Altitude <> 0
+    -- 11) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.AKR_ATTACH_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+
+	-- ATTACH
+	---------
+	-- 1) OBJECTID: nothing to do
+    -- 2) if BLDGNAME is an empty string, change to NULL
+    update gis.AKR_ATTACH_evw set ATCHNAME = NULL where ATCHNAME = ''
+    -- 3) if BLDGALTNAME is an empty string, change to NULL
+    update gis.AKR_ATTACH_evw set ATCHALTNAME = NULL where ATCHALTNAME = ''
+    -- 4) if MAPLABEL is an empty string, change to NULL
+    update gis.AKR_ATTACH_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 5) Add ATCHTYPE = 'Photo' if null/empty
+    update gis.AKR_ATTACH_evw set ATCHTYPE = 'Photo' where ATCHTYPE is null or ATCHTYPE = '' 
+	-- 6) ATCHLINK: nothing to do
+	-- 7) ATCHDATE: nothing to do
+	-- 8) if ATCHSOURCE is an empty string, change to NULL
+    update gis.AKR_ATTACH_evw set ATCHSOURCE = NULL where ATCHSOURCE = ''
+	-- 9) if ATCHDESC is an empty string, change to NULL
+    update gis.AKR_ATTACH_evw set ATCHDESC = NULL where ATCHDESC = ''
+    -- 10) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.AKR_ATTACH_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 11) DATAACCESS defaults to No Public Map Display
+    update gis.AKR_ATTACH_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 12) UNITCODE: No shape, so we can't calc based on location
+	--     TODO: calc based on shape or FMSS.PARK of foreign keys
+    -- 13) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.AKR_ATTACH_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.AKR_ATTACH_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 14) if GROUPCODE is an empty string, change to NULL
+    update gis.AKR_ATTACH_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 15) GROUPNAME is always calc'd from GROUPCODE
+    update gis.AKR_ATTACH_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.AKR_ATTACH_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 16) REGIONCODE is always set to AKR
+    update gis.AKR_ATTACH_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+	-- 17) CREATEDATE: nothing to do
+	-- 18) CREATEUSER: nothing to do
+	-- 19) EDITDATE: nothing to do
+	-- 20) EDITUSER: nothing to do
+    -- 21) if FACLOCID is empty string change to null
+    update gis.AKR_ATTACH_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 22) if FACASSETID is empty string change to null
+    update gis.AKR_ATTACH_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 23) if FEATUREID is empty string change to null
+    update gis.AKR_ATTACH_evw set FEATUREID = NULL where FEATUREID = ''
+    -- 24) if GEOMETRYID is empty string change to null
+    update gis.AKR_ATTACH_evw set GEOMETRYID = NULL where GEOMETRYID = ''
+    -- 25) Add ATCHID if null/empty
+    update gis.AKR_ATTACH_evw set ATCHID = '{' + convert(varchar(max),newid()) + '}' where ATCHID is null or ATCHID = ''
+    -- 26) if NOTES is an empty string, change to NULL
+    update gis.AKR_ATTACH_evw set NOTES = NULL where NOTES = ''
+    -- 27) WEBEDITUSER: Nothing to do.
+    -- 28) WEBCOMMENT: Nothing to do.
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
 GO
 SET ANSI_NULLS ON
 GO

@@ -54,5 +54,13 @@ select * from dbo.QC_ISSUES_TRAILS_ATTRIBUTE_PT
 -- Create a table of issues
 -- drop table QC_ISSUES_TRAILS_ATTRIBUTE_PT_for_owner_on_date
 -- select * into QC_ISSUES_TRAILS_ATTRIBUTE_PT_for_owner_on_date from dbo.QC_ISSUES_TRAILS_ATTRIBUTE_PT
+select * from dbo.QC_ISSUES_AKR_ATTACH
+-- Create a table of issues
+-- drop table QC_ISSUES_AKR_ATTACH_for_owner_on_date
+-- select * into QC_ISSUES_AKR_ATTACH_for_owner_on_date from dbo.QC_ISSUES_AKR_ATTACH
+select * from dbo.QC_ISSUES_AKR_ATTACH_PT
+-- Create a table of issues
+-- drop table QC_ISSUES_AKR_ATTACH_PT_for_owner_on_date
+-- select * into QC_ISSUES_AKR_ATTACH_PT_for_owner_on_date from dbo.QC_ISSUES_AKR_ATTACH_PT
 
 exec sde.set_default
