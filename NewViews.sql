@@ -1706,8 +1706,10 @@ union all
 select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.PARKLOTS_PY_evw as t1
        left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
 union all
-select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue, NULL from gis.PARKLOTS_PY_evw as p join 
-  dbo.FMSSExport as f on f.Location = p.FACLOCID join dbo.DOM_MAINTAINER as d on f.FAMARESP = d.FMSS where p.MAINTAINER <> d.Code
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.PARKLOTS_PY_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
 union all
 -- 16) ISEXTANT is a required domain value; Default to True with Warning
 select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue, NULL from gis.PARKLOTS_PY_evw where ISEXTANT is null
@@ -2067,9 +2069,9 @@ select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL
        left join dbo.DOM_RDMAINTAINER as t2 on t1.RDMAINTAINER = t2.Code where t1.RDMAINTAINER is not null and t2.Code is null
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
-  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' (' + d.Code + ') when GIS has RDMAINTAINER = ' + p.RDMAINTAINER as Details
+  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has RDMAINTAINER = ' + p.RDMAINTAINER as Details
   from gis.ROADS_LN_evw as p join 
-  dbo.FMSSExport as f on f.Location = p.FACLOCID join dbo.DOM_MAINTAINER as d on f.FAMARESP = d.FMSS where p.RDMAINTAINER <> d.Code
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.RDMAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
 union all
 -- 22) ISEXTANT is a required domain value; Default to 'True' with Warning
 select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue, NULL from gis.ROADS_LN_evw where ISEXTANT is null
