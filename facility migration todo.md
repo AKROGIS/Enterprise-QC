@@ -3,10 +3,10 @@ Facilities Database Upgrade
 
 Immediate Todo (Regan, UNO):
 ----------------------------
-* Fix trail qc/calculations: TRLISADMIN should match FMSS.PRIMUSE
-* Fix trail qc/calculations: TRLCLASS, TRLSURFACE
-* Import photos
+* Make TRAIL_FEATURE_PT.FEATUREID a primary key, and fix Calcs/Scripts/Data
+* Add CQ check for duplicate attachments (same link and foreign key)
 * Script to create FGDB
+* Update FMSS Exports
 * Rename akr_facility to akr_facility_archive2018 and akr_facility2 to akr_facility
 * Check permissions of tables/views - hide all QC only items
 * Add metadata where missing (Joel)
@@ -26,15 +26,14 @@ Long term Todo (Regan, UNO):
   instead of SDE binary then we can use it directly in all queries and delete
   gis.AKR_UNIT (check speed)
 * Get other missing foreign key data: ASMIS, LCS, CLS, Fire, CR, RIP
+* Add ATTACH checks against the Filesystem, ATCHLINK location
+* Do more checking/warnings for bad foreign keys in the attachments tables
 
 
 Data Quality Improvements (Team):
 ---------------------------------
-* Run calcs and fix QC issues for TRLISADMIN, TRLCLASS, and TRLSURFACE
 * Activate two disabled queries in TRAILS_FEATURE_PT, and fix the few remaining issues
-* Fixes to Trails for new MAINTAINER QC check
 * Add Sheep Camp picnic shelter to buildings from POI
-* Convert few remaining Arbitrary line to Center line in roads and trails
 * Add operating FMSS Locations to GIS
 * Topology checks for roads and trails
 * Remove 'Unknown' values for records with ISOUTPARK = 'No' and/or
@@ -52,6 +51,9 @@ Data Quality Improvements (Team):
   - `select TRLSTATUS, TRLFEATTYPE, count(*) from gis.TRAILS_LN_evw where FACLOCID is not null group by TRLSTATUS, TRLFEATTYPE order by TRLSTATUS, TRLFEATTYPE`
 * Compare TRLUSE with FMSS.TRLUSE
   - `select t.TRLUSE, f.TRLUSE from gis.TRAILS_LN_evw as t join FMSSExport as f on t.FACLOCID = f.Location`
+* Photos for 91051 from LACL 2012 are not in the DB
+* Find Kantishna OHV photos and deploy to ATCHLINK location (or delete the records)
+* Add additional photos from T:\Projects\fmss\photos to database (find 16 photos listed in trail_photos in old facilities db)
 
 
 Issues to discuss (Team):
