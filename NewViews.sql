@@ -2920,12 +2920,19 @@ select t1.OBJECTID, 'Error: TRLSTATUS does not match the FMSS Status'  as Issue,
 union all
 -- 14) TRLSURFACE is a required domain value; default is 'Unknown'
 --     different parts of a single 'Feature' can have different surface
---     TODO: Compare with FMSS; all parts of the feature with same FACLOCID will have the same surface 
+--     all parts of the feature with same FACLOCID will have the same surface as specified in FMSS.TREADTYP
 select OBJECTID, 'Warning: TRLSURFACE is not provided, default value of *Unknown* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where TRLSURFACE is null or TRLSURFACE = ''
 union all
 select t1.OBJECTID, 'Error: TRLSURFACE is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_TRLSURFACE as t2 on t1.TRLSURFACE = t2.Code where t1.TRLSURFACE is not null and t1.TRLSURFACE <> '' and t2.Code is null
 union all 
+select p.OBJECTID, 'Error: TRLSURFACE does not match FMSS.TREADTYP' as Issue,
+  'Location ' + FACLOCID + ' has TREADTYP ' + f.TREADTYP + ' when GIS has TRLSURFACE = ' + p.TRLSURFACE + ' (' + d.FMSS_TREADTYP + ')' as Details
+  from gis.TRAILS_LN_evw as p
+  join dbo.FMSSExport as f on f.Location = p.FACLOCID
+  join DOM_TRLSURFACE as d on p.TRLSURFACE = d.Code
+  where d.FMSS_TREADTYP <> f.TREADTYP
+union all
 -- 15) TRLTYPE is a required domain value; default is 'Standard Terra Trail'
 select OBJECTID, 'Warning: TRLTYPE is not provided, default value of *Standard Terra Trail* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where TRLTYPE is null or TRLTYPE = ''
 union all
@@ -2937,7 +2944,15 @@ select OBJECTID, 'Warning: TRLCLASS is not provided, default value of *Unknown* 
 union all
 select t1.OBJECTID, 'Error: TRLCLASS is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_TRLCLASS as t2 on t1.TRLCLASS = t2.Code where t1.TRLCLASS is not null and t1.TRLCLASS <> '' and t2.Code is null
-union all 
+union all
+select p.OBJECTID, 'Error: TRLCLASS does not match FMSS.Facility_Type' as Issue,
+  'Location ' + FACLOCID + ' has Facility_Type ' + f.Facility_Type + ' (' + d1.Description + ') when GIS has TRLCLASS = ' + p.TRLCLASS as Details
+  from gis.TRAILS_LN_evw as p
+  join dbo.FMSSExport as f on f.Location = p.FACLOCID
+  join DOM_FMSS_FACILITYTYPE as d1 on f.Facility_Type = d1.Code
+  join DOM_TRLCLASS as d2 on p.TRLCLASS = d2.Code
+  where f.Facility_Type like '21%' and (d2.FMSS_Facility_Type <> f.Facility_Type or (d2.FMSS_Facility_Type is null and p.TRLCLASS is not null and p.TRLCLASS <> '' and p.TRLCLASS <> 'Unknown'))
+union all
 -- 17) TRLUSE is a required pipe delimited list of approved uses
 --     In AKR, this is a calculated field based on the various TRLUSE_* boolean columns
 --     It will always be silently updated.  Woe to the unwary user that edits this field.
@@ -2961,9 +2976,9 @@ select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value'  as Issue, NUL
        left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
-  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' (' + d.Code + ') when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
   from gis.TRAILS_LN_evw as p join 
-  dbo.FMSSExport as f on f.Location = p.FACLOCID join dbo.DOM_MAINTAINER as d on f.FAMARESP = d.FMSS where p.MAINTAINER <> d.Code
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
 union all
 -- 21) ISEXTANT is a required domain value; Default to 'True' with Warning
 select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used'  as Issue, NULL from gis.TRAILS_LN_evw where ISEXTANT is null
@@ -3125,6 +3140,12 @@ union all
 -- 37) TRLISADMIN: This is an AKR extension; it is a required domain element; defaults to 'No' without a warning
 select t1.OBJECTID, 'Error: TRLISADMIN is not a recognized value'  as Issue, NULL from gis.TRAILS_LN_evw as t1
        left join dbo.DOM_YES_NO as t2 on t1.TRLISADMIN = t2.Code where t1.TRLISADMIN is not null and t1.TRLISADMIN <> '' and t2.Code is null
+union all
+select p.OBJECTID, 'Error: TRLISADMIN does not match FMSS.PRIMUSE' as Issue,
+  'Location ' + FACLOCID + ' has PRIMUSE ' + isnull(f.PRIMUSE,'NULL') + ' (' + f.TRLISADMIN + ') when GIS has TRLISADMIN = ' + p.TRLISADMIN as Details
+  from gis.TRAILS_LN_evw as p join 
+  (select Location, PRIMUSE, case when PRIMUSE = 'Admin Use' then 'Yes' when PRIMUSE is null then null else 'No' end as TRLISADMIN from dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.TRLISADMIN <> f.TRLISADMIN
 union all
 --TODO: Look for illogical combinations of TRLFEATTYPE and TRLIS*
 -- 38) WHLENGTH_FT: This is an AKR extension; it is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
@@ -4068,9 +4089,8 @@ BEGIN
 
     -- Per the standard, Possible TSDS fields that can be populated using FMSS data are: 
     --     TRLNAME, TRLALTNAME, TRLSTATUS, TRLCLASS, TRLSURFACE, TRLTYPE, TRLUSE, SEASONAL, SEADESC, MAINTAINER, ISEXTENT, RESTRICTIION and ASSETID.
-	--   DONE: TRLSTATUS, SEASONAL, MAINTAINER
+	--   DONE: TRLSTATUS, SEASONAL, MAINTAINER, TRLCLASS, TRLSURFACE
 	--   SKIP: TRLNAME, TRLALTNAME, TRLTYPE, TRLUSE, SEADESC, ISEXTENT, RESTRICTIION and ASSETID
-	--   TODO: TRLCLASS, TRLSURFACE
 
     -- 1) if TRLNAME is an empty string, change to NULL
     update gis.TRAILS_LN_evw set TRLNAME = NULL where TRLNAME = ''
@@ -4091,7 +4111,10 @@ BEGIN
     -- 6) TRLTRACK: This is an AKR extension; Required domain element; defaults to 'Unknown'
     update gis.TRAILS_LN_evw set TRLTRACK = 'Unknown' where TRLTRACK is null or TRLTRACK = ''
     -- 7) TRLCLASS defaults to FMSSExport.FeatureType (via transformation) or to 'Unknown'
-    --     TODO: if a feature has a FACLOCID then the FMSS.Facility_type implies a class (see DOM_FMSS_FACILITYTYPE and DOM_TRLCLASS)
+    merge into gis.TRAILS_LN_evw as p
+      using (SELECT d.Code as CLASS, location FROM dbo.FMSSExport as t join dbo.DOM_TRLCLASS as d on t.Facility_Type = d.FMSS_Facility_Type) as f
+      on f.Location = p.FACLOCID and (TRLCLASS is null or TRLCLASS = '' or TRLCLASS = 'Unknown') and f.CLASS is not null
+      when matched then update set TRLCLASS = f.CLASS;
     update gis.TRAILS_LN_evw set TRLCLASS = 'Unknown' where TRLCLASS is null or TRLCLASS = ''
     -- 8) TRLUSE_* -- Nothing to do, invalid values (including empty string) will generate an error
     -- 8) TRLUSE: Calculate from TRLUSE_*
@@ -4105,11 +4128,17 @@ BEGIN
     update gis.TRAILS_LN_evw set TRLISSOCIAL = 'No' where TRLISSOCIAL is null or TRLISSOCIAL = ''
     -- 10) TRLISANIMAL  is an AKR extension; it silently defaults to 'No'
     update gis.TRAILS_LN_evw set TRLISANIMAL = 'No' where TRLISANIMAL is null or TRLISANIMAL = ''
-    -- 11) TRLISADMIN is an AKR extension; it silently defaults to 'No'
-	--     TODO must match FMSS.PRIMUSE
+    -- 11) TRLISADMIN is an AKR extension; it silently defaults FMSS.PRIMUSE (via transform) or 'No'
+	merge into gis.TRAILS_LN_evw as p
+      using (SELECT Location, case when PRIMUSE = 'Admin Use' then 'Yes' when PRIMUSE is null then null else 'No' end as PRIMUSE FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (TRLISADMIN is null or TRLISADMIN = '') and f.PRIMUSE is not null
+      when matched then update set TRLISADMIN = f.PRIMUSE;
     update gis.TRAILS_LN_evw set TRLISADMIN = 'No' where TRLISADMIN is null or TRLISADMIN = ''
     -- 12) TRLSURFACE defaults to FMSS.TREADTYP (via transform) or 'Unknown'
-    --     TODO: if a feature has a FACLOCID then the FMSS.TREADTYP has the surface type (see DOM_TRLSURFACE)
+    merge into  gis.TRAILS_LN_evw as p
+      using (SELECT d.Code as TREADTYP, location FROM dbo.FMSSExport as t join dbo.DOM_TRLSURFACE as d on t.TREADTYP = d.FMSS_TREADTYP and d.FMSS_Default = 'Y') as f
+      on f.Location = p.FACLOCID and (TRLSURFACE is null or TRLSURFACE = '' or TRLSURFACE = 'Unknown') and f.TREADTYP is not null
+      when matched then update set TRLSURFACE = f.TREADTYP;
     update gis.TRAILS_LN_evw set TRLSURFACE = 'Unknown' where TRLSURFACE is null or TRLSURFACE = ''
     -- 13) WHLENGTH_FT: This is an AKR extension; it is an optional numerical value > Zero. If zero is provided convert to Null.
     update gis.TRAILS_LN_evw set WHLENGTH_FT = NULL where WHLENGTH_FT = 0
