@@ -3,7 +3,6 @@ Facilities Database Upgrade
 
 Immediate Todo (Regan, UNO):
 ----------------------------
-* Make TRAIL_FEATURE_PT.FEATUREID a primary key, and fix Calcs/Scripts/Data
 * Add CQ check for duplicate attachments (same link and foreign key)
 * Script to create FGDB
 * Update FMSS Exports
@@ -32,7 +31,6 @@ Long term Todo (Regan, UNO):
 
 Data Quality Improvements (Team):
 ---------------------------------
-* Activate two disabled queries in TRAILS_FEATURE_PT, and fix the few remaining issues
 * Add Sheep Camp picnic shelter to buildings from POI
 * Add operating FMSS Locations to GIS
 * Topology checks for roads and trails
@@ -54,6 +52,7 @@ Data Quality Improvements (Team):
 * Photos for 91051 from LACL 2012 are not in the DB
 * Find Kantishna OHV photos and deploy to ATCHLINK location (or delete the records)
 * Add additional photos from T:\Projects\fmss\photos to database (find 16 photos listed in trail_photos in old facilities db)
+* Remove duplicate FACLOCIDs in Trail_feature_pts
 
 
 Issues to discuss (Team):
@@ -86,3 +85,7 @@ Issues to discuss (Team):
   - `select TRLFEATTYPE, TRLISADMIN, TRLISSOCIAL, TRLISANIMAL, count(*) from gis.TRAILS_LN_evw group by TRLFEATTYPE, TRLISADMIN, TRLISSOCIAL, TRLISANIMAL`
 * Are there illogical combinations of TRLTYPE and TRLUSE_*?
   - `select TRLTYPE, TRLUSE, count(*) from gis.TRAILS_LN_evw group by TRLTYPE, TRLUSE`
+* Should we delete trail features that aren't really part of a trail (i.e. structures and other "interest points" collected by OHV)
+  and require that all trail features are related to a trail (via a non-null SEGMENTID)
+* Should Trail_feature_pt.FACLOCID be unique? Exception for TRLFEATTYPE = Trail Start (1), Trail End (1)
+  and Other/AnchorPt (many) may share the same trail FACLOCID

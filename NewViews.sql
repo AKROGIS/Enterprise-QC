@@ -2541,26 +2541,11 @@ select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
 	  OR right(GEOMETRYID,1) <> '}'
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
--- 3) FEATUREID must be well-formed or null/empty (in which case we will generate a unique well-formed value)
---    TODO: What is a featureid in this case?
---          is each sign, bench, etc a unique feature
---          are all the culverts on a trail a feature with the same featureid
---          is it a foreign key to the trail featureid that this sign, bench, etc is a part of (near to, maintained with, etc)
---    TODO: are these feature independent of the trails, or are these the 'parent' featureid?
---    TODO: if the feature is tied to a 'parent' trail, would some of the attributes also be tied?  i.e. a sign on a internal trail should probably be internal
--- A FEATUREID should either match a trail feature or be unique
-select t1.OBJECTID, 'Error: FEATUREID not matching a TRAILS_LN must be unique' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1
-  left join gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t1.FEATUREID is not null and t2.FEATUREID is null
-  and t1.FEATUREID in (select FEATUREID from gis.TRAILS_FEATURE_PT_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
+-- 3) FEATUREID must be unique and well-formed or null (in which case we will generate a unique well-formed value)
+--    This is a primary key for each mapped feature, and not a foreign key to the "related" trail.
+select OBJECTID, 'Error: FEATUREID is not unique' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where FEATUREID in
+       (select FEATUREID from gis.TRAILS_FEATURE_PT_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
 union all
--- A featureID should be unique
---select OBJECTID, 'Error: FEATUREID must be unique' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where FEATUREID in 
---       (select FEATUREID from gis.TRAILS_FEATURE_PT_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
---union all
--- TODO: Maybe all FEATUREIDs should match a trail
---select t1.OBJECTID, 'Error: FEATUREID not found in TRAILS_LN' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1
---  left join gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID where t1.FEATUREID is not null and t2.FEATUREID is null
---union all
 select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	from gis.TRAILS_FEATURE_PT_evw where
 	  -- Will ignore FEATUREID = NULL 
@@ -2719,78 +2704,86 @@ union all
 select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
 union all
 -- 28) FACLOCID is optional free text, but if provided it must match a Trail Location in the FMSS Export
+--     FACLOCID is a foreign key to the same feature in the FMSS location table.  Not many trail features have
+--     thier own location records (like a bridge or wayside exhibit), so this is typically NULL.  FACLOCID is not used
+--     to track the related "parent" trail for this feature (except maybe for trail head/end features).
+--     See SEGMENTID to get information on the trail this feature is "on".
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
--- A trail feature must be a 2100 (Trail) or a 2200 (Trail Bridge). A 2200 can be a TRLFEATTYPE Bridge or Walkable Structure. A TRLFEATTYPE Bridge must be a 2200, but a Walkable Structure can be a 2100 or a 2200
+-- Check that FACLOCID is the appropriate type (Asset_code) for this type of trail feature
+-- if FACLOCID.Asset_Code = 2100 (trail), then TRLFEATTYPE = Trail head or Trail End, or Other/AnchorPt
+-- if FACLOCID.Asset_Code = 2200 (trail bridge), then TRLFEATTYPE = Bridge or Walkable Structure
+-- if FACLOCID.Asset_Code = 7%00, then TRLFEATTYPE = 'Wayside Feature'
+-- This list may need to be expanded as we develop the trail features
 select t1.OBJECTID, 'Error: FACLOCID is not approriate for this kind of trail feature (based on the Asset Code)' as Issue,
   'TRLFEATTYPE = ' + t1.TRLFEATTYPE + ' but Asset Code for ' + t2.Location + ' = ' + t2.Asset_Code + ' (' + d.Description + ')' as Details
   from gis.TRAILS_FEATURE_PT_evw as t1 join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
   join DOM_FMSS_ASSETCODE as d on t2.Asset_Code = d.Code
-  where (t2.Asset_Code <> '2100' and t2.Asset_Code <> '2200')
-     or (t2.Asset_Code = '2200' and t1.TRLFEATTYPE <> 'Bridge' and t1.TRLFEATTYPE <> 'Walkable Structure' and t1.TRLFEATTYPE <> 'Trail Head'and t1.TRLFEATTYPE <> 'Trail End')
-     or (t1.TRLFEATTYPE = 'Bridge' and t2.Asset_Code <> '2200')
-     or (t1.TRLFEATTYPE = 'Walkable Structure' and t2.Asset_Code <> '2200' and t2.Asset_Code <> '2100')
+  where (t2.Asset_Code = '2100' and not (t1.TRLFEATTYPE = 'Trail Head' or t1.TRLFEATTYPE = 'Trail End' or (t1.TRLFEATTYPE = 'Other' and t1.TRLFEATTYPEOTHER = 'AnchorPt')))
+     or (t2.Asset_Code = '2200' and not (t1.TRLFEATTYPE = 'Bridge' or t1.TRLFEATTYPE = 'Walkable Structure'))
+     or (t2.Asset_Code like '7%00' and t1.TRLFEATTYPE <> 'Wayside Feature')
 union all
--- FACLOCID does not need to be unique (a single trail can have several features) 
--- FACLOCID must be the same as the parent trail
-select t1.OBJECTID, 'Error: FACLOCID does not match the nearest trail' as Issue,
-  'Feature point has FACLOCID = ' + ISNULL(t1.FACLOCID,'NULL') + ' but the trail it is near has FACLOCID = ' + ISNULL(t2.FACLOCID,'NULL') as Details
-  from gis.TRAILS_FEATURE_PT_evw as t1 join
-  --gis.TRAILS_LN_evw as t2 on t1.FEATUREID = t2.FEATUREID  --(doesn't work well because it is a many to many join)
-  gis.TRAILS_LN_evw as t2 on t1.SEGMENTID = t2.GEOMETRYID
-  where (t1.FACLOCID is null and t2.FACLOCID is not null) or (t2.FACLOCID is null and t1.FACLOCID is not null) or t1.FACLOCID <> t2.FACLOCID
-union all
-select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where FACLOCID in (
-    select FACLOCID from (select FACLOCID from gis.TRAILS_FEATURE_PT_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
-union all
--- 29) FACASSETID is optional free text, provided it must match a Trail Location in the FMSS Assets Export
---     All records with the same FACASSETID must have the same FEATUREID
+-- FACLOCID should be unique, except TRLFEATTYPE = Trail Start (1), Trail End (1) and Other/AnchorPt (many) may share the same FACLOCID
+-- TODO: There are a lot of duplicate trail heads/ends; review the data and requirements before initiating cleanup
+/*
+select t1.oid, 'Error: Too many features are using the same FACLOCID' as Issue,
+'There are ' + convert(nvarchar(10), t1.cnt) + ' features with FACLOCID = ' + t1.FACLOCID + '. ' +
+convert(nvarchar(10), isnull(t2.cnt,0)) + ' Trail Heads (max 1), ' + 
+convert(nvarchar(10), isnull(t3.cnt,0)) + ' Trail Ends (max 1), ' + 
+convert(nvarchar(10), isnull(t4.cnt,0)) + ' Anchor Points (unlimited), ' + 
+convert(nvarchar(10), t1.cnt - isnull(t2.cnt,0) - isnull(t3.cnt,0) - isnull(t4.cnt,0)) + ' Others (max 0)' as Details from 
+(select min(OBJECTID) as oid, FACLOCID, count(*)as cnt from gis.TRAILS_FEATURE_PT_evw where FACLOCID is not null group by FACLOCID having count(*) > 1) as t1
+left join (select FACLOCID, count(*) as cnt from gis.TRAILS_FEATURE_PT_evw where FACLOCID is not null and TRLFEATTYPE = 'Trail Head' group by FACLOCID) as t2 on t1.faclocid = t2.faclocid
+left join (select FACLOCID, count(*) as cnt from gis.TRAILS_FEATURE_PT_evw where FACLOCID is not null and TRLFEATTYPE = 'Trail End' group by FACLOCID) as t3 on t1.faclocid = t3.faclocid
+left join (select FACLOCID, count(*)as cnt from gis.TRAILS_FEATURE_PT_evw where FACLOCID is not null and TRLFEATTYPE = 'Other' and TRLFEATTYPEOTHER = 'AnchorPt' group by FACLOCID) as t4 on t1.faclocid = t4.faclocid
+where isnull(t2.cnt,0) > 1 or  isnull(t3.cnt,0) > 1 or t1.cnt > isnull(t2.cnt,0) + isnull(t3.cnt,0) + isnull(t4.cnt,0)
+*/
+-- 29) FACASSETID is optional free text. If provided it must match a record in the FMSSExport_Assets
+--    Many features (like culverts and stairs) are FMSS assets of the parent trail, and will have a non-null FACASSETID.
+--    The location recored of an FMSS Asset should match the nearest trail (feature.segmentid = trail.geometryid)
+--    It is not uncommon for several unique features (e.g. mapped culverts) to have the same FACASSETID (e.g. a 'bundle' of culverts)
+--    FACLOCID must be NULL when FACASSETID is not null; See FACASSETID.Location for the parent location record
 select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue,
   'FACASSETID = ' + t1.FACASSETID + ' and FACLOCID = ' + t1.FACLOCID as Details
   from gis.TRAILS_FEATURE_PT_evw as t1 left join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
 union all
-select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue,
-  'FACASSETID = ' + t1.FACASSETID + ' belonging to Location = ' + t2.Location + ' however FACLOCID = ' + t1.FACLOCID as Details
-  from gis.TRAILS_FEATURE_PT_evw as t1 join
-  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
-  dbo.FMSSExport as t3 on t2.Location = t3.Location where t1.FACLOCID <> t3.Location
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match SEGMENTID.FACLOCID' as Issue,
+  'FACASSETID = ' + t1.FACASSETID + ' belongs to Location = ' + t2.Location + ' however SEGMENTID.FACLOCID = ' + t1.SEGMENTID + '.' + t3.FACLOCID as Details
+  from gis.TRAILS_FEATURE_PT_evw as t1
+  join dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset
+  join gis.TRAILS_LN_evw as t3 on t1.SEGMENTID = t3.GEOMETRYID
+  where t2.Location <> t3.FACLOCID
 union all
-select t1.OBJECTID, 'Error: FACASSETID does not match a trail asset in FMSS' as Issue,
-  'FACASSETID = ' + t1.FACASSETID + ' belonging to Location = ' + t2.Location + ' Asset_Code = ' + t3.Asset_Code + ' (' + d.Description + ')' as Details
-  from gis.TRAILS_FEATURE_PT_evw as t1 join
-  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
-  dbo.FMSSExport as t3 on t2.Location = t3.Location join DOM_FMSS_ASSETCODE as d on t3.Asset_Code = d.Code
-  where t1.FACASSETID is not null and t1.FACASSETID <> '' and t3.Asset_Code not in ('2100', '2200', '2300')
+select OBJECTID, 'Error: FACLOCID must be NULL when FACASSETID is not null' as Issue, NULL
+  from gis.TRAILS_FEATURE_PT_evw where FACASSETID is not null and FACLOCID is not null
 union all
-select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where FACASSETID in (
-    select FACASSETID from (select FACASSETID from gis.PARKLOTS_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
-union all
--- SEGMENTID is the GEOMETRYID in TRAILS_LN which this attribute applies to
--- ideally it is coincident with the first vertex, but it is sufficient that it touches
--- this attribute will apply to the rest of the feature (all segments with the same featureid) in the digitized direction
--- until the end of the trail, or changed by a new attribute value.
+-- 30) SEGMENTID is the GEOMETRYID of the closest segment of the "Parent" trail (i.e. the trail that this feature is "on")
+--     SEGMENTID can be null; there are some "trail" features like interest points, that are not really part of a trail.
+--     Maybe a feature without a related trail isn't a *trail* feature, and should be deleted and non-null SEGMENTID enforced
+/*
 select OBJECTID, 'Error: SEGMENTID must not be NULL' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where SEGMENTID is null
 union all
+*/
 select a.OBJECTID, 'Error: SEGMENTID must match a GEOMETRYID in TRAILS_LN' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as a
   left join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID where a.SEGMENTID is not null and t.GEOMETRYID is null
 union all
-select a.OBJECTID, 'Error: FEATUREID must match the FEATUREID of SEGMENTID in TRAILS_LN' as Issue,
-  'Feature point has FEATUREID = ' + a.FEATUREID + ' but the trail it is near has FEATUREID = ' + t.FEATUREID as Details
-  from gis.TRAILS_FEATURE_PT_evw as a join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID where a.FEATUREID <> t.FEATUREID
---union all
--- TODO: Skip until trail issues are resolved.
---       Operation fails due to some trails that are invalid when converted to geography
---select a.OBJECTID, 'Error: SHAPE is more than 20m from SEGMENTID in TRAILS_LN' as Issue,
---  'Point is ' + convert(nvarchar(50),round(GEOGRAPHY::STGeomFromText(a.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(t.shape.STAsText(),4269)),1)) + ' meters from ' + a.SEGMENTID as Details
---  from gis.TRAILS_FEATURE_PT_evw as a
---  join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID
---  where GEOGRAPHY::STGeomFromText(a.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(t.shape.STAsText(),4269)) > 20
-union all
+---------------
+-- Shape Checks
+---------------
 select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw where shape.STIsEmpty() = 1
-
+-- Check that the SEGMENTID is the closest trail geometry
+/*
+-- Calculating the distance to SEGMENTID is a lot faster and easier than finding the closest trail geometry
+union all
+select a.OBJECTID, 'Error: SHAPE is more than 20m from SEGMENTID in TRAILS_LN' as Issue,
+  'Point is ' + convert(nvarchar(50),round(GEOGRAPHY::STGeomFromText(a.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(t.shape.STAsText(),4269)),1)) + ' meters from ' + a.SEGMENTID as Details
+  from gis.TRAILS_FEATURE_PT_evw as a
+  join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID
+  where GEOGRAPHY::STGeomFromText(a.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(t.shape.STAsText(),4269)) > 20
+*/
 
 
 -- ???????????????????????????????????
@@ -4045,7 +4038,8 @@ BEGIN
     update gis.TRAILS_FEATURE_PT_evw set FACLOCID = NULL where FACLOCID = ''
     -- 26) if FACASSETID is empty string change to null
     update gis.TRAILS_FEATURE_PT_evw set FACASSETID = NULL where FACASSETID = ''
-    -- 27) FEATUREID: No action
+    -- 27) Add FEATUREID is NULL or an empty string
+    update gis.AKR_BLDG_CENTER_PT_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
     -- 28) Add GEOMETRYID if null/empty
     update gis.TRAILS_FEATURE_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
     -- 29) if NOTES is an empty string, change to NULL
