@@ -3,7 +3,6 @@ Facilities Database Upgrade
 
 Immediate Todo (Regan, UNO):
 ----------------------------
-* Add CQ check for duplicate attachments (same link and foreign key)
 * Script to create FGDB
 * Update FMSS Exports
 * Rename akr_facility to akr_facility_archive2018 and akr_facility2 to akr_facility
