@@ -3,10 +3,6 @@ Facilities Database Upgrade
 
 Immediate Todo (Regan, UNO):
 ----------------------------
-* Script to create FGDB
-* Update FMSS Exports
-* Rename akr_facility to akr_facility_archive2018 and akr_facility2 to akr_facility
-* Check permissions of tables/views - hide all QC only items
 * Add metadata where missing (Joel)
 * Describe all tables/views without metadata
 * Document deviations from data standards
