@@ -516,6 +516,12 @@ SELECT [OBJECTID]
       ,o.[Shape]
   FROM [gis].[AKR_BLDG_OTHER_PT_evw] AS o join [gis].[AKR_BLDG_CENTER_PT_evw] AS c ON o.FEATUREID = c.FEATUREID
 GO
+GRANT SELECT ON [dbo].[AKR_BLDG_PT] TO [akr_facility_editor] AS [dbo]
+GO
+GRANT SELECT ON [dbo].[AKR_BLDG_PT] TO [akr_reader_web] AS [dbo]
+GO
+GRANT SELECT ON [dbo].[AKR_BLDG_PT] TO [nps\Domain Users] AS [dbo]
+GO
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -618,6 +624,12 @@ SELECT f.[OBJECTID]
       ,o.[WEBCOMMENT]
       ,o.[Shape]
   FROM [gis].[AKR_BLDG_OTHER_PY_evw] AS o join [gis].[AKR_BLDG_CENTER_PT_evw] AS c ON o.FEATUREID = c.FEATUREID
+GO
+GRANT SELECT ON [dbo].[AKR_BLDG_PY] TO [akr_facility_editor] AS [dbo]
+GO
+GRANT SELECT ON [dbo].[AKR_BLDG_PY] TO [akr_reader_web] AS [dbo]
+GO
+GRANT SELECT ON [dbo].[AKR_BLDG_PY] TO [nps\Domain Users] AS [dbo]
 GO
 SET ANSI_NULLS ON
 GO
