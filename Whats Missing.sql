@@ -17,7 +17,7 @@ left join gis.ROADS_LN_evw as r on r.FACLOCID = f.Location
 where r.FACLOCID is null and f.Asset_Code = '1100' and f.Type = 'OPERATING' and f.status = 'OPERATING'
 order by Status, park
 
--- 62/116 parking areas
+-- 0/116 parking areas
 select f.* from FMSSExport as f
 left join gis.PARKLOTS_PY_evw as r on r.FACLOCID = f.Location
 where r.FACLOCID is null and f.Asset_Code = '1300' and f.Type = 'OPERATING' and f.status = 'OPERATING'
@@ -53,8 +53,9 @@ select * from FMSSExport where Asset_Code = '3100'
 -- 1/3 Boundary (Fence)
 select * from FMSSExport where Asset_Code = '3800'
 
--- 39/1268 buildings
-select f.* from FMSSExport as f
+-- 31/1268 buildings (note 8 buildings have been demoed and removed from GIS, but FMSS has not caught up) 
+select case when r2.faclocid is null then 'No' else 'Yes' end as gis_deleted, f.* from FMSSExport as f
 left join gis.AKR_BLDG_CENTER_PT_evw as r on r.FACLOCID = f.Location
+left join gis.AKR_BLDG_CENTER_PT_H as r2 on r2.FACLOCID = f.Location
 where r.FACLOCID is null and f.Asset_Code = '4100' and f.Type = 'OPERATING' and f.status = 'OPERATING'
 order by Status, park

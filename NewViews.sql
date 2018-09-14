@@ -1713,7 +1713,7 @@ select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
   'Location ' + FACLOCID + ' has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
   from gis.PARKLOTS_PY_evw as p join 
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
-  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
 union all
 -- 14) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
 select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue, NULL from gis.PARKLOTS_PY_evw as p
