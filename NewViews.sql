@@ -1194,7 +1194,7 @@ select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
   'Location ' + FACLOCID + ' has OPSEAS ' + f.OPSEAS + ' when GIS has SEASONAL = ' + p.SEASONAL as Details
   from gis.AKR_BLDG_CENTER_PT_evw as p join 
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
-  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
 union all
 -- 20) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
 select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as p
@@ -2074,7 +2074,7 @@ select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
   'Location ' + FACLOCID + ' has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
   from gis.ROADS_LN_evw as p join 
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
-  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
 union all
 -- 20) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
 select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue, NULL from gis.ROADS_LN_evw as p
@@ -2974,7 +2974,7 @@ union all
 select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS'  as Issue,
   'SEASONAL = ' + p.SEASONAL + ' while FMSS.OPSEAS = ' + f.OPSEAS as Details from gis.TRAILS_LN_evw as p join 
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
-  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
 union all
 -- 19) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
 select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used'  as Issue, NULL from gis.TRAILS_LN_evw as p
