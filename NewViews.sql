@@ -1392,6 +1392,10 @@ select p.OBJECTID, 'Error: PARKBLDGID does not match FMSS.PARKNUMB' as Issue,
 -- 38) SHAPE
 union all
 select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw where shape.STIsEmpty() = 1
+union all
+select c.OBJECTID, 'Error: SHAPE must be within the footprint' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as c
+  join gis.AKR_BLDG_FOOTPRINT_PY_evw as f on c.FEATUREID = f.FEATUREID
+  where c.Shape.STWithin(f.Shape) <> 1
 
 
 
@@ -1554,6 +1558,13 @@ select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown
 union all
 select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue from gis.AKR_BLDG_OTHER_PT_evw as t1
   left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+-- 9) SHAPE
+union all
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue from gis.AKR_BLDG_OTHER_PT_evw where shape.STIsEmpty() = 1
+union all
+select o.OBJECTID, 'Error: SHAPE must be within 25m of centroid' as Issue from gis.AKR_BLDG_OTHER_PT_evw as o
+  join gis.AKR_BLDG_CENTER_PT_evw as c on c.FEATUREID = o.FEATUREID
+  where GEOGRAPHY::STGeomFromText(o.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(c.shape.STAsText(),4269)) > 25
 
 ) AS I
 on D.OBJECTID = I.OBJECTID
