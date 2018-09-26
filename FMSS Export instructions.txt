@@ -1,3 +1,5 @@
+This process should take about 45 minutes
+
 go to FMSS (need to request access from Scott Vantrees)
   - https://pfmdportal.nps.gov/index.cfm
 click on AMRS (Asset Management Reporting System) in the Application list
@@ -37,7 +39,7 @@ In the Crystal report configuration:
       info on each line (and no column names)
 Open in Excel, delete top 11 rows (everything above the column names)
 Delete all the columns between Location and ASMISID in the first report
-Delete all the columns between Location and NOLANE in the first report
+Delete all the columns between Location and NOLANE in the second report
 Delete at least two "empty" columns on the right (there are some empty cell values that will create two bad columns on the right)
 make sure all data is formatted as text
 Save as CSV
@@ -77,15 +79,15 @@ Import to SQL Server as FMSSExport_FRP
 Build final table:
 drop table FMSSExport
 SELECT l1.*, 
-  nullif(l2.ASMISID,'') ASMISID, nullif(l2.BLDGTYPE,'') BLDGTYPE, nullif(l2.CLASSSTR,'') CLASSSTR, nullif(l2.CLINO,'') CLINO, nullif(l2.FAMARESP,'') FAMARESP, nullif(l2.FCLASS,'') FCLASS, nullif(l2.OPSEAS,'') OPSEAS, nullif(l2.PARKNAME,'') PARKNAME, nullif(l2.PARKNUMB,'') PARKNUMB, nullif(l2.PRIMUSE,'') PRIMUSE,
-  nullif(l3.NOLANE,'') NOLANE, nullif(l3.NUMPLOT,'') NUMPLOT, nullif(l3.PRKLNG,'') PRKLNG, nullif(l3.PRKWID,'') PRKWID, nullif(l3.ROUTEID,'') ROUTEID, nullif(l3.RTENAME,'') RTENAME, nullif(l3.TREADTYP,'') TREADTYP, nullif(l3.TRLGRADE,'') TRLGRADE, nullif(l3.TRLUSE,'') TRLUSE, nullif(l3.TRLWIDTH,'') TRLWIDTH,
+  nullif(l2.ASMISID,'') ASMISID, nullif(l2.BLDGTYPE,'') BLDGTYPE, nullif(l2.CLASSSTR,'') CLASSSTR, nullif(l2.CLINO,'') CLINO, nullif(l2.FAMARESP,'') FAMARESP, nullif(l2.FCLASS,'') FCLASS, nullif(l2.OPSEAS,'') OPSEAS, nullif(l3.PARKNAME,'') PARKNAME, nullif(l3.PARKNUMB,'') PARKNUMB, nullif(l3.PRIMUSE,'') PRIMUSE,
+  nullif(l2.NOLANE,'') NOLANE, nullif(l2.NUMPLOT,'') NUMPLOT, nullif(l3.PRKLNG,'') PRKLNG, nullif(l3.PRKWID,'') PRKWID, nullif(l3.ROUTEID,'') ROUTEID, nullif(l3.RTENAME,'') RTENAME, nullif(l3.TREADTYP,'') TREADTYP, nullif(l3.TRLGRADE,'') TRLGRADE, nullif(l3.TRLUSE,'') TRLUSE, nullif(l3.TRLWIDTH,'') TRLWIDTH,
   l4.DOI_Code, l4.Predominant_Use, l4.Asset_Ownership, l4.Street_Address, l4.City, l4.County, l4.Primary_Latitude__NAD_83_ as lat, l4.Primary_Longitude__NAD_83_ as lon, l4.FRP_Long_Description
 into FMSSExport 
    FROM FMSSExport_Location1 as l1
 left join FMSSExport_Location2 as l2 on l1.Location = l2.Location
 left join FMSSExport_Location3 as l3 on l1.Location = l3.Location
 left join FMSSExport_FRP as l4  on l1.Location = l4.Location;
-alter table FMSSExport alter column Location NVARCHAR(50) not null
+alter table FMSSExport alter column Location NVARCHAR(50) not null;
 alter table FMSSExport add primary key (Location)
 drop table FMSSExport_Location1
 drop table FMSSExport_Location2
