@@ -7,8 +7,7 @@ Immediate Todo (Regan, UNO):
 * Describe all tables/views without metadata
 * Document deviations from data standards
 * Test sync with national datasets
-* Test/Fix layer files (Julie)
-* Send lists of building issues to Scott - on Regan's desktop
+* QC check for building center point within the building footprint
 
 
 Long term Todo (Regan, UNO):
@@ -22,12 +21,14 @@ Long term Todo (Regan, UNO):
 * Get other missing foreign key data: ASMIS, LCS, CLS, Fire, CR, RIP
 * Add ATTACH checks against the Filesystem, ATCHLINK location
 * Do more checking/warnings for bad foreign keys in the attachments tables
+* Coordinate changes with POIs
 
 
 Data Quality Improvements (Team):
 ---------------------------------
-* Add Sheep Camp picnic shelter to buildings from POI
-* Add operating FMSS Locations to GIS
+* Find moved Slana buildings (see email to Gary Catledge on 2018-09-18)
+* Finish boardwalks in Skagway historical district
+* Improve Dyea trails and campground
 * Topology checks for roads and trails
 * Remove 'Unknown' values for records with ISOUTPARK = 'No' and/or
   PUBLICDISPLAY = 'Public Map Display'
@@ -65,7 +66,7 @@ Issues to discuss (Team):
   users; what good is 'Arbitrary line'?. Regardless, we should filter for 'Center line' in
   the layer definition query, or create a separate dataset for LINETYPE != 'Center line'
 * Review schema changes to TRAILS_LN
-  - TRLSTATUS: remove 'Not Applicable' from Domain; consider removing 'Abandoned'
+  - TRLSTATUS: Consider removing 'Not Applicable', 'Unknown', and 'Abandoned'  
     (use decommissioned instead) to match domain of roads/buildings
   - Renamed: TRLUSE_SOCIALTRL, TRLUSE_ANIMALTRL to TRLISSOCIAL, TRLISANIMAL
   - Removed: TRLUSE_OTHER (Y/N), TRLUSE_UNKNOWN (Y/N)
