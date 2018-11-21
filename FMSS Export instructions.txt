@@ -1,7 +1,7 @@
 This process should take about 45 minutes
 
 go to FMSS (need to request access from Scott Vantrees)
-  - https://pfmdportal.nps.gov/index.cfm
+  - https://portal.pfmd.nps.gov/index.cfm
 click on AMRS (Asset Management Reporting System) in the Application list
   - or go directly to http://pfmdamrs.nps.gov/BOE/BI
 Click on the Documents tab (top left)
