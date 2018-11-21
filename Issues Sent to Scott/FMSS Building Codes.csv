@@ -1,0 +1,71 @@
+﻿DOI_Code_FMSS,Code_GIS,Predominant_Use_FMSS,Description_GIS,Count
+NULL,NULL,NULL,NULL,194
+00000000,NULL,NULL,NULL,72
+35100000,35100000,Bldg Office,Bldg Office,48
+35100000,35100000,Bldg. Office (GSF),Bldg Office,2
+35140000,35140000,Bldg Post Office,Bldg Post Office,1
+35230900,35230900,Bldg School Environmental Education,Bldg School Environmental Education Center,4
+35240100,35240100,Bldg Comfort Stations,Bldg Comfort Stations/Restrooms,28
+35240100,35240100,Bldg. Comfort Station/Restroom (GSF),Bldg Comfort Stations/Restrooms,1
+35240200,35240200,Bldg Vault Toilets/Pit Toilets,Bldg Vault Toilets/Pit Toilets,144
+35240200,35240200,Bldg. Vault/Pit Toilet (GSF),Bldg Vault Toilets/Pit Toilets,2
+35290000,NULL,Bldg Other Institutional Uses,NULL,1
+35290100,35290100,Bldg Museum Repository,Bldg Museum Repository,7
+35290300,35290300,Bldg Law Enforcement Center,Bldg Law Enforcement Center,10
+35290700,35290700,Bldg Visitor Center,Bldg Visitor Center,20
+35290700,35290700,Bldg. Visitor Center,Bldg Visitor Center,1
+35290800,35290800,Bldg Visitor Contact Station,Bldg Visitor Contact Station,25
+35290900,35290900,Bldg Entrance Station,Bldg Entrance Station,5
+35291000,35291000,Bldg Restaurant,Bldg Restaurant,4
+35291000,35291000,Bldg. Restaurant,Bldg Restaurant,1
+35291100,35291100,Bldg Gymnasium,Bldg Gymnasium,1
+35291400,35291400,Bldg Dining Hall Cafeteria,Bldg Dining Hall Cafeteria,9
+35291500,35291500,Bldg Auditorium,Bldg Auditorium,3
+35291700,35291700,Bldg Lodge/Motel/Hotel,Bldg Lodge/Motel/Hotel,31
+35291800,35291800,Bldg Retail Store,Bldg Retail Store,7
+35300100,35300100,Bldg Housing Mobile Home,Bldg Housing Mobile Home,2
+35300200,35300200,Bldg Housing Single Family,Bldg Housing Single Family,65
+35300300,35300300,Bldg Housing Multi- Family Plex,Bldg Housing Multi- Family Plex,39
+35300300,35300300,"Bldg. Multiplex, Family",Bldg Housing Multi- Family Plex,8
+35300300,35300300,"Bldg. Multiplex, Family (GSF)",Bldg Housing Multi- Family Plex,1
+35300400,35300400,Bldg Housing Apartment,Bldg Housing Apartment,13
+35300500,35300500,Bldg Housing Cabin,Bldg Housing Cabin,236
+35300500,35300500,Bldg. Housing Cabin,Bldg Housing Cabin,2
+35300600,35300600,Bldg Housing Garage,Bldg Housing Garage,4
+35300700,35300700,Bldg Housing Support Building,Bldg Housing Support Building,52
+35300700,35300700,"Bldg. Housing, Support (GSF)",Bldg Housing Support Building,1
+35310000,35310000,Bldg Dormitories/ Barracks,"Bldg  Dormitories/ Barracks ",24
+35310000,35310000,"Bldg. Dormitory, Barrack","Bldg  Dormitories/ Barracks ",1
+35310000,35310000,"Bldg. Dormitory, Barrack (GSF)","Bldg  Dormitories/ Barracks ",1
+35410100,35410100,Bldg Warehouse Fire Cache,Bldg Warehouse Fire Cache,5
+35410300,35410300,Bldg Warehouse Equipment Vehicle,Bldg Warehouse Equipment Vehicle,14
+35410300,35410300,Bldg. Warehouse Equip/Veh (GSF),Bldg Warehouse Equipment Vehicle,2
+35410500,35410500,Bldg Warehouse Shed Outbuilding,Bldg Warehouse Shed Outbuilding,228
+35410500,35410500,Bldg. Warehouse Shed/Outbuilding (GSF),Bldg Warehouse Shed Outbuilding,4
+35410600,35410600,Bldg Warehouse Chemical,"Bldg Warehouse Chemical ",17
+35410700,35410700,Bldg Warehouse Warehouse,Bldg Warehouse Warehouse,21
+35410700,35410700,Bldg. Warehouse,Bldg Warehouse Warehouse,1
+35410800,35410800,Bldg Warehouse Explosive,Bldg Warehouse Explosive,1
+35500200,35500200,Bldg Pump House Well House,Bldg Pump House Well House,27
+35500200,35500200,Bldg. Pump/House (GSF),Bldg Pump House Well House,2
+35500300,35500300,Bldg Power Generation,Bldg Power Generation,23
+35500400,35500400,Bldg Sewage Treatment,Bldg Sewage Treatment,6
+35500500,35500500,Bldg Water Treatment,Bldg Water Treatment,6
+35500500,35500500,Bldg. Water Treatment (GSF),Bldg Water Treatment,1
+35600100,35600100,Bldg Service Shop Maintenance,Bldg Service Shop Maintenance,50
+35600100,35600100,Bldg. Service Shop/Maint (GSF),Bldg Service Shop Maintenance,2
+35600200,NULL,Bldg Auto Service Refueling,NULL,1
+35720000,35720000,Bldg Communications Systems,Bldg Communications Systems,5
+35740100,35740100,Bldg Laboratory,Bldg Laboratory,4
+35740100,35740100,Bldg. Laboratory,Bldg Laboratory,1
+35800400,35800400,Bldg Multi-Purpose,Bldg Multi-Purpose,1
+35800500,35800500,Bldg Barn Stable,Bldg Barn Stable,4
+35800800,35800800,Bldg Cultural Center,Bldg Cultural Center,72
+35800900,35800900,Bldg Hogan,Bldg Hogan,1
+35801100,35801100,Bldg Laundry,"Bldg Laundry ",3
+35801200,35801200,Bldg Security,Bldg Security,1
+35801500,35801500,Bldg Greenhouse,Bldg Greenhouse,7
+40711100,NULL,Fuel System,NULL,1
+40750800,40750800,Amphitheater,"Amphitheater ",4
+40750900,40750900,Pavilion,Pavilion,21
+40780200,40780200,Ruin,Ruin,1

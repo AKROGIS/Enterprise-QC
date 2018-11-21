@@ -1,0 +1,152 @@
+﻿FACLOCID,UNITCODE,FMSS_DESCRIPTION,FMSS_PARKNUM,PARKBLDGID,BLDGNAME
+Theses buildings have a PARKNUM attribute in FMSS that does not match the PARKID in GIS (which was historically populated from FMSS)
+The GIS has been updated to align with FMSS.  This documents the old and new ParkIDs.
+In some cases the FMSS ParkID does not match the FMSS description
+In some cases the PARKID is inconsistent (hyphen or not) in a set of buildings.
+In some cases (street addresses) the Park ID in GIS was more descriptive/complete
+Cleanup would be nice but it needs to start in FMSS.
+42574,WEAR,"Superintendent House 152, 152A",152,152 2nd Ave,"Superintendent House  152, 152A"
+42575,WEAR,"4 Plex 153 A, B, C, D",153,153 2nd Ave,"4-Plex  153 A, B, C, D"
+42577,WEAR,Visitor Info Ctr 154A aka Annex,154A,154A 2nd Ave,Visitor Information Center aka Annex
+42579,WEAR,Residence 154 B SFU Corner House,154B,154B 2nd Ave,Corner House 154B
+42581,WEAR,"Duplex 154 C, D","154 C,D",154C&D 2nd Ave,Duplex 154 C & D
+42582,WEAR,EON Building 160,160,160 2nd Ave,EON Building
+241900,KATM,KS - King Salmon Housing  FAA161,00FAA161,161,King Salmon Housing 161
+18703,DENA,Moose Creek Cabin B19 Historic,B19,18703-B,Moose Creek Cabin Cache
+18703,DENA,Moose Creek Cabin B19 Historic,B19,18703-C,Moose Creek Cabin Outhouse
+00001535,DENA,HQ Duplex P252 A & B,P252,251a and 251b,Residence 251a and 251b
+42588,WEAR,Bunk House 297 A,297A,297A Mission St,Bunk House
+43490,GAAR,00000301 AKPB-Ranger station/residence,00000301,AKPB,Anaktuvuk Pass Ranger Station
+73281,GAAR,AKPB Ranger Station/Residence Storage Shed,73281,AKPB,Anaktuvuk Pass - Ranger Station Storage Shed
+43491,GAAR,00000302 AKPH-Bunk House,00000302,AKPH,Anaktuvuk Pass Bunk House
+00001503,DENA,HQ Kennels Area Storage B104,B96,B104,HQ Kennels Area Storage Shed
+18839,DENA,REMOVED Wonder Lake Campground Pit Toilet B131-2,B131-2,B131,Wonder Lake Campground Pit Toilet B131 OPEROBSO
+18840,DENA,REMOVED Wonder Lake Campground Pit Toilet B131-1,B131-1,B132,Wonder Lake Campground Pit Toilet B132 OPEROBSO
+19117,DENA,Wonder Lake Ranger Station Womens Pit Toilet B139,B139,B134,Wonder Lake Ranger Station Pit Toilet B135 OPEROBSO
+19115,DENA,Wonder Lake Ranger Station Mens Pit Toilet B138,B138,B135,Wonder Lake Ranger Station Pit Toilet B134 OPEROBSO
+19121,DENA,Toklat Old Pump House B226 REMOVED,226,B226,Pump House
+98760,DENA,"Toklat B&U Storage Shed, B240",B666,B240,Toklat B&U Storage Shed
+46494,DENA,Teklanika Rest Stop Bus Shelter B245-1,B245-1,B245,"Teklanika Rest Stop Bus Shelter #1, B245"
+88656,DENA,Concessions Cabin Unit 1 S506 LSI [Gen Mgr],S506,B24-B,Toklat Ranger Staton (Kennels) Food Cache
+238578,KATM,KS B3 Visitor Center Rented and Shared w USF&W Ser,KS B3 (Visitor Center),B3,King Salmon Interagency Visitor Center
+18930,DENA,RCCG Caribou West Comfort Station B606 Concessions,B606,B321,Riley Creek CG Caribou Loop West Comfort Station
+18931,DENA,RCCG Caribou East Comfort Station B607 Concessions,B607,B322,Riley Creek CG Caribou Loop East Comfort Station
+228380,KATM,REMOVE KS B36 Storage Van,B36,B35,Outboard Engine Storage Van
+83354,KATM,KS B35 Outboard Engine Storage Van,B35,B36,Storage Van ( Hold Cabin Kit & Building Supplies)
+81340,DENA,HQ Area Resources Storage Shed B119,B119,B378,Interpretive Storage
+00001168,KATM,KS B51-Quadplex constructed 1996,Q51,B51,Quadplex
+228821,DENA,C Camp Cabin S548,S548,B548,C-Camp Cabin 548
+228820,DENA,C Camp Cabin S549,S549,B549,C-Camp Cabin 549
+86499,DENA,Denali Visitor Center Book Store B550,B449,B550,Denali Bookstore
+228818,DENA,C Camp Cabin S550,S550,B550,C-Camp Cabin 550
+228817,DENA,C Camp Cabin S551,S551,B551,C-Camp Cabin 551
+228812,DENA,C Camp Cabin S552,S552,B552,C-Camp Cabin 552
+98937,DENA,Toklat River Rest Area SST #7 B563,B563,B557,Toklat River Rest Area SST #7 B563 REMOVED
+97627,DENA,Toklat River Rest Area SST #4 B560,B560,B558,Toklat River Rest Area SST #4 B560  REMOVED
+97682,DENA,Toklat River Rest Area SST #6 B562,B562,B559,Toklat River Rest Area SST #6 B562 REMOVED
+97626,DENA,Toklat River Rest Area SST #3 B559,B559,B560,Toklat River Rest Area SST #3 B559 REMOVED
+97625,DENA,Toklat River Rest Area SST #2 B558,B558,B561,Toklat River Rest Area SST #2 B558  REMOVED
+97679,DENA,Toklat River Rest Area SST #5 B561,B561,B562,Toklat River Rest Area SST #5 B561  REMOVED
+97622,DENA,"Toklat River Rest Area SST #1, B557",B557,B563,"Toklat River Rest Area SST's, 7 Units"
+110771,DENA,C Camp Cabin S584,S584,B584,Q-584 C Camp Cabin S584 FY08 STW ADA
+110772,DENA,C Camp Cabin S585,S585,B585,Cabin S585
+226507,DENA,Over and Out Building B911 (Shaffer Annex),B911,B592,Over & Out
+228806,DENA,C Camp Cabin S592,S592,B592,C Camp Cabin 592
+228810,DENA,C Camp Cabin S593,S593,B593,C Camp Cabin 593
+228834,DENA,C Camp Cabin S599,S599,B599,C-Camp Cabin 599
+228835,DENA,C Camp Cabin S600,S600,B600,C-Camp Cabin 600
+243237,KATM,"KS KATM, ANIA, ALAG Headquarters, Suite 7, Bldg 603","Suite 7, BLDG. 603 USAF Base King Salmon",B603,Headquarters on Silver St. Suite 7
+113033,DENA,Mountain Vista SST B623-2,B623--2,B623-2,Mountain Vista SST#2
+113044,DENA,Mountain Vista SST B623-4,B623-,B623-4,Mountain Vista SST#4
+19133,DENA,"Toklat Roads Small Engine Shed, B666",B240,B666,Toklat Roads Small Engine Shed
+245136,DENA,"Toklat Sauna, B61",B61,B666,Toklat Sauna
+46497,DENA,"Toklat Federal Highways Office and Quarters, B89A",B89-A,B89A,FHWY Quarters South
+46498,DENA,"Toklat Federal Highways Quarters, B89B",B89-B,B89B,FHWY Quarters
+243016,DENA,HQ Air Quality Instrument Trailer B372,B372,B93,Air Quality Shed
+18747,DENA,Teklanika MSLC Camp Food Locker B608,B608,B93,The FEATS
+53670,KATM,BR-27  BC Barabara Exhibit Building,CS-1,BR-27,Barabara Exhibit Building
+38422,KATM,BR-38 BC Ranger Station,BR38,BR-38,Ranger Station
+53641,KATM,BR-40  Ranger Cache,BR40,BR-40,Ranger Cache
+38408,KATM,BR - Brooks Camp Quarters BR41,BR41,BR-41,Quarters
+38409,KATM,BR - Brooks Camp Quarters BR42,BR42,BR-42,Quarters
+38410,KATM,BR - Brooks Camp Quarters BR43,BR43,BR-43,Brooks Camp Quarters
+38411,KATM,BR - Brooks Camp Quarters BR46,BR46,BR-46,Brooks Camp Quarters
+38412,KATM,BR-47  Brooks Camp Quarters,BR47,BR-47,Brooks Camp Quarters
+38413,KATM,BR-48 Brooks Camp Quarters,BR48,BR-48,Brooks Camp Quarters
+38414,KATM,BR -Brooks Camp Quarters BR49,BR49,BR-49,Brooks Camp Quarters
+38415,KATM,BR - Brooks Camp Quarters BR50,BR50,BR-50,Brooks Camp Quarters
+90879,KATM,BR-54 Propane/Dry Storage Bldg,BR13,BR-54,Propane/Dry Storage Bldg
+99559,KATM,BR-OH Outhouse and Thinking Seat (for Hard Sided Wall Tents),BL-OH,BR-OH,Outhouse and Thinking Seat (for Hard Sided Wall Tents)
+38416,KATM,BR-T1 Brooks Camp Quarters (Hard Sided Wall Tent ),BRT1,BR-T1,Brooks Camp Quarters (Hard Sided Wall Tent )
+38417,KATM,BR-T2 Brooks Camp Quarters (Hard sided wall tent),BRT2,BR-T2,Brooks Camp Quarters (Hard Sided Wall Tent )
+38418,KATM,BR-T3 Brooks Camp Quarters (Hard sided wall tent),BRT3,BR-T3,Brooks Camp Quarters (Hard Sided Wall Tent )
+38419,KATM,BR-T4  Brooks Camp Quarters (hard sided wall tent),BRT4,BR-T4,Brooks Camp Quarters (Hard Sided Wall Tent )
+90895,KATM,BR-T5 Brooks Camp Quarters (Hilton),0000BRT5,BR-T5,Brooks Camp Quarters (Hilton)
+00001547,DENA,Q-159 C Camp Cabin S159 REMOVED,159,Cabin S179,Q-159 C Camp Cabin S159 REMOVED
+00001546,DENA,Q-158 C Camp Cabin S158 REMOVED,158,Cabin S180,Q-158 C Camp Cabin S158 REMOVED
+00001543,DENA,Q-157 C Camp Cabin S157 REMOVED,157,Cabin S181,Q-157 C Camp Cabin S157 REMOVED
+00001534,DENA,Q-153 C Camp Cabin S153 REMOVED,153,Cabin S182,Q-153 C Camp Cabin S153 REMOVED
+42550,GLBA,HA - Storage Building - GBA10,10,GBA10,Housing Storage
+86757,GLBA,MA - Maintenance Covered Parking and Storage Building GBA130,86757,GBA130,Maintenance Covered Parking and Storage
+42557,GLBA,IP - Indian Point Wellhouse Building GBA29,42551,GBA29,Indian Point Wellhouse
+42644,GLBA,LA - Lodge Service Building GBL17,GBL-17,GBL17,Lodge Service Building
+226564,GLBA,LH - Staff Kitchen Dry Storage Annex GBL71A,P003,GBL71A,Lodge Staff Kitchen Dry Storage Annex
+87973,GLBA,DB - VIP Cabin GBQ105,GBA105,GBQ105,Dry Bay VIP Cabin
+73350,GLBA,LA - Lodge Guest Cabins 7-8 - GBQ16C,GBQ16D,GBQ16C,Lodge Guest Cabins 7-8
+73341,GLBA,LA - Lodge Guest Cabins 9-12 & 14-15 - GBQ16D,GBQ16C,GBQ16D,Lodge Guest Cabins 9-15
+73383,GLBA,LA - Lodge Guest Cabins 47-50 GBQ16M,GLQ16M,GBQ16M,Lodge Guest Cabins 47-50
+73386,GLBA,LA - Lodge Guest Cabins 51-52 / U3 - GBQ16N,GLQ16N,GBQ16N,Lodge Guest Cabins 51-52
+73387,GLBA,LA - Lodge Guest Cabins 53-54 - GBQ16O,GLB16O,GBQ16O,Lodge Guest Cabins 53-54
+73395,GLBA,LA - Lodge Baggage Storage Building GBL16R,GBL16R,GBQ16R,Lodge Baggage Storage
+42583,GLBA,GA - Gustavus FAA Cottage GBQ20,GBA 20,GBQ20,Gustavus FAA Cottage #20
+84216,GLBA,LH - Lodge Staff Dormitory Building GBQ57,GBL-57,GBQ57,Lodge Staff Dormitory #57
+84218,GLBA,LH - Lodge Staff Dormitory Building GBQ58,GBL-58,GBQ58,Lodge Staff Dormitory #58
+95838,KATM,GSC-6 Outhouse for Golden Squirrel Camp,VR-OT,GSC-6,Golden Squirrel Camp Outhouse
+95833,KATM,GSQ-1 Quarters Unit 1 Golden Squirrel Camp,VR-T1,GSCQ-1,Golden Squirrel Camp Quarters Unit 1
+95835,KATM,GSQ-2  Quarters Unit 2 Gloden Squirrel Camp,VR-T2,GSCQ-2,Golden Squirrel Camp Quarters Unit 2
+95836,KATM,GSQ-3 Quarters 3 in  Golden Squirrel Camp,VR-T3,GSCQ-3,Golden Squirrel Camp Quarters Unit 3
+95837,KATM,GSQ-4 Quarters Unit 4 in Golden Squirrel Camp,VR-T4,GSCQ-4,Golden Squirrel Camp Quarters Unit 4
+55661,KATM,KB Hammersly Cabin (Historic Structure/Ruin),ILI-103,KATM-110,Hammersly Cabin (Historic/Ruin)
+38405,KATM,LB - Lake Brooks Quarters BL1,BL1,LB-1,Lake Brooks Quarters
+38406,KATM,LB - Lake Brooks Quarters BL2,BL2,LB-2,Lake Brooks Quarters
+38407,KATM,LB - Brooks Lake Quarters BL3,BL3,LB3,Lake Brooks Quarters
+43508,GAAR,00000201 MACB-Ranger residence (C1),00000201,MACB-C1,Marion Creek Ranger Residence (C1)
+43509,GAAR,00000202 MACH-Transient housing (C2),00000202,MACH-C2,Marion Creek Transient Housing (C2)
+00001521,DENA,HQ Apartments P12 A & B Historic,P12,"P12(A,B)",Apartments P12
+00001522,DENA,HQ Apartments P13 A & B Historic,P13,"P13(A,B)",Apartments P11
+18821,DENA,HQ Residence P171,B171,P171,"Residence "
+92276,LACL,PA Hangar Facility,PA Hanger,PA-?,Hanger Facility
+99577,LACL,PA-Historic Cache,PA-Historic Cach,PA-?,Historic Cache
+99576,LACL,PA-Museum & Boat Barn,PA-M,PA-?,Museum & Boat Barn
+38548,LACL,PA-12 VIP Wash house and Kitchen Building,PA-VIP,PA-12,VIP Wash house and Kitchen Building
+38543,LACL,PA-13 Well House,PA13,PA-13,Well House
+91050,LACL,PA-14  Jet A fuel Dispensing Building,14,PA-14,Jet A Fuel Dispensing
+107647,LACL,"PA-1B Fuel Building for Headquarters, Visitor Center and Ran",Fuel Tank Bldg,PA-1B,"Fuel Building for Headquarters, Visitor Center and Ranger Warehouse"
+38432,LACL,PA-2   Port Alsworth Duplex,PA2,PA-2,Port Alsworth Duplex
+38540,LACL,PA-3 Visitor Center Building,PA3,PA-3,Visitor Center Building
+38436,LACL,PA-4 Housing Unit,PA4,PA-4,House (Dan and Amy's House)
+38541,LACL,PA-6 Ranger WareHouse & Weight Room,PA6,PA-6,Ranger WareHouse & Weight Room
+107614,LACL,PA-AVDB Port Alsworth Avgas Dispensing Building,PA-AVDS,PA-AVDB,Port Alsworth Avgas Dispensing Building
+38545,LACL,PA-SWS Solid Waste Sorting Building (former Incinerator Bldg,PA-IN,PA-SWS,Incinerator Building
+38435,LACL,PT-1 Bly House,PT1,PT-1,Bly House
+91040,LACL,PT-5 Point Fuel Dispensing Shed,PT5,PT-5,Point Fuel Dispensing Shed
+99547,LACL,PT-8 Fire Cache,PT-5,PT-8,Fire Cache
+91045,LACL,PT-WT1 Point Hard sided Wall tent #1,PT WT1,PT-WT1,Point Hard sided Wall tent #1
+91046,LACL,PT-WT2 Point Wall tent #2,PT WT2,PT-WT2,Point Wall tent #2
+91049,LACL,PT-WT5 Point Wall Tent #5,PT-WT 5,PT-WT5,"Point Fuel System for PT-WT3,WT4,WT5"
+230269,KATM,KS - King Salmon Housing Mosquito Coast Road FAA139,FAA-139,QFAA 139,Housing Unit 139
+101239,KATM,KS - King Salmon Housing White Sox Way FAA150,00FAA150,QFAA 150,Housing Unit 150
+93634,KATM,KS - King Salmon Housing Rainbow Ridge Road FAA158,FAA-158,QFAA 158,Residence 158
+101238,KATM,KS - King Salmon Duplex FAA162/163,KS QFAA Duplex,QFAA 162/163,Duplex 162/163
+230268,KATM,KS - King Salmon Housing Rainbow Ridge Road FAA164,FAA-164,QFAA 164,"Residence 164 "
+18827,DENA,Q-183 C Camp Cabin S183 REMOVED,183,S183,Q-183 C Camp Cabin S183 REMOVED
+18830,DENA,Q-184 C Camp Cabin S184 REMOVED,184,S184,Q-184 C Camp Cabin S184 REMOVED
+18831,DENA,Q-185 C Camp Cabin S185 REMOVED,185,S185,Q-185 C Camp Cabin S185 REMOVED
+19132,DENA,Toklat Recreation Hall B237,B237,S237,Toklat Recreation Hall
+38020,DENA,Toklat Upper Cabin S24 Historic,B24,S24,Q-024 Toklat Historic Ranger Station Cabin S24
+18908,DENA,Toklat Duplex S243,B243,S243,Toklat Duplex S243
+18708,DENA,Igloo Cabin S25 Historic,B25,S25,Historic Igloo Cabin
+18925,DENA,Gallop Cabin S259 Kantishna,B259,S259,Gallop Cabin
+18709,DENA,East Fork Upper Cabin S29 Historic,B29,S29,Historic Upper East Fork Cabin
+18711,DENA,Sanctuary Cabin S31 Historic,B31,S31,Historic Sanctuary Cabin
+18650,DENA,Pearson Cabin S4 Historic,B4,S4,Q-004 Historic Pearson Cabin S4 Toklat
