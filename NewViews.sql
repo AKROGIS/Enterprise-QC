@@ -636,6 +636,118 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+
+CREATE VIEW [dbo].[FMSS_Report_Cordinates] as 
+
+	-- building with only one point
+	select FACLOCID, Shape.STY as Lat1, Shape.STX as Long1, NULL as Lat2, NULL as Long2 from gis.AKR_BLDG_CENTER_PT_evw where FACLOCID in (SELECT FACLOCID from gis.AKR_BLDG_CENTER_PT_evw where FACLOCID is not null group by FACLOCID having count(*) = 1)
+	union all
+
+	-- buildings with multiple points
+	select FACLOCID, geometry::EnvelopeAggregate(Shape).STCentroid().STY as Lat1, geometry::EnvelopeAggregate(Shape).STCentroid().STX as Long1, NULL as Lat2, NULL as Long2 from gis.AKR_BLDG_CENTER_PT_evw where FACLOCID is not null group by FACLOCID having count(*) >1
+	union all
+
+	-- parkinglot polygons (may be multiple), so union first, may also be part of a road asset (like a pullout), so eliminate those
+	select FACLOCID,
+	  geometry::UnionAggregate(Shape).STCentroid().STY as Lat1,
+	  geometry::UnionAggregate(Shape).STCentroid().STX as Long1,
+	  NULL as Lat2, NULL as Long2 
+	from gis.PARKLOTS_PY_evw as t join FMSSExport as F on t.FACLOCID = f.Location where FACLOCID is not null and f.Asset_Code = '1300' group by FACLOCID
+	union all
+
+	-- Roads
+	-- only one segment in the road
+	select faclocid,  
+	  Shape.STStartPoint().STY as Lat1,
+	  Shape.STStartPoint().STX as Long1,
+	  Shape.STEndPoint().STY as Lat2,
+	  Shape.STEndPoint().STX as Long2
+	from gis.ROADS_LN_evw where FACLOCID in (
+		select FACLOCID from gis.ROADS_LN_evw as t join FMSSExport as F on t.FACLOCID = f.Location where FACLOCID is not null and linetype = 'Center Line' and f.Asset_Code = '1100' group by faclocid having count(*) = 1
+	)
+	union all
+	-- multi segment roads
+	select faclocid,  
+	  geometry::UnionAggregate(Shape).STStartPoint().STY as Lat1,
+	  geometry::UnionAggregate(Shape).STStartPoint().STX as Long1,
+	  geometry::UnionAggregate(Shape).STEndPoint().STY as Lat2,
+	  geometry::UnionAggregate(Shape).STEndPoint().STX as Long2
+	from gis.ROADS_LN_evw as t join FMSSExport as F on t.FACLOCID = f.Location where FACLOCID is not null  and linetype = 'Center Line' and f.Asset_Code = '1100' group by faclocid having count(*) > 1
+	union all
+
+	-- Road Bridges (assume only one segment)
+	  -- check assumption
+	  -- select Faclocid, count(*) from gis.ROADS_LN_evw where ISBRIDGE = 'Yes' and FACLOCID is not null group by FACLOCID having count(*) > 1
+	select FACLOCID, Shape.STStartPoint().STY as Lat1, Shape.STStartPoint().STX as Long1, Shape.STEndPoint().STY as Lat2, Shape.STEndPoint().STX as Long2 from gis.ROADS_LN_evw where FACLOCID in (
+		select t.FACLOCID from gis.ROADS_LN_evw as t join FMSSExport as F on t.FACLOCID = f.Location where t.ISBRIDGE = 'Yes' and t.FACLOCID is not null and t.linetype = 'Center Line' and f.Asset_Code = '1700' group by FACLOCID having count(*) = 1
+	) and linetype = 'Center Line' 
+	union all
+
+	-- Trails
+	-- only one segment in the trail
+	select faclocid,  
+	  Shape.STStartPoint().STY as Lat1,
+	  Shape.STStartPoint().STX as Long1,
+	  Shape.STEndPoint().STY as Lat2,
+	  Shape.STEndPoint().STX as Long2
+	from gis.TRAILS_LN_evw where FACLOCID in (
+		select t.FACLOCID from gis.TRAILS_LN_evw as t join FMSSExport as F on t.FACLOCID = f.Location where t.FACLOCID is not null and t.linetype = 'Center Line' and f.Asset_Code = '2100' group by FACLOCID having count(*) = 1
+	)
+	union all
+	-- Multi segment trails
+	select faclocid,  
+	  geometry::UnionAggregate(Shape).STStartPoint().STY as Lat1,
+	  geometry::UnionAggregate(Shape).STStartPoint().STX as Long1,
+	  geometry::UnionAggregate(Shape).STEndPoint().STY as Lat2,
+	  geometry::UnionAggregate(Shape).STEndPoint().STX as Long2
+	from gis.TRAILS_LN_evw as t join FMSSExport as F on t.FACLOCID = f.Location where FACLOCID is not null and linetype = 'Center Line' and f.Asset_Code = '2100' group by faclocid having count(*) > 1
+	union all
+
+	-- Trail Bridges (assume There are some with multiple segments)
+	  -- check assumption
+	  -- select Faclocid, count(*) from gis.TRAILS_LN_evw where ISBRIDGE = 'Yes' and FACLOCID is not null  and linetype = 'Center Line' group by FACLOCID having count(*) > 1
+	-- Single segment trail bridges
+	select FACLOCID, Shape.STStartPoint().STY as Lat1, Shape.STStartPoint().STX as Long1, Shape.STEndPoint().STY as Lat2, Shape.STEndPoint().STX as Long2 from gis.TRAILS_LN_evw where FACLOCID in (
+		select t.FACLOCID from gis.TRAILS_LN_evw as t join FMSSExport as F on t.FACLOCID = f.Location where t.ISBRIDGE = 'Yes' and t.FACLOCID is not null and t.linetype = 'Center Line' and f.Asset_Code = '2200' group by FACLOCID having count(*) = 1
+	) and linetype = 'Center Line' 
+
+	union all
+	-- Multi segment trail bridges
+	select faclocid,  
+	  geometry::UnionAggregate(Shape).STStartPoint().STY as Lat1,
+	  geometry::UnionAggregate(Shape).STStartPoint().STX as Long1,
+	  geometry::UnionAggregate(Shape).STEndPoint().STY as Lat2,
+	  geometry::UnionAggregate(Shape).STEndPoint().STX as Long2
+	from gis.TRAILS_LN_evw as t join FMSSExport as F on t.FACLOCID = f.Location where ISBRIDGE = 'Yes' AND FACLOCID is not null and linetype = 'Center Line' and f.Asset_Code = '2200' group by faclocid having count(*) > 1
+
+
+	/*
+
+	-- We might be able to improve multi segment roads and trails by adding in the bridges (with different FACLOCID but same FEATUREID)
+	-- all segments with the same faclocid must have the same featureid (QC check #31)
+	-- all segments with the same featureid must be connected (QC check #3)
+	-- I don't know what algorithm is used in the unionaggregate, but maybe a more explicit algorithm would yield better end points
+	-- Maybe looking at the envelope of the unioned segments would help us pick a better set of end points. 
+	-- group by faclocid, get the featureid, get the connected linestring for the featureid, get the start and end points
+
+	-- It is tricky to get the right FACLOCID and FEATUREID in the GROUP BY situation
+	select FEATUREID,  MAX(FACLOCID), MIN(FACLOCID),  -- these are often but not always the same, they may even both be bridges
+	  geometry::UnionAggregate(Shape).STStartPoint().STY as Lat1,
+	  geometry::UnionAggregate(Shape).STStartPoint().STX as Long1,
+	  geometry::UnionAggregate(Shape).STEndPoint().STY as Lat2,
+	  geometry::UnionAggregate(Shape).STEndPoint().STX as Long2
+	from gis.ROADS_LN_evw where FEATUREID in (
+	  select min(featureid) as featureid from gis.ROADS_LN_evw where FACLOCID is not null and linetype = 'Center Line' group by faclocid having count(*) > 1
+	) GROUP BY FEATUREID
+
+	*/
+
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_ATTACH] AS select I.Issue, I.Details, D.* from  gis.AKR_ATTACH_evw AS D
 join (
 
