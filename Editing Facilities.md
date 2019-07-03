@@ -13,12 +13,18 @@ In general the following process is applied:
 3) [DM updates from FMSS](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#fmss-update)
 4) [DM runs QC checks](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#quality-check)
 5) [DM/User address QC Issues](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#quality-control-fixes)
-6) Repeat steps 4/6 as needed
+6) Repeat steps 4 and 5 as needed
 7) [DM calculates fields](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#calculate-fields)
 8) [DM posts to default](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#post-to-default)
 9) [DM Updates Metadata](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#update-metadata)
 9) [DM publishes copy to PDS](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#publish-to-pds)
 
+This document does not cover bulk updates with new data, such as a
+new trail data collection effort.  It also does not cover updating
+the facilities web application
+(see https://github.com/regan-sarwas/Building-QC/tree/master/Photo%20Processing/scripts)
+or facility related photo processing
+(see https://github.com/regan-sarwas/Building-QC/tree/master/Photo%20Processing)
 
 User Editing
 ------------
