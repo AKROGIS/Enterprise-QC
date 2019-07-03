@@ -1,23 +1,23 @@
 Updating the Facilities GIS
 ===========================
 
-_[The master copy of this document can be found at https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing Facilities.md]_
+_[The master copy of this document can be found at https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md]_
 
 The Alaska Region facilities GIS lives in SDE on INPAKROVMAIS.
 Updates are controlled by the regional GIS data manager (DM)
 and go through a rigorous quality control (QC) process.
 In general the following process is applied:
 
-1) User edits a new version
-2) DM reviews the version
-3) DM updates from FMSS
-4) DM runs QC checks
-5) DM/User address QC Issues
+1) [User edits a new version](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#user-editing)
+2) [DM reviews the version](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#dm-review)
+3) [DM updates from FMSS](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#fmss-update)
+4) [DM runs QC checks](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#quality-check)
+5) [DM/User address QC Issues](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#quality-control-fixes)
 6) Repeat steps 4/6 as needed
-7) DM calculates fields
-8) DM posts to default
-9) DM Updates Metadata
-9) DM publishes copy to PDS
+7) [DM calculates fields](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#calculate-fields)
+8) [DM posts to default](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#post-to-default)
+9) [DM Updates Metadata](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#update-metadata)
+9) [DM publishes copy to PDS](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#publish-to-pds)
 
 
 User Editing
@@ -113,8 +113,8 @@ Editing a version with SQL is beyond this document, but you can
 see examples in the stored procedures used in the following section.
 
 
-Calculated Fields
------------------
+Calculate Fields
+----------------
 The DM edits and runs a SQL script
 (https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Do%20Calculation.sql)
 to calculate missing fields.
