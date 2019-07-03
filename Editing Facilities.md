@@ -118,6 +118,21 @@ corrections can be made with a SQL query against the user's version or in an Arc
 Editing a version with SQL is beyond this document, but you can
 see examples in the stored procedures used in the following section.
 
+For some issues, running the calculations (section below) will
+resolve the issue. However, this should not be done until the user
+(or DM) has a chance to see the warnings that will disappear
+after the calculations have been run.
+
+Some issue cannot be resolved, for example GIS may be correct,
+but it disagrees with FMSS because FMSS has yet to be updated.
+Some issue cannot be resolved because they are valid exceptions
+to the normal QC rules, i.e. two buildings with the same
+FMSS FACLOCID.  In these cases, the user or the DM can create
+new records in the **gis.QC_ISSUES_EXPLAINED** table.  The
+columns for _Feature_oid_ and _Issue_ must match exactly the
+_ObjectID_ and _Issue_ fields in the QC Check output. The _Explanation_
+and _Feature_class_ attributes cannot be empty.
+
 
 Calculate Fields
 ----------------
