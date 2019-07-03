@@ -46,7 +46,7 @@ with the DM before proceeding.
 Before submitting the version to the DM, it is a good idea for the
 user to:
 
-1) Review the changes in their version (see instructions in 
+1) Review the changes in their version (see instructions in
 the following section) to ensure there are no unintended changes.
 2) Reconcile their version with any changes to DEFAULT since the
 check out was made.  Any conflicts (someone else has modified the
@@ -152,9 +152,9 @@ after the calculations have been run.
 Some issue cannot be resolved by editing the GIS. For example:
 * The GIS may be correct, but there is an issue because it
   disagrees with FMSS -- probably because FMSS needs to be updated.
-* The change is valid but violates the normal QC rules. Fore example
+* The change is valid but violates the normal QC rules. For example
   in general it is an error if two buildings have the same
-  FMSS FACLOCID, but this does happen.
+  FMSS FACLOCID, but this can happen.
 
 In these cases, the user or DM can create
 new records in the **gis.QC_ISSUES_EXPLAINED** table.  The
@@ -190,7 +190,7 @@ does not like the default, they can provide a more suitable
 value before the calculation provides the unwanted default.
 
 This script can be run at any time if there are no _default value
-warnings_ or the user has indicated acceptance.  However, 
+warnings_ or the user has indicated acceptance.  However,
 this script uses the links to FMSS (**FACLOCID** or **FACASSETID**)
 as well as the FMSS tables (see above) to populate some fields
 in the user's version.  If any of these items change during the QC
@@ -216,7 +216,7 @@ do the reconcile and properly address the conflicts.
 
 Update Metadata
 ---------------
-It is a judgement call as to wether or not the changes in this
+It is a judgement call as to whether or not the changes in this
 version warrant a new processing step in the lineage.  It also
 seems like a good idea to update the _update date_.
 
