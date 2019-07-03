@@ -1,4 +1,6 @@
 This process should take about 45 minutes
+It assumes you are using SSMS v17
+** NOTE THAT THERE IS A BUG IN SSMS v18.0 (15.0.18118.0) that replaces all alpha locations (i.e. AKRO) with NULL**
 
 go to FMSS (need to request access from Scott Vantrees)
   - https://portal.pfmd.nps.gov/index.cfm
