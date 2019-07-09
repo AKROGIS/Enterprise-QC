@@ -2942,6 +2942,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+
 CREATE VIEW [dbo].[QC_ISSUES_TRAILS_LN] AS select I.Issue, I.Details, D.* from  gis.TRAILS_LN_evw AS D
 join (
 
@@ -3372,7 +3373,7 @@ select OBJECTID, 'Error: Multiline roads are not allowed' as Issue, NULL from gi
 union all
 -- Overlapping segments:  Takes about 15 seconds
 select r1.OBJECTID, 'Error: Overlapping segments are not allowed' as Issue, 'Overlaps with OBJECTID = ' + convert(nvarchar(20), r2.OBJECTID) as Details
-from gis.TRAILS_LN_evw as r1 join gis.TRAILS_LN_evw as r2 on r1.shape.Filter(r2.shape) = 1 and r1.OBJECTID < r2.OBJECTID where r1.Shape.STOverlaps(r2.Shape) = 1
+from gis.TRAILS_LN_evw as r1 join gis.TRAILS_LN_evw as r2 on r1.shape.Filter(r2.shape) = 1 and r1.OBJECTID < r2.OBJECTID where r1.LINETYPE <> 'Perimeter line' AND r2.LINETYPE <> 'Perimeter line' AND r1.Shape.STOverlaps(r2.Shape) = 1
 
 
 
