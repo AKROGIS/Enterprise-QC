@@ -3417,9 +3417,13 @@ BEGIN
 	-- ATTACH_PT
 	------------
 	-- 1) OBJECTID: nothing to do
-    -- 2) if BLDGNAME is an empty string, change to NULL
+    -- 2) if ATCHNAME is an empty string, change to NULL
     update gis.AKR_ATTACH_PT_evw set ATCHNAME = NULL where ATCHNAME = ''
-    -- 3) if BLDGALTNAME is an empty string, change to NULL
+	merge into gis.AKR_ATTACH_evw as t1
+      using (select f.Location, 'Photo of ' + d.Description AS ATCHNAME from dbo.FMSSExport as f join dbo.DOM_FMSS_ASSETCODE as d on f.Asset_Code = d.Code) as t2
+      on t1.faclocid = t2.Location and t1.ATCHNAME IS NULL
+      when matched then update set ATCHNAME = t2.ATCHNAME;
+    -- 3) if ATCHALTNAME is an empty string, change to NULL
     update gis.AKR_ATTACH_PT_evw set ATCHALTNAME = NULL where ATCHALTNAME = ''
     -- 4) if MAPLABEL is an empty string, change to NULL
     update gis.AKR_ATTACH_PT_evw set MAPLABEL = NULL where MAPLABEL = ''
