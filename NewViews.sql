@@ -2896,7 +2896,8 @@ select t1.OBJECTID, 'Error: FACASSETID.Location does not match SEGMENTID.FACLOCI
   from gis.TRAILS_FEATURE_PT_evw as t1
   join dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset
   join gis.TRAILS_LN_evw as t3 on t1.SEGMENTID = t3.GEOMETRYID
-  where t2.Location <> t3.FACLOCID
+  join dbo.FMSSExport as t4 on t2.Location = t4.Location
+  where t2.Location <> t3.FACLOCID AND t4.Asset_Code = '2100' -- Only applies to trail assets, not I&M assets
 union all
 select OBJECTID, 'Error: FACLOCID must be NULL when FACASSETID is not null' as Issue, NULL
   from gis.TRAILS_FEATURE_PT_evw where FACASSETID is not null and FACLOCID is not null
