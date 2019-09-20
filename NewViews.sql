@@ -4185,7 +4185,7 @@ BEGIN
     -- 26) if FACASSETID is empty string change to null
     update gis.TRAILS_FEATURE_PT_evw set FACASSETID = NULL where FACASSETID = ''
     -- 27) Add FEATUREID is NULL or an empty string
-    update gis.AKR_BLDG_CENTER_PT_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    update gis.TRAILS_FEATURE_PT_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
     -- 28) Add GEOMETRYID if null/empty
     update gis.TRAILS_FEATURE_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
     -- 29) if NOTES is an empty string, change to NULL
