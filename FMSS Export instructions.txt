@@ -1,6 +1,34 @@
 This process should take about 45 minutes
 It assumes you are using SSMS v17
+
+
+
 ** NOTE THAT THERE IS A BUG IN SSMS v18.0 (15.0.18118.0) that replaces all alpha locations (i.e. AKRO) with NULL**
+
+The solutions is to create new data rows below the first data row (not directly below the header) that result in more than 10% unique values
+that have the correct data type.  The values in the columns must be unique.  For all but assets, this means 2 new rows. For assets it means 6 new rows
+For example, here is the first few rows of the FRP table, with details elided
+
+Location,DOI Code,Predominant Use,Asset Ownership,Occupant,Street Address,City,County,Primary Latitude (NAD 83),Primary Longitude (NAD 83),FRP Long Description
+YUCH,.....
+a2,a,a,a,a,a,a,a,a,a,a
+a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1
+WRST,.....
+
+For FMSSExport_Location1 it is:
+
+Location,Description,Park,Park Name,Region,State,Parent,Type,Status,FBMS ID,Asset Code,Facility Type,Asset Category,OB,API,FCI,CRV,DM,Rank,UM,Qty,YearBlt,Occupant,Concession ID (Park Concession),Historic Status,LCS#,FRPP Value,Disposal Date,CSDM,Site,Web CRV,Long Description
+AKRO,....
+115414,.....
+a1,a,a,a,a,a,a,a,a,a,a1,a1,a,a,a1,1.01,a1,a1,a,a,a1,a,a,a,a1,a,a1,a,a1,a1,a1,a1
+a2,a,a,a,a,a,a,a,a,a,a2,a2,a,a,a2,1.01,a2,a2,a,a,a2,a,a,a,a2,a,a2,a,a2,a2,a2,a2
+225618,.....
+
+
+Then you need to remove the bogus rows after import: delete from FMSSExport_FRP where location  = 'a2' or location  = 'a1'
+
+
+
 
 go to FMSS (need to request access from Scott Vantrees)
   - https://portal.pfmd.nps.gov/index.cfm
@@ -83,7 +111,7 @@ drop table FMSSExport
 SELECT l1.*, 
   nullif(l2.ASMISID,'') ASMISID, nullif(l2.BLDGTYPE,'') BLDGTYPE, nullif(l2.CLASSSTR,'') CLASSSTR, nullif(l2.CLINO,'') CLINO, nullif(l2.FAMARESP,'') FAMARESP, nullif(l2.FCLASS,'') FCLASS, nullif(l2.OPSEAS,'') OPSEAS, nullif(l3.PARKNAME,'') PARKNAME, nullif(l3.PARKNUMB,'') PARKNUMB, nullif(l3.PRIMUSE,'') PRIMUSE,
   nullif(l2.NOLANE,'') NOLANE, nullif(l2.NUMPLOT,'') NUMPLOT, nullif(l3.PRKLNG,'') PRKLNG, nullif(l3.PRKWID,'') PRKWID, nullif(l3.ROUTEID,'') ROUTEID, nullif(l3.RTENAME,'') RTENAME, nullif(l3.TREADTYP,'') TREADTYP, nullif(l3.TRLGRADE,'') TRLGRADE, nullif(l3.TRLUSE,'') TRLUSE, nullif(l3.TRLWIDTH,'') TRLWIDTH,
-  l4.DOI_Code, l4.Predominant_Use, l4.Asset_Ownership, l4.Street_Address, l4.City, l4.County, l4.Primary_Latitude__NAD_83_ as lat, l4.Primary_Longitude__NAD_83_ as lon, l4.FRP_Long_Description
+  l4.DOI_Code, l4.Predominant_Use, l4.Asset_Ownership, l4.Street_Address, l4.City, l4.County, l4.Primary_Latitude_NAD_83 as lat, l4.Primary_Longitude_NAD_83 as lon, l4.FRP_Long_Description
 into FMSSExport 
    FROM FMSSExport_Location1 as l1
 left join FMSSExport_Location2 as l2 on l1.Location = l2.Location
@@ -116,9 +144,9 @@ For Assets
       - into table FMSSExport_Asset, nvarchar(50) for all except Description = nvarchar(250), Allow nulls on all, no PK 
       - remove null records, create index (no PK on Asset because it isn't unique ??)
           - select * from FMSSExport_Asset where asset in (select asset from FMSSExport_Asset group by asset having count(*) > 1) order by asset, location
-        - delete FMSSExport_Asset where Asset is null
-        - alter table FMSSExport_Asset alter column Asset NVARCHAR(10) not null
-        - CREATE INDEX idx_FMSSExport_Asset_Asset ON FMSSExport_Asset (Asset ASC)
+        delete FMSSExport_Asset where Asset is null or location is null
+        alter table FMSSExport_Asset alter column Asset NVARCHAR(10) not null
+        CREATE INDEX idx_FMSSExport_Asset_Asset ON FMSSExport_Asset (Asset ASC)
         GRANT SELECT ON FMSSExport_Asset TO akr_facility_editor AS dbo
         GRANT SELECT ON FMSSExport_Asset TO akr_reader_web AS dbo
         GRANT SELECT ON FMSSExport_Asset TO [nps\Domain Users] AS dbo
