@@ -6,12 +6,30 @@ exec sde.set_current_version '"NPS\JJCUSICK".joel_facilities';
 -- Count of operating features
 select d.Code, d.Description, count(*) from FMSSExport as f
 join DOM_FMSS_ASSETCODE as d on f.Asset_Code = d.Code
-where f.Type = 'OPERATING' and f.status = 'OPERATING'
+where f.Type = 'OPERATING' and f.status = 'OPERATING' or f.status = 'SITE'
 group by d.Code, d.Description
 order by d.code
 
+-- 
+-- All top level location records (no parent)
+-- 95
+select * from FMSSExport where Type <> 'SALVAGE' and (parent is null or parent = 'N/A') order by Park, Asset_Code
+
+-- All top level location records with at least one child
+-- 17
+select p.location, p.description from FMSSExport as p left join FMSSExport as c on p.location = c.parent where c.location is not null and c.Type <> 'SALVAGE' and p.Type <> 'SALVAGE' and p.parent = 'N/A' group by p.location, p.description
+
+-- All top level location records with no children
+-- 78
+select p.location, p.description, p.Park, p.Asset_Code from FMSSExport as p left join FMSSExport as c on p.location = c.parent where c.location is null and p.Type <> 'SALVAGE' and p.parent = 'N/A' group by p.location, p.description, p.Park, p.Asset_Code order by p.Asset_code, p.Park
+
+
 -- What's Missing
 -- missing/operational/all status/all
+
+-- 0/80/87/106 Site/Area
+select * from FMSSExport where Asset_Code = '0000' and Type = 'OPERATING' and status = 'SITE'
+order by Type, status, park
 
 -- 0/80/87/106 roads
 select f.* from FMSSExport as f
