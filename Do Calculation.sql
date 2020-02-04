@@ -34,4 +34,29 @@ exec dbo.Calc_Trail_Features @version
 exec dbo.Calc_Trail_Attributes @version
 exec dbo.Calc_Attachments @version
 
+-- Calcs to fix The fact that Regan has to edit as SDE and not Domain User
+exec sde.set_current_version @version
+exec sde.edit_version @version, 1 -- 1 to start edits
+
+update gis.AKR_BLDG_CENTER_PT_evw set CREATEUSER = 'RESARWAS' where CREATEUSER = 'SDE'
+update gis.AKR_BLDG_CENTER_PT_evw set EDITUSER = 'RESARWAS' where EDITUSER = 'SDE'
+update gis.AKR_BLDG_FOOTPRINT_PY_evw set CREATEUSER = 'RESARWAS' where CREATEUSER = 'SDE'
+update gis.AKR_BLDG_FOOTPRINT_PY_evw set EDITUSER = 'RESARWAS' where EDITUSER = 'SDE'
+update gis.AKR_ATTACH_evw set CREATEUSER = 'RESARWAS' where CREATEUSER = 'SDE'
+update gis.AKR_ATTACH_evw set EDITUSER = 'RESARWAS' where EDITUSER = 'SDE'
+update gis.AKR_ATTACH_PT_evw set CREATEUSER = 'RESARWAS' where CREATEUSER = 'SDE'
+update gis.AKR_ATTACH_PT_evw set EDITUSER = 'RESARWAS' where EDITUSER = 'SDE'
+update gis.PARKLOTS_PY_evw set CREATEUSER = 'RESARWAS' where CREATEUSER = 'SDE'
+update gis.PARKLOTS_PY_evw set EDITUSER = 'RESARWAS' where EDITUSER = 'SDE'
+update gis.ROADS_LN_evw set CREATEUSER = 'RESARWAS' where CREATEUSER = 'SDE'
+update gis.ROADS_LN_evw set EDITUSER = 'RESARWAS' where EDITUSER = 'SDE'
+update gis.TRAILS_LN_evw set CREATEUSER = 'RESARWAS' where CREATEUSER = 'SDE'
+update gis.TRAILS_LN_evw set EDITUSER = 'RESARWAS' where EDITUSER = 'SDE'
+update gis.TRAILS_ATTRIBUTE_PT_evw set CREATEUSER = 'RESARWAS' where CREATEUSER = 'SDE'
+update gis.TRAILS_ATTRIBUTE_PT_evw set EDITUSER = 'RESARWAS' where EDITUSER = 'SDE'
+update gis.TRAILS_FEATURE_PT_evw set CREATEUSER = 'RESARWAS' where CREATEUSER = 'SDE'
+update gis.TRAILS_FEATURE_PT_evw set EDITUSER = 'RESARWAS' where EDITUSER = 'SDE'
+
+exec sde.edit_version @version, 2; -- 2 to stop edits
+
 exec sde.set_default
