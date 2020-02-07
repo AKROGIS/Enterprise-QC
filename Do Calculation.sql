@@ -29,6 +29,7 @@ DECLARE @version nvarchar(255) = 'owner.name'
 exec dbo.Calc_Buildings @version
 exec dbo.Calc_ParkingLots @version
 exec dbo.Calc_Roads @version
+exec dbo.Calc_Road_Features @version
 exec dbo.Calc_Trails @version
 exec dbo.Calc_Trail_Features @version
 exec dbo.Calc_Trail_Attributes @version

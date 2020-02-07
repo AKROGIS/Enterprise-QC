@@ -2014,6 +2014,279 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+CREATE VIEW [dbo].[QC_ISSUES_ROADS_FEATURE_PT] AS select I.Issue, I.Details, D.* from  gis.ROADS_FEATURE_PT_evw AS D
+join (
+
+-------------------------
+-- gis.ROADS_FEATURE_PT
+-------------------------
+
+-- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
+
+-- 1) POINTTYPE must be an recognized value; if it is null/empty, then it will default to 'Arbitrary point' without a warning
+select t1.OBJECTID, 'Error: POINTTYPE is not a recognized value' as Issue, NULL as Details from gis.ROADS_FEATURE_PT_evw as t1
+  left join dbo.DOM_POINTTYPE as t2 on t1.POINTTYPE = t2.Code where t1.POINTTYPE is not null and t1.POINTTYPE <> '' and t2.Code is null
+union all 
+-- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.ROADS_FEATURE_PT_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
+	from gis.ROADS_FEATURE_PT_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 3) FEATUREID must be unique and well-formed or null (in which case we will generate a unique well-formed value)
+--    This is a primary key for each mapped feature, and not a foreign key to the "related" road.
+select OBJECTID, 'Error: FEATUREID is not unique' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where FEATUREID in
+       (select FEATUREID from gis.ROADS_FEATURE_PT_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
+union all
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
+	from gis.ROADS_FEATURE_PT_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where SOURCEDATE > GETDATE()
+union all
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 8) NOTES is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) RDFEATNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: RDFEATNAME must use proper case' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where RDFEATNAME = upper(RDFEATNAME) Collate Latin1_General_CS_AI or RDFEATNAME = lower(RDFEATNAME) Collate Latin1_General_CS_AI
+union all
+-- 10) RDFEATALTNAME is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 11) MAPLABEL is optional free text, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 12) RDFEATTYPE must be non null and in DOM_RDFEATFEATTYPE.  Theres is no default value
+select OBJECTID, 'Error: RDFEATTYPE is required' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where RDFEATTYPE is null
+union all
+select t1.OBJECTID, 'Error: RDFEATTYPE is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1
+       left join dbo.DOM_RDFEATFEATTYPE as t2 on t1.RDFEATTYPE = t2.Code where t1.RDFEATTYPE is not null and t1.RDFEATTYPE <> '' and t2.Code is null
+union all
+-- 13) RDFEATTYPEOTHER is optional free text unless RDFEATTYPE = 'Other'. If it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+--     Note: if there are common values here they can be promoted to RDFEATTYPE
+select OBJECTID, 'Error: RDFEATTYPEOTHER is required when RDFEATTYPE is Other' as Issue, NULL from gis.ROADS_FEATURE_PT_evw
+       where RDFEATTYPE = 'Other' and (RDFEATTYPEOTHER is null or RDFEATTYPEOTHER = '')
+union all
+select OBJECTID, 'Warning: RDFEATTYPEOTHER will be cleared when RDFEATTYPE is not Other' as Issue, NULL from gis.ROADS_FEATURE_PT_evw
+       where RDFEATTYPE <> 'Other' and RDFEATTYPEOTHER is not null and RDFEATTYPEOTHER <> ''
+union all
+-- 14) RDFEATSUBTYPE is optional free text, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+--     TODO: do we want to make this a domain value that is sensitive to the RDFEATTYPE
+-- 15) RDFEATDESC is optional free text, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 16) RDFEATCOUNT is optional int, but if it provided is it must be positive.
+--     if it is zero, it will be silently converted to null
+select OBJECTID, 'Error: RDFEATCOUNT must be a poitive number' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where RDFEATCOUNT < 0
+union all
+-- 17) WHLENGTH is optional real, but if it provided is it must be positive.
+--     if it is zero, it will be silently converted to null
+select OBJECTID, 'Error: WHLENGTH must be a poitive number' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where WHLENGTH < 0
+union all
+-- 18) WHLENUOM is an optional domain value (DOM_UOM); if WHLENGTH is not null it must be not null;
+--     if WHLENGTH is null, this field will be silently set to null.
+select OBJECTID, 'Error: WHLENUOM is required when WHLENGTH is positive' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where (WHLENUOM is null or WHLENUOM = '') and WHLENGTH > 0
+union all
+select t1.OBJECTID, 'Error: WHLENUOM is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1
+  left join dbo.DOM_UOM as t2 on t1.WHLENUOM = t2.code where t1.WHLENUOM is not null and t1.WHLENUOM <> '' and t2.code is null
+union all
+-- 19) ISEXTANT is a required domain value; Default to True with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1
+  left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 20) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 21) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: Are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE, ??) when PUBLICDISPLAY is true?
+--           select ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.ROADS_FEATURE_PT_evw where PUBLICDISPLAY = 'Public Map Display' group by ISEXTANT, ISOUTPARK, UNITCODE
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 22) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 21/22) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue, NULL from gis.ROADS_FEATURE_PT_evw
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 23) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.ROADS_FEATURE_PT_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 24) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 25) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.ROADS_FEATURE_PT_evw as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 26) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 27) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 28) FACLOCID is optional free text, but if provided it must match a road Location in the FMSS Export
+--     FACLOCID is a foreign key to the same feature in the FMSS location table.  Not many road features have
+--     their own location records (like a bridge or wayside exhibit), so this is typically NULL.  FACLOCID is not used
+--     to track the related "parent" road for this feature.
+--     See SEGMENTID to get information about the road this feature is "on".
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+-- Check that FACLOCID is the appropriate type (Asset_code) for this type of road feature
+-- if FACLOCID.Asset_Code = 2200 (road bridge), then RDFEATTYPE = Bridge
+-- if FACLOCID.Asset_Code = 7%00, then RDFEATTYPE = 'Wayside Feature'
+-- This list may need to be expanded as we develop the road features
+-- TODO: Move "other" Asset codes, including 7%00 to a different feature class
+select t1.OBJECTID, 'Error: FACLOCID is not approriate for this kind of road feature (based on the Asset Code)' as Issue,
+  'RDFEATTYPE = ' + t1.RDFEATTYPE + ' but Asset Code for ' + t2.Location + ' = ' + t2.Asset_Code + ' (' + d.Description + ')' as Details
+  from gis.ROADS_FEATURE_PT_evw as t1 join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location
+  join DOM_FMSS_ASSETCODE as d on t2.Asset_Code = d.Code
+  where (t2.Asset_Code = '1200' and not t1.RDFEATTYPE = 'Bridge')
+     or (t2.Asset_Code like '7%00' and t1.RDFEATTYPE <> 'Wayside Feature')
+union all
+-- FACLOCID should be unique
+select t1.oid, 'Error: Too many features are using the same FACLOCID' as Issue,
+'There are ' + convert(nvarchar(10), t1.cnt) + ' features with FACLOCID = ' + t1.FACLOCID + '.' as Details from 
+(select min(OBJECTID) as oid, FACLOCID, count(*)as cnt from gis.ROADS_FEATURE_PT_evw where FACLOCID is not null group by FACLOCID having count(*) > 1) as t1
+where t1.cnt > 1
+union all
+-- 29) FACASSETID is optional free text. If provided it must match a record in the FMSSExport_Assets
+--    Many features (like culverts and stairs) are FMSS assets of the parent road, and will have a non-null FACASSETID.
+--    The location recored of an FMSS Asset should match the nearest road (feature.segmentid = road.geometryid)
+--    It is not uncommon for several unique features (e.g. mapped culverts) to have the same FACASSETID (e.g. a 'bundle' of culverts)
+--    FACLOCID must be NULL when FACASSETID is not null; See FACASSETID.Location for the parent location record
+--    NOTE: FACASSETID is not globally UNIQUE, however it is unique to a park, which means FACASSETID/LOCATION is unique 
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue,
+  'FACASSETID = ' + t1.FACASSETID + ' and FACLOCID = ' + t1.FACLOCID as Details
+  from gis.ROADS_FEATURE_PT_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match SEGMENTID.FACLOCID' as Issue,
+  'FACASSETID = ' + t1.FACASSETID + ' belongs to Location = ' + t2.Location + ' however SEGMENTID.FACLOCID = ' + t1.SEGMENTID + '.' + t3.FACLOCID as Details
+  from gis.ROADS_FEATURE_PT_evw as t1
+  join dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset
+  join gis.ROADS_LN_evw as t3 on t1.SEGMENTID = t3.GEOMETRYID
+  join dbo.FMSSExport as t4 on t2.Location = t4.Location
+  where t2.Location <> t3.FACLOCID AND t4.Asset_Code = '1100' -- Only applies to road assets, not I&M assets
+union all
+select OBJECTID, 'Error: FACLOCID must be NULL when FACASSETID is not null' as Issue, NULL
+  from gis.ROADS_FEATURE_PT_evw where FACASSETID is not null and FACLOCID is not null
+union all
+-- 30) SEGMENTID is the GEOMETRYID of the closest segment of the "Parent" road (i.e. the road that this feature is "on")
+select OBJECTID, 'Warning: SEGMENTID is NULL and will be set to nearest road segment' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where SEGMENTID is null
+union all
+select a.OBJECTID, 'Error: SEGMENTID must match a GEOMETRYID in ROADS_LN' as Issue, NULL from gis.ROADS_FEATURE_PT_evw as a
+  left join gis.ROADS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID where a.SEGMENTID is not null and t.GEOMETRYID is null
+union all
+---------------
+-- Shape Checks
+---------------
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.ROADS_FEATURE_PT_evw where shape.STIsEmpty() = 1
+-- Check that the SEGMENTID is the closest road geometry
+/*
+-- Calculating the distance to SEGMENTID is a lot faster and easier than finding the closest road geometry
+union all
+select a.OBJECTID, 'Error: SHAPE is more than 20m from SEGMENTID in ROADS_LN' as Issue,
+  'Point is ' + convert(nvarchar(50),round(GEOGRAPHY::STGeomFromText(a.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(t.shape.STAsText(),4269)),1)) + ' meters from ' + a.SEGMENTID as Details
+  from gis.ROADS_FEATURE_PT_evw as a
+  join gis.ROADS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID
+  where GEOGRAPHY::STGeomFromText(a.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(t.shape.STAsText(),4269)) > 20
+*/
+
+
+-- ???????????????????????????????????
+-- What about webedituser, webcomment?
+-- ???????????????????????????????????
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'ROADS_FEATURE_PT'
+WHERE E.Explanation IS NULL or E.Explanation = ''
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
 CREATE VIEW [dbo].[QC_ISSUES_ROADS_LN] AS select I.Issue, I.Details, D.* from  gis.ROADS_LN_evw AS D
 join (
 
@@ -3833,6 +4106,123 @@ BEGIN
         on f.Location = p.FACLOCID and ((p.LOTSTATUS is null or p.LOTSTATUS = '' or p.LOTSTATUS = 'Unknown') and f.Status is not null)
         when matched then update set LOTSTATUS = f.Status;
     update gis.PARKLOTS_PY_evw set LOTSTATUS = 'Existing' where LOTSTATUS is null or LOTSTATUS = ''
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2018-07-13
+-- Description:	Calculated properties for Road Feature Points
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Road_Features] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- 1) if RDFEATNAME is an empty string, change to NULL
+    update gis.ROADS_FEATURE_PT_evw set RDFEATNAME = NULL where RDFEATNAME = ''
+    -- 2) if RDFEATALTNAME is an empty string, change to NULL
+    update gis.ROADS_FEATURE_PT_evw set RDFEATALTNAME = NULL where RDFEATALTNAME = ''
+    -- 3) if MAPLABEL is an empty string, change to NULL
+    update gis.ROADS_FEATURE_PT_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 4) RDFEATTYPE - Required Domain Value; no default value; nothing to do.
+    -- 5) RDFEATTYPEOTHER: This is an AKR extension; it is optional free text.  Set empty string to null
+    update gis.ROADS_FEATURE_PT_evw set RDFEATTYPEOTHER = null where RDFEATTYPEOTHER = ''
+    update gis.ROADS_FEATURE_PT_evw set RDFEATTYPEOTHER = null where RDFEATTYPE <> 'Other' and RDFEATTYPEOTHER <> null 
+    -- 6) RDFEATSUBTYPE: This is an AKR extension; it is optional free text.  Set empty string to null
+    update gis.ROADS_FEATURE_PT_evw set RDFEATSUBTYPE = NULL where RDFEATSUBTYPE = ''
+    -- 7) RDFEATDESC is an AKR extension; it is optional free text.  Set empty string to null
+    update gis.ROADS_FEATURE_PT_evw set RDFEATDESC = NULL where RDFEATDESC = ''
+    -- 8) RDFEATCOUNT is an AKR extension; it silently clears zero to null
+    update gis.ROADS_FEATURE_PT_evw set RDFEATCOUNT = NULL where RDFEATCOUNT = 0
+    -- 9) WHLENGTH is an AKR extension; it silently clears zero to null
+    update gis.ROADS_FEATURE_PT_evw set WHLENGTH = NULL where WHLENGTH = 0
+    -- 10) WHLENUOM  is an AKR extension; it silently defaults to 'No'
+    update gis.ROADS_FEATURE_PT_evw set WHLENUOM = NULL where WHLENUOM = ''
+    update gis.ROADS_FEATURE_PT_evw set WHLENUOM = NULL where WHLENGTH is NULL and WHLENUOM is not null
+    -- 11) POINTTYPE: if it is null/empty, then it will default to 'Arbitrary point'
+    update gis.ROADS_FEATURE_PT_evw set POINTTYPE = 'Arbitrary point' where POINTTYPE is null or POINTTYPE = '' 
+    -- 12) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.ROADS_FEATURE_PT_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 13) ISOUTPARK (See the end, this must be done after UNITCODE)
+    -- 14) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.ROADS_FEATURE_PT_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 15) DATAACCESS defaults to No Public Map Display
+    update gis.ROADS_FEATURE_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 16) UNITCODE is a spatial calc if null
+    merge into gis.ROADS_FEATURE_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 17) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.ROADS_FEATURE_PT_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.ROADS_FEATURE_PT_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 18) if GROUPCODE is an empty string, change to NULL
+    update gis.ROADS_FEATURE_PT_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 19) GROUPNAME is always calc'd from GROUPCODE
+    update gis.ROADS_FEATURE_PT_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.ROADS_FEATURE_PT_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 20) REGIONCODE is always set to AKR
+    update gis.ROADS_FEATURE_PT_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- 21) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.ROADS_FEATURE_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 22) if MAPSOURCE is NULL or an empty string, change to Unknown
+    update gis.ROADS_FEATURE_PT_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 23) SOURCEDATE: Nothing to do.
+    -- 24) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.ROADS_FEATURE_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 25) if FACLOCID is empty string change to null
+    update gis.ROADS_FEATURE_PT_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 26) if FACASSETID is empty string change to null
+    update gis.ROADS_FEATURE_PT_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 27) Add FEATUREID is NULL or an empty string
+    update gis.ROADS_FEATURE_PT_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    -- 28) Add GEOMETRYID if null/empty
+    update gis.ROADS_FEATURE_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 29) if NOTES is an empty string, change to NULL
+    update gis.ROADS_FEATURE_PT_evw set NOTES = NULL where NOTES = ''
+    -- 30) SEGMENTID is calced if null;
+    merge into gis.ROADS_FEATURE_PT_evw as t1 using 
+      (
+        SELECT p.GEOMETRYID AS POINTID, LINEID
+        FROM gis.roads_feature_pt AS p
+        CROSS APPLY (
+            SELECT TOP 1 GEOMETRYID AS LINEID
+            FROM gis.ROADS_LN_evw AS l
+            WHERE  p.SEGMENTID IS NULL AND p.UNITCODE = l.UNITCODE AND l.Shape.STDistance(p.Shape) IS NOT NULL
+            ORDER BY l.Shape.STDistance(p.Shape)
+            ) AS b
+      ) as t2
+      on t1.GEOMETRYID = t2.POINTID
+      when matched then update set SEGMENTID = t2.LINEID;
+    -- 13) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.ROADS_FEATURE_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
 
     -- Stop editing
     exec sde.edit_version @version, 2; -- 2 to stop edits

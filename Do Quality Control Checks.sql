@@ -42,6 +42,10 @@ select * from dbo.QC_ISSUES_ROADS_LN
 -- Create a table of issues
 -- drop table QC_ISSUES_ROADS_LN_for_owner_on_date
 -- select * into QC_ISSUES_ROADS_LN_for_owner_on_date from dbo.QC_ISSUES_ROADS_LN
+select * from dbo.QC_ISSUES_ROADS_FEATURE_PT
+-- Create a table of issues
+-- drop table QC_ISSUES_ROADS_FEATURE_PT_for_owner_on_date
+-- select * into QC_ISSUES_ROADS_FEATURE_PT_for_owner_on_date from dbo.QC_ISSUES_ROADS_FEATURE_PT
 select * from dbo.QC_ISSUES_TRAILS_LN
 -- Create a table of issues
 -- drop table QC_ISSUES_TRAILS_LN_for_owner_on_date
