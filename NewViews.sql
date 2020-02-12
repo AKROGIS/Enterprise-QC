@@ -748,6 +748,1145 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+CREATE VIEW [dbo].[QC_ISSUES_AKR_ASSET] AS select I.Issue, I.Details, D.* from  gis.AKR_ASSET_evw AS D
+join (
+
+-------------------------
+-- gis.AKR_ASSET
+-------------------------
+
+-- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
+
+-- 1) No geometry type i.e. LINETYPE 
+-- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue, NULL as Details from gis.AKR_ASSET_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.AKR_ASSET_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
+	from gis.AKR_ASSET_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 3) FEATUREID must be well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    All records with the same FeatureID must be proximal (in the vicinity of each other)
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
+	from gis.AKR_ASSET_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_evw where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue, NULL from gis.AKR_ASSET_evw where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue, NULL from gis.AKR_ASSET_evw where SOURCEDATE > GETDATE()
+union all
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_evw where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 8) NOTES is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) ASSETNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_evw where ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI
+union all
+-- 10) ASSETALTNAME is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 12) ASSETTYPE must be in DOM_ASSETTYPE.
+select t1.OBJECTID, 'Error: ASSETTYPE is required' as Issue, NULL from gis.AKR_ASSET_evw as t1
+       where t1.ASSETTYPE is null or t1.ASSETTYPE = ''
+union all 
+select t1.OBJECTID, 'Error: ASSETTYPE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+       left join dbo.DOM_ASSETTYPE as t2 on t1.ASSETTYPE = t2.Code where t1.ASSETTYPE is not null and t1.ASSETTYPE <> '' and t2.Code is null
+union all 
+-- 13) SEASONAL is a optional domain value; must match valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+       left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + FACLOCID + ' has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.AKR_ASSET_evw as p join 
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.AKR_ASSET_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on a.Location = f.Location where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
+union all
+-- 14) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
+select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue, NULL from gis.AKR_ASSET_evw as p
+  left join (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
+union all
+-- 15) MAINTAINER is a optional domain value; if FACLOCID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+       left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.AKR_ASSET_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
+union all
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.AKR_ASSET_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  dbo.FMSSExport as f on f.Location = a.Location where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
+union all
+-- 16) ISEXTANT is a required domain value; Default to True with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue, NULL from gis.AKR_ASSET_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+  left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 17) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 18) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
+--           select ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.AKR_ASSET_evw where PUBLICDISPLAY = 'Public Map Display' group by ISEXTANT, ISOUTPARK, UNITCODE
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.AKR_ASSET_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 19) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue, NULL from gis.AKR_ASSET_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 18/19) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue, NULL from gis.AKR_ASSET_evw
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 20) UNITCODE is a required domain value.
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select OBJECTID, 'Error: UNITCODE is required (It cannot be calculated for a non-spatial feature)' as Issue, NULL from gis.AKR_ASSET_evw
+  where UNITCODE is null or UNITCODE = ''
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+  'Location ' + FACLOCID + ' has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_ASSET_evw as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_ASSET_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = a.Location where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 21) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_evw as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 22) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.AKR_ASSET_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue, NULL from gis.AKR_ASSET_evw as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.AKR_ASSET_evw as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 23) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 24) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue, NULL from gis.AKR_ASSET_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 25) FACLOCID is optional free text, but if provided it must match a Parking Lot Location in the FMSS Export;
+--     All records with the same FACLOCID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_evw where FACLOCID in (
+    select FACLOCID from (select FACLOCID from gis.AKR_ASSET_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
+union all
+-- 26) FACASSETID is optional free text, provided it must match a Parking Lot Location in the FMSS Assets Export
+--     All records with the same FACASSETID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue, NULL from gis.AKR_ASSET_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location and t1.UNITCODE = t3.PARK where t1.FACLOCID <> t3.Location
+union all
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_evw where FACASSETID in (
+    select FACASSETID from (select FACASSETID from gis.AKR_ASSET_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
+union all
+-- 27) ASSETCODE must be in DOM_ASSETCODE; if FACLOCID OR FACASSETID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: ASSETCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+       left join dbo.DOM_ASSETCODE as t2 on t1.ASSETCODE = t2.Code where t1.ASSETCODE is not null and t1.ASSETCODE <> '' and t2.Code is null
+union all 
+select p.OBJECTID, 'Error: ASSETCODE does not match FMSS.ASSET_CODE' as Issue,
+  'Location ' + FACLOCID + ' has ASSET_CODE = ' + f.Asset_Code + ' when GIS has ASSETCODE = ' + p.ASSETCODE as Details
+  from gis.AKR_ASSET_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.ASSET_CODE <> p.ASSETCODE and p.ASSETCODE <> ''
+union all
+select p.OBJECTID, 'Error: ASSETCODE does not match FMSS.ASSET_CODE' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has ASSET_CODE = ' + f.Asset_Code + ' when GIS has ASSETCODE = ' + p.ASSETCODE as Details
+  from gis.AKR_ASSET_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID 
+  join dbo.FMSSExport as f on a.Location = f.Location
+  where f.ASSET_CODE <> p.ASSETCODE and p.ASSETCODE <> ''
+union all
+-- 28) ASSETTYPEOTHDESC is not required Unless ASSETTYPE = 'Other'.
+--     If it provided is it should not be an empty string. This can be checked and fixed automatically; no need to alert the user.
+select OBJECTID, 'Error: ASSETTYPEOTHDESC is required when ASSETTYPE is Other' as Issue, NULL from gis.AKR_ASSET_evw
+       where ASSETTYPE = 'Other' and (ASSETTYPEOTHDESC = '' or ASSETTYPEOTHDESC is null)
+union all 
+-- 29) ASSETDESC is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 30) ASSETMATERIAL is an optional domain value;
+select t1.OBJECTID, 'Error: ASSETMATERIAL is not a recognized value' as Issue, NULL from gis.AKR_ASSET_evw as t1
+       left join dbo.DOM_ASSETMATERIAL as t2 on t1.ASSETMATERIAL = t2.Code where t1.ASSETMATERIAL is not null and t1.ASSETMATERIAL <> '' and t2.Code is null
+union all
+-- 31) ASSETDIAMETER_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETDIAMETER_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_evw where ASSETDIAMETER_FT < 0
+union all
+-- 32) ASSETLENGTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETLENGTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_evw where ASSETLENGTH_FT < 0
+union all
+-- 33) ASSETWIDTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETWIDTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_evw where ASSETWIDTH_FT < 0
+union all
+-- 34) ASSETDEPTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETDEPTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_evw where ASSETDEPTH_FT < 0
+
+-- ???????????????????????????????????
+-- What about webedituser, webcomment?
+-- ???????????????????????????????????
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_ASSET'
+WHERE E.Explanation IS NULL or E.Explanation = ''
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE VIEW [dbo].[QC_ISSUES_AKR_ASSET_LN] AS select I.Issue, I.Details, D.* from  gis.AKR_ASSET_LN_evw AS D
+join (
+
+-------------------------
+-- gis.AKR_ASSET_LN
+-------------------------
+
+-- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
+
+-- 1) LINETYPE must be an recognized value; if it is null/empty, then it will default to 'Center line' without a warning
+select t1.OBJECTID, 'Error: LINETYPE is not a recognized value' as Issue, NULL as Details from gis.AKR_ASSET_LN_evw as t1
+  left join dbo.DOM_LINETYPE as t2 on t1.LINETYPE = t2.Code where t1.LINETYPE is not null and t1.LINETYPE <> '' and t2.Code is null
+union all 
+-- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue, NULL from gis.AKR_ASSET_LN_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.AKR_ASSET_LN_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
+	from gis.AKR_ASSET_LN_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 3) FEATUREID must be well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    All records with the same FeatureID must be proximal (in the vicinity of each other)
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
+	from gis.AKR_ASSET_LN_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+select OBJECTID, 'Error: Features with the same FEATUREID are not close to each other' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+  from gis.AKR_ASSET_LN_evw where featureid in 
+  (select FEATUREID from gis.AKR_ASSET_LN_evw group by FEATUREID having count(*) > 1 and
+   geometry::ConvexHullAggregate(Shape).STArea()/geometry::CollectionAggregate(Shape).STArea() > 10)
+union all
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_LN_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_LN_evw where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue, NULL from gis.AKR_ASSET_LN_evw where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue, NULL from gis.AKR_ASSET_LN_evw where SOURCEDATE > GETDATE()
+union all
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_LN_evw where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 8) NOTES is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) ASSETNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_LN_evw where ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI
+union all
+-- 10) ASSETALTNAME is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 12) ASSETTYPE must be in DOM_ASSETTYPE.
+select t1.OBJECTID, 'Error: ASSETTYPE is required' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+       where t1.ASSETTYPE is null or t1.ASSETTYPE = ''
+union all 
+select t1.OBJECTID, 'Error: ASSETTYPE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+       left join dbo.DOM_ASSETTYPE as t2 on t1.ASSETTYPE = t2.Code where t1.ASSETTYPE is not null and t1.ASSETTYPE <> '' and t2.Code is null
+union all 
+-- 13) SEASONAL is a optional domain value; must match valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+       left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + FACLOCID + ' has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.AKR_ASSET_LN_evw as p join 
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.AKR_ASSET_LN_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on a.Location = f.Location where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
+union all
+-- 14) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
+select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue, NULL from gis.AKR_ASSET_LN_evw as p
+  left join (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
+union all
+-- 15) MAINTAINER is a optional domain value; if FACLOCID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+       left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.AKR_ASSET_LN_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
+union all
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.AKR_ASSET_LN_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  dbo.FMSSExport as f on f.Location = a.Location where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
+union all
+-- 16) ISEXTANT is a required domain value; Default to True with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue, NULL from gis.AKR_ASSET_LN_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+  left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 17) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 18) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
+--           select ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.AKR_ASSET_LN_evw where PUBLICDISPLAY = 'Public Map Display' group by ISEXTANT, ISOUTPARK, UNITCODE
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.AKR_ASSET_LN_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 19) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue, NULL from gis.AKR_ASSET_LN_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 18/19) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue, NULL from gis.AKR_ASSET_LN_evw
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 20) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.AKR_ASSET_LN_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+  'Location ' + FACLOCID + ' has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_ASSET_LN_evw as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_ASSET_LN_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = a.Location where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 21) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 22) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.AKR_ASSET_LN_evw as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 23) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 24) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue, NULL from gis.AKR_ASSET_LN_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 25) FACLOCID is optional free text, but if provided it must match a Parking Lot Location in the FMSS Export;
+--     All records with the same FACLOCID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_LN_evw where FACLOCID in (
+    select FACLOCID from (select FACLOCID from gis.AKR_ASSET_LN_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
+union all
+-- 26) FACASSETID is optional free text, provided it must match a Parking Lot Location in the FMSS Assets Export
+--     All records with the same FACASSETID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location and t1.UNITCODE = t3.PARK where t1.FACLOCID <> t3.Location
+union all
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_LN_evw where FACASSETID in (
+    select FACASSETID from (select FACASSETID from gis.AKR_ASSET_LN_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
+union all
+-- 27) ASSETCODE must be in DOM_ASSETCODE; if FACLOCID OR FACASSETID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: ASSETCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+       left join dbo.DOM_ASSETCODE as t2 on t1.ASSETCODE = t2.Code where t1.ASSETCODE is not null and t1.ASSETCODE <> '' and t2.Code is null
+union all 
+select p.OBJECTID, 'Error: ASSETCODE does not match FMSS.ASSET_CODE' as Issue,
+  'Location ' + FACLOCID + ' has ASSET_CODE = ' + f.Asset_Code + ' when GIS has ASSETCODE = ' + p.ASSETCODE as Details
+  from gis.AKR_ASSET_LN_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.ASSET_CODE <> p.ASSETCODE and p.ASSETCODE <> ''
+union all
+select p.OBJECTID, 'Error: ASSETCODE does not match FMSS.ASSET_CODE' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has ASSET_CODE = ' + f.Asset_Code + ' when GIS has ASSETCODE = ' + p.ASSETCODE as Details
+  from gis.AKR_ASSET_LN_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID 
+  join dbo.FMSSExport as f on a.Location = f.Location
+  where f.ASSET_CODE <> p.ASSETCODE and p.ASSETCODE <> ''
+union all
+-- 28) ASSETTYPEOTHDESC is not required Unless ASSETTYPE = 'Other'.
+--     If it provided is it should not be an empty string. This can be checked and fixed automatically; no need to alert the user.
+select OBJECTID, 'Error: ASSETTYPEOTHDESC is required when ASSETTYPE is Other' as Issue, NULL from gis.AKR_ASSET_LN_evw
+       where ASSETTYPE = 'Other' and (ASSETTYPEOTHDESC = '' or ASSETTYPEOTHDESC is null)
+union all 
+-- 29) ASSETDESC is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 30) ASSETMATERIAL is an optional domain value;
+select t1.OBJECTID, 'Error: ASSETMATERIAL is not a recognized value' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
+       left join dbo.DOM_ASSETMATERIAL as t2 on t1.ASSETMATERIAL = t2.Code where t1.ASSETMATERIAL is not null and t1.ASSETMATERIAL <> '' and t2.Code is null
+union all
+-- 31) ASSETDIAMETER_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETDIAMETER_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_LN_evw where ASSETDIAMETER_FT < 0
+union all
+-- 32) ASSETLENGTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETLENGTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_LN_evw where ASSETLENGTH_FT < 0
+union all
+-- 33) ASSETWIDTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETWIDTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_LN_evw where ASSETWIDTH_FT < 0
+union all
+-- 34) ASSETDEPTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETDEPTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_LN_evw where ASSETDEPTH_FT < 0
+union all
+---------------
+-- Shape Checks
+---------------
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.AKR_ASSET_LN_evw where shape.STIsEmpty() = 1
+union all
+select OBJECTID, 'Error: SHAPE must be valid' as Issue, NULL from gis.AKR_ASSET_LN_evw where shape.STIsValid() = 0
+-- Overlaps are possible (even exepcted among SITES)
+-- Size checks are difficult because of variation in QTY units; May try later when trends are identified 
+
+-- ???????????????????????????????????
+-- What about webedituser, webcomment?
+-- ???????????????????????????????????
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_ASSET_LN'
+WHERE E.Explanation IS NULL or E.Explanation = ''
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE VIEW [dbo].[QC_ISSUES_AKR_ASSET_PT] AS select I.Issue, I.Details, D.* from  gis.AKR_ASSET_PT_evw AS D
+join (
+
+-------------------------
+-- gis.AKR_ASSET_PT
+-------------------------
+
+-- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
+
+-- 1) POINTTYPE must be an recognized value; if it is null/empty, then it will default to 'arbitrary point' without a warning
+select t1.OBJECTID, 'Error: POINTTYPE is not a recognized value' as Issue, NULL as Details from gis.AKR_ASSET_PT_evw as t1
+  left join dbo.DOM_POINTTYPE as t2 on t1.POINTTYPE = t2.Code where t1.POINTTYPE is not null and t1.POINTTYPE <> '' and t2.Code is null
+union all 
+-- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue, NULL from gis.AKR_ASSET_PT_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.AKR_ASSET_PT_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
+	from gis.AKR_ASSET_PT_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 3) FEATUREID must be well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    All records with the same FeatureID must be proximal (in the vicinity of each other)
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
+	from gis.AKR_ASSET_PT_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+select OBJECTID, 'Error: Features with the same FEATUREID are not close to each other' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+  from gis.AKR_ASSET_PT_evw where featureid in 
+  (select FEATUREID from gis.AKR_ASSET_PT_evw group by FEATUREID having count(*) > 1 and
+   geometry::ConvexHullAggregate(Shape).STArea()/geometry::CollectionAggregate(Shape).STArea() > 10)
+union all
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_PT_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_PT_evw where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue, NULL from gis.AKR_ASSET_PT_evw where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue, NULL from gis.AKR_ASSET_PT_evw where SOURCEDATE > GETDATE()
+union all
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_PT_evw where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 8) NOTES is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) ASSETNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_PT_evw where ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI
+union all
+-- 10) ASSETALTNAME is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 12) ASSETTYPE must be in DOM_ASSETTYPE.
+select t1.OBJECTID, 'Error: ASSETTYPE is required' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+       where t1.ASSETTYPE is null or t1.ASSETTYPE = ''
+union all 
+select t1.OBJECTID, 'Error: ASSETTYPE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+       left join dbo.DOM_ASSETTYPE as t2 on t1.ASSETTYPE = t2.Code where t1.ASSETTYPE is not null and t1.ASSETTYPE <> '' and t2.Code is null
+union all 
+-- 13) SEASONAL is a optional domain value; must match valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+       left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + FACLOCID + ' has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.AKR_ASSET_PT_evw as p join 
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.AKR_ASSET_PT_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on a.Location = f.Location where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
+union all
+-- 14) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
+select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue, NULL from gis.AKR_ASSET_PT_evw as p
+  left join (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
+union all
+-- 15) MAINTAINER is a optional domain value; if FACLOCID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+       left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.AKR_ASSET_PT_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
+union all
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.AKR_ASSET_PT_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  dbo.FMSSExport as f on f.Location = a.Location where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
+union all
+-- 16) ISEXTANT is a required domain value; Default to True with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue, NULL from gis.AKR_ASSET_PT_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+  left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 17) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 18) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
+--           select ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.AKR_ASSET_PT_evw where PUBLICDISPLAY = 'Public Map Display' group by ISEXTANT, ISOUTPARK, UNITCODE
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.AKR_ASSET_PT_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 19) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue, NULL from gis.AKR_ASSET_PT_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 18/19) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue, NULL from gis.AKR_ASSET_PT_evw
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 20) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.AKR_ASSET_PT_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+  'Location ' + FACLOCID + ' has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_ASSET_PT_evw as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_ASSET_PT_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = a.Location where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 21) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 22) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.AKR_ASSET_PT_evw as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 23) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 24) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue, NULL from gis.AKR_ASSET_PT_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 25) FACLOCID is optional free text, but if provided it must match a Parking Lot Location in the FMSS Export;
+--     All records with the same FACLOCID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_PT_evw where FACLOCID in (
+    select FACLOCID from (select FACLOCID from gis.AKR_ASSET_PT_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
+union all
+-- 26) FACASSETID is optional free text, provided it must match a Parking Lot Location in the FMSS Assets Export
+--     All records with the same FACASSETID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location and t1.UNITCODE = t3.PARK where t1.FACLOCID <> t3.Location
+union all
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_PT_evw where FACASSETID in (
+    select FACASSETID from (select FACASSETID from gis.AKR_ASSET_PT_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
+union all
+-- 27) ASSETCODE must be in DOM_ASSETCODE; if FACLOCID OR FACASSETID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: ASSETCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+       left join dbo.DOM_ASSETCODE as t2 on t1.ASSETCODE = t2.Code where t1.ASSETCODE is not null and t1.ASSETCODE <> '' and t2.Code is null
+union all 
+select p.OBJECTID, 'Error: ASSETCODE does not match FMSS.ASSET_CODE' as Issue,
+  'Location ' + FACLOCID + ' has ASSET_CODE = ' + f.Asset_Code + ' when GIS has ASSETCODE = ' + p.ASSETCODE as Details
+  from gis.AKR_ASSET_PT_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.ASSET_CODE <> p.ASSETCODE and p.ASSETCODE <> ''
+union all
+select p.OBJECTID, 'Error: ASSETCODE does not match FMSS.ASSET_CODE' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has ASSET_CODE = ' + f.Asset_Code + ' when GIS has ASSETCODE = ' + p.ASSETCODE as Details
+  from gis.AKR_ASSET_PT_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID 
+  join dbo.FMSSExport as f on a.Location = f.Location
+  where f.ASSET_CODE <> p.ASSETCODE and p.ASSETCODE <> ''
+union all
+-- 28) ASSETTYPEOTHDESC is not required Unless ASSETTYPE = 'Other'.
+--     If it provided is it should not be an empty string. This can be checked and fixed automatically; no need to alert the user.
+select OBJECTID, 'Error: ASSETTYPEOTHDESC is required when ASSETTYPE is Other' as Issue, NULL from gis.AKR_ASSET_PT_evw
+       where ASSETTYPE = 'Other' and (ASSETTYPEOTHDESC = '' or ASSETTYPEOTHDESC is null)
+union all 
+-- 29) ASSETDESC is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 30) ASSETMATERIAL is an optional domain value;
+select t1.OBJECTID, 'Error: ASSETMATERIAL is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
+       left join dbo.DOM_ASSETMATERIAL as t2 on t1.ASSETMATERIAL = t2.Code where t1.ASSETMATERIAL is not null and t1.ASSETMATERIAL <> '' and t2.Code is null
+union all
+-- 31) ASSETDIAMETER_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETDIAMETER_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_PT_evw where ASSETDIAMETER_FT < 0
+union all
+-- 32) ASSETLENGTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETLENGTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_PT_evw where ASSETLENGTH_FT < 0
+union all
+-- 33) ASSETWIDTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETWIDTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_PT_evw where ASSETWIDTH_FT < 0
+union all
+-- 34) ASSETDEPTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETDEPTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_PT_evw where ASSETDEPTH_FT < 0
+union all
+---------------
+-- Shape Checks
+---------------
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.AKR_ASSET_PT_evw where shape.STIsEmpty() = 1
+union all
+select OBJECTID, 'Error: SHAPE must be valid' as Issue, NULL from gis.AKR_ASSET_PT_evw where shape.STIsValid() = 0
+-- Overlaps are possible (even exepcted among SITES)
+-- Size checks are difficult because of variation in QTY units; May try later when trends are identified 
+
+-- ???????????????????????????????????
+-- What about webedituser, webcomment?
+-- ???????????????????????????????????
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_ASSET_PT'
+WHERE E.Explanation IS NULL or E.Explanation = ''
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE VIEW [dbo].[QC_ISSUES_AKR_ASSET_PY] AS select I.Issue, I.Details, D.* from  gis.AKR_ASSET_PY_evw AS D
+join (
+
+-------------------------
+-- gis.AKR_ASSET_PY
+-------------------------
+
+-- OBJECTID, SHAPE, CREATEDATE CREATEUSER, EDITDATE, EDITUSER - are managed by ArcGIS no QC or Calculations required
+
+-- 1) POLYGONTYPE must be an recognized value; if it is null/empty, then it will default to 'Circumscribed polygon' without a warning
+select t1.OBJECTID, 'Error: POLYGONTYPE is not a recognized value' as Issue, NULL as Details from gis.AKR_ASSET_PY_evw as t1
+  left join dbo.DOM_POLYGONTYPE as t2 on t1.POLYGONTYPE = t2.Code where t1.POLYGONTYPE is not null and t1.POLYGONTYPE <> '' and t2.Code is null
+union all 
+-- 2) GEOMETRYID must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue, NULL from gis.AKR_ASSET_PY_evw where GEOMETRYID in 
+       (select GEOMETRYID from gis.AKR_ASSET_PY_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
+union all
+select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
+	from gis.AKR_ASSET_PY_evw where
+	  -- Will ignore GEOMETRYID = NULL 
+	  len(GEOMETRYID) <> 38 
+	  OR left(GEOMETRYID,1) <> '{'
+	  OR right(GEOMETRYID,1) <> '}'
+	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+-- 3) FEATUREID must be well-formed or null/empty (in which case we will generate a unique well-formed value)
+--    All records with the same FeatureID must be proximal (in the vicinity of each other)
+select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
+	from gis.AKR_ASSET_PY_evw where
+	  -- Will ignore FEATUREID = NULL 
+	  len(FEATUREID) <> 38 
+	  OR left(FEATUREID,1) <> '{'
+	  OR right(FEATUREID,1) <> '}'
+	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+union all
+select OBJECTID, 'Error: Features with the same FEATUREID are not close to each other' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
+  from gis.AKR_ASSET_PY_evw where featureid in 
+  (select FEATUREID from gis.AKR_ASSET_PY_evw group by FEATUREID having count(*) > 1 and
+   geometry::ConvexHullAggregate(Shape).STArea()/geometry::CollectionAggregate(Shape).STArea() > 10)
+union all
+-- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
+select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_PY_evw where MAPMETHOD is null or MAPMETHOD = ''
+union all
+select t1.OBJECTID, 'Error: MAPMETHOD is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+  left join dbo.DOM_MAPMETHOD as t2 on t1.MAPMETHOD = t2.code where t1.MAPMETHOD is not null and t1.MAPMETHOD <> '' and t2.code is null
+union all
+-- 5) MAPSOURCE is required free text; the only check we can make is that it is non null and not an empty string
+select OBJECTID, 'Warning: MAPSOURCE is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_PY_evw where MAPSOURCE is null or MAPSOURCE = ''
+union all
+-- 6) SOURCEDATE is required for some map sources, however since MAPSOURCE is free text we do not know when null is ok.
+--    check to make sure date is before today, and after 1995 (earliest in current dataset, others can be exceptions)
+select OBJECTID, 'Warning: SOURCEDATE is unexpectedly old (before 1995)' as Issue, NULL from gis.AKR_ASSET_PY_evw where SOURCEDATE < convert(Datetime2,'1995')
+union all
+select OBJECTID, 'Error: SOURCEDATE is in the future' as Issue, NULL from gis.AKR_ASSET_PY_evw where SOURCEDATE > GETDATE()
+union all
+-- 7) XYACCURACY is a required domain value; default is 'Unknown'
+select OBJECTID, 'Warning: XYACCURACY is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_PY_evw where XYACCURACY is null or XYACCURACY = ''
+union all
+select t1.OBJECTID, 'Error: XYACCURACY is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+  left join dbo.DOM_XYACCURACY as t2 on t1.XYACCURACY = t2.code where t1.XYACCURACY is not null and t1.XYACCURACY <> '' and t2.code is null
+union all
+-- 8) NOTES is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+-- 9) ASSETNAME is not required, but if it provided is it should not be an empty string
+--    This can be checked and fixed automatically; no need to alert the user.
+--    Must use proper case - can only check for all upper or all lower case
+select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_PY_evw where ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI
+union all
+-- 10) ASSETALTNAME is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 12) ASSETTYPE must be in DOM_ASSETTYPE.
+select t1.OBJECTID, 'Error: ASSETTYPE is required' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+       where t1.ASSETTYPE is null or t1.ASSETTYPE = ''
+union all 
+select t1.OBJECTID, 'Error: ASSETTYPE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+       left join dbo.DOM_ASSETTYPE as t2 on t1.ASSETTYPE = t2.Code where t1.ASSETTYPE is not null and t1.ASSETTYPE <> '' and t2.Code is null
+union all 
+-- 13) SEASONAL is a optional domain value; must match valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+       left join dbo.DOM_YES_NO_UNK as t2 on t1.SEASONAL = t2.Code where t1.SEASONAL is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + FACLOCID + ' has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.AKR_ASSET_PY_evw as p join 
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
+union all
+select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
+  from gis.AKR_ASSET_PY_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on a.Location = f.Location where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
+union all
+-- 14) SEASDESC optional free text.  Required if SEASONAL = 'Yes'; Convert empty string to null; default of "Winter seasonal closure" with a warning
+select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a default value of *Winter seasonal closure* will be used' as Issue, NULL from gis.AKR_ASSET_PY_evw as p
+  left join (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+  on p.FACLOCID = f.Location where (p.SEASDESC is null or p.SEASDESC = '') and (p.SEASONAL = 'Yes' or (p.SEASONAL is null and f.OPSEAS = 'Yes'))
+union all
+-- 15) MAINTAINER is a optional domain value; if FACLOCID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+       left join dbo.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+union all
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.AKR_ASSET_PY_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
+union all
+select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
+  from gis.AKR_ASSET_PY_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  dbo.FMSSExport as f on f.Location = a.Location where f.FAMARESP is not null and p.MAINTAINER not in (select code from DOM_MAINTAINER where FMSS = f.FAMARESP)
+union all
+-- 16) ISEXTANT is a required domain value; Default to True with Warning
+select OBJECTID, 'Warning: ISEXTANT is not provided, a default value of *True* will be used' as Issue, NULL from gis.AKR_ASSET_PY_evw where ISEXTANT is null
+union all
+select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+  left join dbo.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
+union all
+-- 17) ISOUTPARK:  This is not exposed for editing by the user, and will be overwritten regardless, so there is nothing to check
+-- 18) PUBLICDISPLAY is a required Domain Value; Default to No Public Map Display with Warning
+--     TODO: are there requirements of other fields (i.e. ISEXTANT, ISOUTPARK, UNITCODE) when PUBLICDISPLAY is true?
+--           select ISEXTANT, ISOUTPARK, UNITCODE, Count(*) from gis.AKR_ASSET_PY_evw where PUBLICDISPLAY = 'Public Map Display' group by ISEXTANT, ISOUTPARK, UNITCODE
+select OBJECTID, 'Warning: PUBLICDISPLAY is not provided, a default value of *No Public Map Display* will be used' as Issue, NULL from gis.AKR_ASSET_PY_evw where PUBLICDISPLAY is null or PUBLICDISPLAY = ''
+union all
+select t1.OBJECTID, 'Error: PUBLICDISPLAY is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+  left join dbo.DOM_PUBLICDISPLAY as t2 on t1.PUBLICDISPLAY = t2.code where t1.PUBLICDISPLAY is not null and t1.PUBLICDISPLAY <> '' and t2.code is null
+union all
+-- 19) DATAACCESS is a required Domain Value; Default to Internal NPS Only with Warning
+select OBJECTID, 'Warning: DATAACCESS is not provided, a default value of *Internal NPS Only* will be used' as Issue, NULL from gis.AKR_ASSET_PY_evw where DATAACCESS is null or DATAACCESS = ''
+union all
+select t1.OBJECTID, 'Error: DATAACCESS is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+  left join dbo.DOM_DATAACCESS as t2 on t1.DATAACCESS = t2.code where t1.DATAACCESS is not null and t1.DATAACCESS <> '' and t2.code is null
+union all
+-- 18/19) PUBLICDISPLAY and DATAACCESS are related
+select OBJECTID, 'Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted' as Issue, NULL from gis.AKR_ASSET_PY_evw
+  where PUBLICDISPLAY = 'Public Map Display' and DATAACCESS in ('Internal NPS Only', 'Secure Access Only')
+union all
+-- 20) UNITCODE is a required domain value.  If null will be set spatially; error if not within a unit boundary
+--     Error if it doesn't match valid value in FMSS Lookup Location.Park
+--     TODO: Can we accept a null UNITCODE if GROUPCODE is not null and valid?  Need to merge for a standard compliance
+select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+  left join gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
+union all
+-- TODO: Should this non-spatial query use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 left join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
+--   union all
+select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+union all
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+  'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from gis.AKR_UNIT as t1
+  left join gis.AKR_ASSET_PY_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+  'Location ' + FACLOCID + ' has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_ASSET_PY_evw as p join 
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
+  from gis.AKR_ASSET_PY_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
+  (SELECT Park, Location FROM dbo.FMSSExport where Park in (select Code from dbo.DOM_UNITCODE)) as f
+  on f.Location = a.Location where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
+union all
+-- 21) UNITNAME is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
+select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+union all
+-- TODO: Should we use dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+--   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 join
+--     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
+--   union all
+-- 22) GROUPCODE is optional free text; AKR restriction: if provided must be in AKR_GROUP
+--     it can be null and not spatially within a group (this check is problematic, see discussion below),
+--     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
+--     GROUPCODE must match related UNITCODE in dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or dbo.DOM_UNITCODE
+---- dbo.DOM_UNITCODE does not allow UNIT in multiple groups
+---- gis.AKR_GROUP does not try to match group and unit
+select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 left join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
+union all
+select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 left join
+  dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+union all
+-- TODO: Consider doing a spatial check.  There are several problems with the current approach:
+----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
+----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
+--select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+--  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.AKR_ASSET_PY_evw as t3 left join 
+--  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
+--union all
+-- 23) GROUPNAME is calc'd from GROUPCODE when non-null and  free text; AKR restriction: if provided must be in AKR_GROUP
+select t1.OBJECTID, 'Error: GROUPNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 join
+  gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t1.GROUPNAME <> t2.Group_Name
+union all
+-- 24) REGIONCODE is always 'AKR' Issue a warning if not null and not equal to 'AKR'
+select OBJECTID, 'Warning: REGIONCODE will be replaced with *AKR*' as Issue, NULL from gis.AKR_ASSET_PY_evw where REGIONCODE is not null and REGIONCODE <> 'AKR'
+union all
+-- 25) FACLOCID is optional free text, but if provided it must match a Parking Lot Location in the FMSS Export;
+--     All records with the same FACLOCID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 left join
+  dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
+union all
+select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_PY_evw where FACLOCID in (
+    select FACLOCID from (select FACLOCID from gis.AKR_ASSET_PY_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
+union all
+-- 26) FACASSETID is optional free text, provided it must match a Parking Lot Location in the FMSS Assets Export
+--     All records with the same FACASSETID must have the same FEATUREID
+select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 left join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset where t1.FACASSETID is not null and t1.FACASSETID <> '' and t2.Asset is null
+union all
+select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1 join
+  dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
+  dbo.FMSSExport as t3 on t2.Location = t3.Location and t1.UNITCODE = t3.PARK where t1.FACLOCID <> t3.Location
+union all
+select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_PY_evw where FACASSETID in (
+    select FACASSETID from (select FACASSETID from gis.AKR_ASSET_PY_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
+union all
+-- 27) ASSETCODE must be in DOM_ASSETCODE; if FACLOCID OR FACASSETID is provided this should match a valid value in FMSS Lookup.
+select t1.OBJECTID, 'Error: ASSETCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+       left join dbo.DOM_ASSETCODE as t2 on t1.ASSETCODE = t2.Code where t1.ASSETCODE is not null and t1.ASSETCODE <> '' and t2.Code is null
+union all 
+select p.OBJECTID, 'Error: ASSETCODE does not match FMSS.ASSET_CODE' as Issue,
+  'Location ' + FACLOCID + ' has ASSET_CODE = ' + f.Asset_Code + ' when GIS has ASSETCODE = ' + p.ASSETCODE as Details
+  from gis.AKR_ASSET_PY_evw as p join 
+  dbo.FMSSExport as f on f.Location = p.FACLOCID where f.ASSET_CODE <> p.ASSETCODE and p.ASSETCODE <> '' 
+union all
+select p.OBJECTID, 'Error: ASSETCODE does not match FMSS.ASSET_CODE' as Issue,
+  'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has ASSET_CODE = ' + f.Asset_Code + ' when GIS has ASSETCODE = ' + p.ASSETCODE as Details
+  from gis.AKR_ASSET_PY_evw as p
+  join dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID 
+  join dbo.FMSSExport as f on a.Location = f.Location
+  where f.ASSET_CODE <> p.ASSETCODE and p.ASSETCODE <> ''
+union all
+-- 28) ASSETTYPEOTHDESC is not required Unless ASSETTYPE = 'Other'.
+--     If it provided is it should not be an empty string. This can be checked and fixed automatically; no need to alert the user.
+select OBJECTID, 'Error: ASSETTYPEOTHDESC is required when ASSETTYPE is Other' as Issue, NULL from gis.AKR_ASSET_PY_evw
+       where ASSETTYPE = 'Other' and (ASSETTYPEOTHDESC = '' or ASSETTYPEOTHDESC is null)
+union all 
+-- 29) ASSETDESC is not required, but if it provided is it should not be an empty string
+--     This can be checked and fixed automatically; no need to alert the user.
+-- 30) ASSETMATERIAL is an optional domain value;
+select t1.OBJECTID, 'Error: ASSETMATERIAL is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
+       left join dbo.DOM_ASSETMATERIAL as t2 on t1.ASSETMATERIAL = t2.Code where t1.ASSETMATERIAL is not null and t1.ASSETMATERIAL <> '' and t2.Code is null
+union all
+-- 31) ASSETDIAMETER_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETDIAMETER_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_PY_evw where ASSETDIAMETER_FT < 0
+union all
+-- 32) ASSETLENGTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETLENGTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_PY_evw where ASSETLENGTH_FT < 0
+union all
+-- 33) ASSETWIDTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETWIDTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_PY_evw where ASSETWIDTH_FT < 0
+union all
+-- 34) ASSETDEPTH_FT is an optional numerical value > Zero. If zero is provided it will be silently converted to Null.
+select OBJECTID, 'Error: ASSETDEPTH_FT is not allowed to be a negative number'  as Issue, NULL from gis.AKR_ASSET_PY_evw where ASSETDEPTH_FT < 0
+union all
+---------------
+-- Shape Checks
+---------------
+select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.AKR_ASSET_PY_evw where shape.STIsEmpty() = 1
+union all
+select OBJECTID, 'Error: SHAPE must be valid' as Issue, NULL from gis.AKR_ASSET_PY_evw where shape.STIsValid() = 0
+-- Overlaps are possible (even exepcted among SITES)
+-- Size checks are difficult because of variation in QTY units; May try later when trends are identified 
+
+-- ???????????????????????????????????
+-- What about webedituser, webcomment?
+-- ???????????????????????????????????
+
+) AS I
+on D.OBJECTID = I.OBJECTID
+LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
+ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'AKR_ASSET_PY'
+WHERE E.Explanation IS NULL or E.Explanation = ''
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
 CREATE VIEW [dbo].[QC_ISSUES_AKR_ATTACH] AS select I.Issue, I.Details, D.* from  gis.AKR_ATTACH_evw AS D
 join (
 
@@ -3661,6 +4800,550 @@ on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'TRAILS_LN'
 WHERE E.Explanation IS NULL or E.Explanation = ''
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2020-02-11
+-- Description:	Calculated properties for Assets
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Asset] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- 1) if ASSETNAME is an empty string, change to NULL
+    update gis.AKR_ASSET_evw set ASSETNAME = NULL where ASSETNAME = ''
+    -- 2) if ASSETALTNAME is an empty string, change to NULL
+    update gis.AKR_ASSET_evw set ASSETALTNAME = NULL where ASSETALTNAME = ''
+    -- 3) if MAPLABEL is an empty string, change to NULL
+    update gis.AKR_ASSET_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 4) if ASSETCODE is NULL or empty and FACLOCID is not null or FACASSETID is not null then calc from from FMSS
+    merge into gis.AKR_ASSET_evw as t1 using FMSSExport as t2
+      on t1.FACLOCID = t2.Location and (ASSETCODE is null or ASSETCODE = '') and FACLOCID is not null
+      when matched then update set ASSETCODE = t2.Asset_Code;
+    merge into gis.AKR_ASSET_evw as t1 using 
+      (SELECT t3.Asset, t4.Asset_Code FROM FMSSExport_Asset as t3 join FMSSExport as t4 on t3.Location = t4.Location) as t2
+      on t1.FACASSETID = t2.Asset and (ASSETCODE is null or ASSETCODE = '') and FACASSETID is not null
+      when matched then update set ASSETCODE = t2.Asset_Code;
+    -- 5) ASSETTYPE - No calcs; NULL, Empty and not in DOM trigger QC Error
+    -- 6) if ASSETTYPEOTHDESC is an empty string, change to NULL
+    update gis.AKR_ASSET_evw set ASSETTYPEOTHDESC = NULL where ASSETTYPEOTHDESC = ''
+    -- 7) if ASSETDESC is an empty string, change to NULL
+    update gis.AKR_ASSET_evw set ASSETDESC = NULL where ASSETDESC = ''
+    -- 8) if ASSETMATERIAL is an empty string, change to NULL
+    update gis.AKR_ASSET_evw set ASSETMATERIAL = NULL where ASSETMATERIAL = ''
+    -- 9) if ASSETDIAMETER_FT is zero then converted to Null.
+    update gis.AKR_ASSET_evw set ASSETDIAMETER_FT = NULL where ASSETDIAMETER_FT = 0
+    -- 10) if ASSETLENGTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_evw set ASSETLENGTH_FT = NULL where ASSETLENGTH_FT = 0
+    -- 11) if ASSETWIDTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_evw set ASSETWIDTH_FT = NULL where ASSETWIDTH_FT = 0
+    -- 12) if ASSETDEPTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_evw set ASSETDEPTH_FT = NULL where ASSETDEPTH_FT = 0
+    -- 13) if SEASONAL is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_ASSET_evw as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    merge into gis.AKR_ASSET_evw as p
+      using (SELECT case when t2.OPSEAS = 'Y' then 'Yes' when t2.OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, t1.Asset
+            FROM dbo.FMSSExport_Asset as t1 JOIN dbo.FMSSExport as t2 on t1.Location = t2.Location) as f
+      on f.Asset = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    -- 14) if SEASDESC is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.AKR_ASSET_evw set SEASDESC = NULL where SEASDESC = ''
+    update gis.AKR_ASSET_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+    -- 15) if MAINTAINER is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_ASSET_evw as p
+      using (SELECT d.Code as FAMARESP, location FROM dbo.FMSSExport as t join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    merge into gis.AKR_ASSET_evw as p
+      using (SELECT d.Code as FAMARESP, a.Asset FROM dbo.FMSSExport_Asset as a join dbo.FMSSExport as t on a.Location = t.Location
+             join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    -- 16) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.AKR_ASSET_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 17) ISOUTPARK is meaningless for non-spatial assets; Nothing to do
+    -- 18) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.AKR_ASSET_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 19) DATAACCESS defaults to No Public Map Display
+    update gis.AKR_ASSET_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 20) UNITCODE must be in DOM; Nothing to do
+    -- 21) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.AKR_ASSET_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.AKR_ASSET_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 22) if GROUPCODE is an empty string, change to NULL
+    update gis.AKR_ASSET_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 23) GROUPNAME is always calc'd from GROUPCODE
+    update gis.AKR_ASSET_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.AKR_ASSET_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 24) REGIONCODE is always set to AKR
+    update gis.AKR_ASSET_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- no CALCs for CREATEUSER, CREATEDATE, EDITUSER, EDITDATE (managed by system)
+    -- 25) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.AKR_ASSET_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 26) if MAPSOURCE is NULL or an empty string, change to Unknown
+    --     by SQL Magic '' is the same as any string of just white space
+    update gis.AKR_ASSET_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 27) SOURCEDATE: Nothing to do.
+    -- 28) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.AKR_ASSET_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 29) if FACLOCID is empty string change to null
+    update gis.AKR_ASSET_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 30) if FACASSETID is empty string change to null
+    update gis.AKR_ASSET_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 31) Add FEATUREID if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.AKR_ASSET_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    -- 32) Add GEOMETRYID if null/empty
+    update gis.AKR_ASSET_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 33) if NOTES is an empty string, change to NULL
+    update gis.AKR_ASSET_evw set NOTES = NULL where NOTES = ''
+    -- no CALCs for WEBEDITUSER, WEBCOMMENT
+
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2020-02-11
+-- Description:	Calculated properties for Assets
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Asset_Ln] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- 1) if ASSETNAME is an empty string, change to NULL
+    update gis.AKR_ASSET_LN_evw set ASSETNAME = NULL where ASSETNAME = ''
+    -- 2) if ASSETALTNAME is an empty string, change to NULL
+    update gis.AKR_ASSET_LN_evw set ASSETALTNAME = NULL where ASSETALTNAME = ''
+    -- 3) if MAPLABEL is an empty string, change to NULL
+    update gis.AKR_ASSET_LN_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 4) if ASSETCODE is NULL or empty and FACLOCID is not null or FACASSETID is not null then calc from from FMSS
+    merge into gis.AKR_ASSET_LN_evw as t1 using FMSSExport as t2
+      on t1.FACLOCID = t2.Location and (ASSETCODE is null or ASSETCODE = '') and FACLOCID is not null
+      when matched then update set ASSETCODE = t2.Asset_Code;
+    merge into gis.AKR_ASSET_LN_evw as t1 using 
+      (SELECT t3.Asset, t4.Asset_Code FROM FMSSExport_Asset as t3 join FMSSExport as t4 on t3.Location = t4.Location) as t2
+      on t1.FACASSETID = t2.Asset and (ASSETCODE is null or ASSETCODE = '') and FACASSETID is not null
+      when matched then update set ASSETCODE = t2.Asset_Code;
+    -- 5) ASSETTYPE - No calcs; NULL, Empty and not in DOM trigger QC Error
+    -- 6) if ASSETTYPEOTHDESC is an empty string, change to NULL
+    update gis.AKR_ASSET_LN_evw set ASSETTYPEOTHDESC = NULL where ASSETTYPEOTHDESC = ''
+    -- 7) if ASSETDESC is an empty string, change to NULL
+    update gis.AKR_ASSET_LN_evw set ASSETDESC = NULL where ASSETDESC = ''
+    -- 8) if ASSETMATERIAL is an empty string, change to NULL
+    update gis.AKR_ASSET_LN_evw set ASSETMATERIAL = NULL where ASSETMATERIAL = ''
+    -- 9) if ASSETDIAMETER_FT is zero then converted to Null.
+    update gis.AKR_ASSET_LN_evw set ASSETDIAMETER_FT = NULL where ASSETDIAMETER_FT = 0
+    -- 10) if ASSETLENGTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_LN_evw set ASSETLENGTH_FT = NULL where ASSETLENGTH_FT = 0
+    -- 11) if ASSETWIDTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_LN_evw set ASSETWIDTH_FT = NULL where ASSETWIDTH_FT = 0
+    -- 12) if ASSETDEPTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_LN_evw set ASSETDEPTH_FT = NULL where ASSETDEPTH_FT = 0
+    -- 13) if SEASONAL is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_ASSET_LN_evw as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    merge into gis.AKR_ASSET_LN_evw as p
+      using (SELECT case when t2.OPSEAS = 'Y' then 'Yes' when t2.OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, t1.Asset
+            FROM dbo.FMSSExport_Asset as t1 JOIN dbo.FMSSExport as t2 on t1.Location = t2.Location) as f
+      on f.Asset = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    -- 14) if SEASDESC is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.AKR_ASSET_LN_evw set SEASDESC = NULL where SEASDESC = ''
+    update gis.AKR_ASSET_LN_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+    -- 15) if MAINTAINER is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_ASSET_LN_evw as p
+      using (SELECT d.Code as FAMARESP, location FROM dbo.FMSSExport as t join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    merge into gis.AKR_ASSET_LN_evw as p
+      using (SELECT d.Code as FAMARESP, a.Asset FROM dbo.FMSSExport_Asset as a join dbo.FMSSExport as t on a.Location = t.Location
+             join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    -- 16) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.AKR_ASSET_LN_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 17) Add LINETYPE = 'Arbitrary line' if null/empty
+    update gis.AKR_ASSET_LN_evw set LINETYPE = 'Arbitrary line' where LINETYPE is null or LINETYPE = '' 
+    -- 18) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.AKR_ASSET_LN_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+    -- 19) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.AKR_ASSET_LN_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 20) DATAACCESS defaults to No Public Map Display
+    update gis.AKR_ASSET_LN_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 21) UNITCODE is a spatial calc if null
+    merge into gis.AKR_ASSET_LN_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 22) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.AKR_ASSET_LN_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.AKR_ASSET_LN_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 23) if GROUPCODE is an empty string, change to NULL
+    update gis.AKR_ASSET_LN_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 24) GROUPNAME is always calc'd from GROUPCODE
+    update gis.AKR_ASSET_LN_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.AKR_ASSET_LN_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 25) REGIONCODE is always set to AKR
+    update gis.AKR_ASSET_LN_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- no CALCs for CREATEUSER, CREATEDATE, EDITUSER, EDITDATE (managed by system)
+    -- 26) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.AKR_ASSET_LN_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 27) if MAPSOURCE is NULL or an empty string, change to Unknown
+    --     by SQL Magic '' is the same as any string of just white space
+    update gis.AKR_ASSET_LN_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 28) SOURCEDATE: Nothing to do.
+    -- 29) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.AKR_ASSET_LN_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 30) if FACLOCID is empty string change to null
+    update gis.AKR_ASSET_LN_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 31) if FACASSETID is empty string change to null
+    update gis.AKR_ASSET_LN_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 32) Add FEATUREID if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.AKR_ASSET_LN_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    -- 33) Add GEOMETRYID if null/empty
+    update gis.AKR_ASSET_LN_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 34) if NOTES is an empty string, change to NULL
+    update gis.AKR_ASSET_LN_evw set NOTES = NULL where NOTES = ''
+    -- no CALCs for WEBEDITUSER, WEBCOMMENT
+
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2020-02-11
+-- Description:	Calculated properties for Assets
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Asset_Pt] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- 1) if ASSETNAME is an empty string, change to NULL
+    update gis.AKR_ASSET_PT_evw set ASSETNAME = NULL where ASSETNAME = ''
+    -- 2) if ASSETALTNAME is an empty string, change to NULL
+    update gis.AKR_ASSET_PT_evw set ASSETALTNAME = NULL where ASSETALTNAME = ''
+    -- 3) if MAPLABEL is an empty string, change to NULL
+    update gis.AKR_ASSET_PT_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 4) if ASSETCODE is NULL or empty and FACLOCID is not null or FACASSETID is not null then calc from from FMSS
+    merge into gis.AKR_ASSET_PT_evw as t1 using FMSSExport as t2
+      on t1.FACLOCID = t2.Location and (ASSETCODE is null or ASSETCODE = '') and FACLOCID is not null
+      when matched then update set ASSETCODE = t2.Asset_Code;
+    merge into gis.AKR_ASSET_PT_evw as t1 using 
+      (SELECT t3.Asset, t4.Asset_Code FROM FMSSExport_Asset as t3 join FMSSExport as t4 on t3.Location = t4.Location) as t2
+      on t1.FACASSETID = t2.Asset and (ASSETCODE is null or ASSETCODE = '') and FACASSETID is not null
+      when matched then update set ASSETCODE = t2.Asset_Code;
+    -- 5) ASSETTYPE - No calcs; NULL, Empty and not in DOM trigger QC Error
+    -- 6) if ASSETTYPEOTHDESC is an empty string, change to NULL
+    update gis.AKR_ASSET_PT_evw set ASSETTYPEOTHDESC = NULL where ASSETTYPEOTHDESC = ''
+    -- 7) if ASSETDESC is an empty string, change to NULL
+    update gis.AKR_ASSET_PT_evw set ASSETDESC = NULL where ASSETDESC = ''
+    -- 8) if ASSETMATERIAL is an empty string, change to NULL
+    update gis.AKR_ASSET_PT_evw set ASSETMATERIAL = NULL where ASSETMATERIAL = ''
+    -- 9) if ASSETDIAMETER_FT is zero then converted to Null.
+    update gis.AKR_ASSET_PT_evw set ASSETDIAMETER_FT = NULL where ASSETDIAMETER_FT = 0
+    -- 10) if ASSETLENGTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_PT_evw set ASSETLENGTH_FT = NULL where ASSETLENGTH_FT = 0
+    -- 11) if ASSETWIDTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_PT_evw set ASSETWIDTH_FT = NULL where ASSETWIDTH_FT = 0
+    -- 12) if ASSETDEPTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_PT_evw set ASSETDEPTH_FT = NULL where ASSETDEPTH_FT = 0
+    -- 13) if SEASONAL is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_ASSET_PT_evw as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    merge into gis.AKR_ASSET_PT_evw as p
+      using (SELECT case when t2.OPSEAS = 'Y' then 'Yes' when t2.OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, t1.Asset
+            FROM dbo.FMSSExport_Asset as t1 JOIN dbo.FMSSExport as t2 on t1.Location = t2.Location) as f
+      on f.Asset = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    -- 14) if SEASDESC is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.AKR_ASSET_PT_evw set SEASDESC = NULL where SEASDESC = ''
+    update gis.AKR_ASSET_PT_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+    -- 15) if MAINTAINER is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_ASSET_PT_evw as p
+      using (SELECT d.Code as FAMARESP, location FROM dbo.FMSSExport as t join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    merge into gis.AKR_ASSET_PT_evw as p
+      using (SELECT d.Code as FAMARESP, a.Asset FROM dbo.FMSSExport_Asset as a join dbo.FMSSExport as t on a.Location = t.Location
+             join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    -- 16) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.AKR_ASSET_PT_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 17) Add POINTTYPE = 'Arbitrary point' if null/empty
+    update gis.AKR_ASSET_PT_evw set POINTTYPE = 'Arbitrary point' where POINTTYPE is null or POINTTYPE = '' 
+    -- 18) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.AKR_ASSET_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+    -- 19) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.AKR_ASSET_PT_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 20) DATAACCESS defaults to No Public Map Display
+    update gis.AKR_ASSET_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 21) UNITCODE is a spatial calc if null
+    merge into gis.AKR_ASSET_PT_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 22) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.AKR_ASSET_PT_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.AKR_ASSET_PT_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 23) if GROUPCODE is an empty string, change to NULL
+    update gis.AKR_ASSET_PT_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 24) GROUPNAME is always calc'd from GROUPCODE
+    update gis.AKR_ASSET_PT_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.AKR_ASSET_PT_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 25) REGIONCODE is always set to AKR
+    update gis.AKR_ASSET_PT_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- no CALCs for CREATEUSER, CREATEDATE, EDITUSER, EDITDATE (managed by system)
+    -- 26) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.AKR_ASSET_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 27) if MAPSOURCE is NULL or an empty string, change to Unknown
+    --     by SQL Magic '' is the same as any string of just white space
+    update gis.AKR_ASSET_PT_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 28) SOURCEDATE: Nothing to do.
+    -- 29) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.AKR_ASSET_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 30) if FACLOCID is empty string change to null
+    update gis.AKR_ASSET_PT_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 31) if FACASSETID is empty string change to null
+    update gis.AKR_ASSET_PT_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 32) Add FEATUREID if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.AKR_ASSET_PT_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    -- 33) Add GEOMETRYID if null/empty
+    update gis.AKR_ASSET_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 34) if NOTES is an empty string, change to NULL
+    update gis.AKR_ASSET_PT_evw set NOTES = NULL where NOTES = ''
+    -- no CALCs for WEBEDITUSER, WEBCOMMENT
+
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2020-02-11
+-- Description:	Calculated properties for Assets
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_Asset_Py] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- 1) if ASSETNAME is an empty string, change to NULL
+    update gis.AKR_ASSET_PY_evw set ASSETNAME = NULL where ASSETNAME = ''
+    -- 2) if ASSETALTNAME is an empty string, change to NULL
+    update gis.AKR_ASSET_PY_evw set ASSETALTNAME = NULL where ASSETALTNAME = ''
+    -- 3) if MAPLABEL is an empty string, change to NULL
+    update gis.AKR_ASSET_PY_evw set MAPLABEL = NULL where MAPLABEL = ''
+    -- 4) if ASSETCODE is NULL or empty and FACLOCID is not null or FACASSETID is not null then calc from from FMSS
+    merge into gis.AKR_ASSET_PY_evw as t1 using FMSSExport as t2
+      on t1.FACLOCID = t2.Location and (ASSETCODE is null or ASSETCODE = '') and FACLOCID is not null
+      when matched then update set ASSETCODE = t2.Asset_Code;
+    merge into gis.AKR_ASSET_PY_evw as t1 using 
+      (SELECT t3.Asset, t4.Asset_Code FROM FMSSExport_Asset as t3 join FMSSExport as t4 on t3.Location = t4.Location) as t2
+      on t1.FACASSETID = t2.Asset and (ASSETCODE is null or ASSETCODE = '') and FACASSETID is not null
+      when matched then update set ASSETCODE = t2.Asset_Code;
+    -- 5) ASSETTYPE - No calcs; NULL, Empty and not in DOM trigger QC Error
+    -- 6) if ASSETTYPEOTHDESC is an empty string, change to NULL
+    update gis.AKR_ASSET_PY_evw set ASSETTYPEOTHDESC = NULL where ASSETTYPEOTHDESC = ''
+    -- 7) if ASSETDESC is an empty string, change to NULL
+    update gis.AKR_ASSET_PY_evw set ASSETDESC = NULL where ASSETDESC = ''
+    -- 8) if ASSETMATERIAL is an empty string, change to NULL
+    update gis.AKR_ASSET_PY_evw set ASSETMATERIAL = NULL where ASSETMATERIAL = ''
+    -- 9) if ASSETDIAMETER_FT is zero then converted to Null.
+    update gis.AKR_ASSET_PY_evw set ASSETDIAMETER_FT = NULL where ASSETDIAMETER_FT = 0
+    -- 10) if ASSETLENGTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_PY_evw set ASSETLENGTH_FT = NULL where ASSETLENGTH_FT = 0
+    -- 11) if ASSETWIDTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_PY_evw set ASSETWIDTH_FT = NULL where ASSETWIDTH_FT = 0
+    -- 12) if ASSETDEPTH_FT is zero then converted to Null.
+    update gis.AKR_ASSET_PY_evw set ASSETDEPTH_FT = NULL where ASSETDEPTH_FT = 0
+    -- 13) if SEASONAL is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_ASSET_PY_evw as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    merge into gis.AKR_ASSET_PY_evw as p
+      using (SELECT case when t2.OPSEAS = 'Y' then 'Yes' when t2.OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, t1.Asset
+            FROM dbo.FMSSExport_Asset as t1 JOIN dbo.FMSSExport as t2 on t1.Location = t2.Location) as f
+      on f.Asset = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    -- 14) if SEASDESC is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.AKR_ASSET_PY_evw set SEASDESC = NULL where SEASDESC = ''
+    update gis.AKR_ASSET_PY_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+    -- 15) if MAINTAINER is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_ASSET_PY_evw as p
+      using (SELECT d.Code as FAMARESP, location FROM dbo.FMSSExport as t join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    merge into gis.AKR_ASSET_PY_evw as p
+      using (SELECT d.Code as FAMARESP, a.Asset FROM dbo.FMSSExport_Asset as a join dbo.FMSSExport as t on a.Location = t.Location
+             join dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    -- 16) ISEXTANT defaults to 'True' with a warning (during QC)
+    update gis.AKR_ASSET_PY_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+    -- 17) Add POLYGONTYPE = 'Perimeter polygon' if null/empty
+    update gis.AKR_ASSET_PY_evw set POLYGONTYPE = 'Perimeter polygon' where POLYGONTYPE is null or POLYGONTYPE = '' 
+    -- 18) ISOUTPARK is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.AKR_ASSET_PY_evw as t1 using gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+    -- 19) PUBLICDISPLAY defaults to No Public Map Display
+    update gis.AKR_ASSET_PY_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+    -- 20) DATAACCESS defaults to No Public Map Display
+    update gis.AKR_ASSET_PY_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+    -- 21) UNITCODE is a spatial calc if null
+    merge into gis.AKR_ASSET_PY_evw as t1 using gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+    -- 22) UNITNAME is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.AKR_ASSET_PY_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.AKR_ASSET_PY_evw as t1 using DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+    -- 23) if GROUPCODE is an empty string, change to NULL
+    update gis.AKR_ASSET_PY_evw set GROUPCODE = NULL where GROUPCODE = ''
+    -- 24) GROUPNAME is always calc'd from GROUPCODE
+    update gis.AKR_ASSET_PY_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.AKR_ASSET_PY_evw as t1 using gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+    -- 25) REGIONCODE is always set to AKR
+    update gis.AKR_ASSET_PY_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+    -- no CALCs for CREATEUSER, CREATEDATE, EDITUSER, EDITDATE (managed by system)
+    -- 26) if MAPMETHOD is NULL or an empty string, change to Unknown
+    update gis.AKR_ASSET_PY_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+    -- 27) if MAPSOURCE is NULL or an empty string, change to Unknown
+    --     by SQL Magic '' is the same as any string of just white space
+    update gis.AKR_ASSET_PY_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+    -- 28) SOURCEDATE: Nothing to do.
+    -- 29) if XYACCURACY is NULL or an empty string, change to Unknown
+    update gis.AKR_ASSET_PY_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+    -- 30) if FACLOCID is empty string change to null
+    update gis.AKR_ASSET_PY_evw set FACLOCID = NULL where FACLOCID = ''
+    -- 31) if FACASSETID is empty string change to null
+    update gis.AKR_ASSET_PY_evw set FACASSETID = NULL where FACASSETID = ''
+    -- 32) Add FEATUREID if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.AKR_ASSET_PY_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+    -- 33) Add GEOMETRYID if null/empty
+    update gis.AKR_ASSET_PY_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+    -- 34) if NOTES is an empty string, change to NULL
+    update gis.AKR_ASSET_PY_evw set NOTES = NULL where NOTES = ''
+    -- no CALCs for WEBEDITUSER, WEBCOMMENT
+
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
 GO
 SET ANSI_NULLS ON
 GO

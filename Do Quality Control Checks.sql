@@ -66,5 +66,21 @@ select * from dbo.QC_ISSUES_AKR_ATTACH_PT
 -- Create a table of issues
 -- drop table QC_ISSUES_AKR_ATTACH_PT_for_owner_on_date
 -- select * into QC_ISSUES_AKR_ATTACH_PT_for_owner_on_date from dbo.QC_ISSUES_AKR_ATTACH_PT
+select * from dbo.QC_ISSUES_AKR_ASSET
+-- Create a table of issues
+-- drop table QC_ISSUES_AKR_ASSET_for_owner_on_date
+-- select * into QC_ISSUES_AKR_ASSET_for_owner_on_date from dbo.QC_ISSUES_AKR_ASSET
+select * from dbo.QC_ISSUES_AKR_ASSET_LN
+-- Create a table of issues
+-- drop table QC_ISSUES_AKR_ASSET_LN_for_owner_on_date
+-- select * into QC_ISSUES_AKR_ASSET_LN_for_owner_on_date from dbo.QC_ISSUES_AKR_ASSET_LN
+select * from dbo.QC_ISSUES_AKR_ASSET_PT
+-- Create a table of issues
+-- drop table QC_ISSUES_AKR_ASSET_PT_for_owner_on_date
+-- select * into QC_ISSUES_AKR_ASSET_PT_for_owner_on_date from dbo.QC_ISSUES_AKR_ASSET_PT
+select * from dbo.QC_ISSUES_AKR_ASSET_PY
+-- Create a table of issues
+-- drop table QC_ISSUES_AKR_ASSET_PY_for_owner_on_date
+-- select * into QC_ISSUES_AKR_ASSET_PY_for_owner_on_date from dbo.QC_ISSUES_AKR_ASSET_PY
 
 exec sde.set_default

@@ -26,6 +26,11 @@ select owner, name from sde.SDE_versions where parent_version_id is not null ord
 ---   then execute one statement (or a group of statements) at a time.
 DECLARE @version nvarchar(255) = 'owner.name'
 
+exec dbo.Calc_Asset @version
+exec dbo.Calc_Asset_Ln @version
+exec dbo.Calc_Asset_Pt @version
+exec dbo.Calc_Asset_Py @version
+exec dbo.Calc_Attachments @version
 exec dbo.Calc_Buildings @version
 exec dbo.Calc_ParkingLots @version
 exec dbo.Calc_Roads @version
@@ -33,7 +38,6 @@ exec dbo.Calc_Road_Features @version
 exec dbo.Calc_Trails @version
 exec dbo.Calc_Trail_Features @version
 exec dbo.Calc_Trail_Attributes @version
-exec dbo.Calc_Attachments @version
 
 -- Calcs to fix The fact that Regan has to edit as SDE and not Domain User
 exec sde.set_current_version @version
