@@ -4,6 +4,32 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+CREATE FUNCTION [dbo].[Concat4ID](
+     @a nvarchar(50), -- id 1
+     @b nvarchar(50), -- id 2
+     @c nvarchar(50), -- id 3
+     @d nvarchar(50) -- id 4
+) RETURNS VARCHAR(255)
+AS
+BEGIN
+  DECLARE @result varchar(255)
+  SET @result = SUBSTRING(CONCAT(
+    CASE @a WHEN NULL THEN NULL ELSE '|'+ @a END,
+    CASE @b WHEN NULL THEN NULL ELSE '|'+ @b END,
+    CASE @c WHEN NULL THEN NULL ELSE '|'+ @c END,
+    CASE @d WHEN NULL THEN NULL ELSE '|'+ @d END
+  ), 2, 254)
+  IF @result = ''
+  BEGIN
+    SET @result = NULL
+  END
+  RETURN @result
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 
 CREATE FUNCTION [dbo].[RoadIsFullyConnected](@featureid VARCHAR(255)) RETURNS int
 AS
