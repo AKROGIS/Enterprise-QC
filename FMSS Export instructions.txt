@@ -1,33 +1,51 @@
 This process should take about 45 minutes
 It assumes you are using SSMS v17
 
-
-
-** NOTE THAT THERE IS A BUG IN SSMS v18.0 (15.0.18118.0) that replaces all alpha locations (i.e. AKRO) with NULL**
+** NOTE THAT THERE IS A BUG IN SSMS v18 upto at least 18.5.1 (15.0.18333.0) that replaces all alpha locations (i.e. AKRO) with NULL**
 
 The solutions is to create new data rows below the first data row (not directly below the header) that result in more than 10% unique values
 that have the correct data type.  The values in the columns must be unique.  For all but assets, this means 2 new rows. For assets it means 6 new rows
-For example, here is the first few rows of the FRP table, with details elided
+For example, here is the first few rows of the FRP table, with details elided. Be sure to keep the first row of column names
+Paste these dummy rows after the first row of data (rows 3+) else, the import may think these are multiple rows fo column names
 
-Location,DOI Code,Predominant Use,Asset Ownership,Occupant,Street Address,City,County,Primary Latitude (NAD 83),Primary Longitude (NAD 83),FRP Long Description
-YUCH,.....
-a2,a,a,a,a,a,a,a,a,a,a
+FMSSExport_Asset:
+a1,a1,a1
+a2,a2,a2
+a3,a3,a3
+a4,a4,a4
+a5,a5,a5
+a6,a6,a6
+a7,a7,a7
+
+FMSSExport_Location1:
+a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,1.01,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1
+a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,1.01,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2
+
+FMSSExport_Location2:
+a1,a1,a1,a1,a1,a1,a1,a1,a1,a1
+a2,a2,a2,a2,a2,a2,a2,a2,a2,a2
+
+FMSSExport_Location3:
+a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1
+a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2
+
+FMSSExport_FRP
 a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1
-WRST,.....
-
-For FMSSExport_Location1 it is:
-
-Location,Description,Park,Park Name,Region,State,Parent,Type,Status,FBMS ID,Asset Code,Facility Type,Asset Category,OB,API,FCI,CRV,DM,Rank,UM,Qty,YearBlt,Occupant,Concession ID (Park Concession),Historic Status,LCS#,FRPP Value,Disposal Date,CSDM,Site,Web CRV,Long Description
-AKRO,....
-115414,.....
-a1,a,a,a,a,a,a,a,a,a,a1,a1,a,a,a1,1.01,a1,a1,a,a,a1,a,a,a,a1,a,a1,a,a1,a1,a1,a1
-a2,a,a,a,a,a,a,a,a,a,a2,a2,a,a,a2,1.01,a2,a2,a,a,a2,a,a,a,a2,a,a2,a,a2,a2,a2,a2
-225618,.....
+a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2
 
 
 Then you need to remove the bogus rows after import: delete from FMSSExport_FRP where location  = 'a2' or location  = 'a1'
 
+delete from FMSSExport_Location1 where location in ('a1','a2')
+delete from FMSSExport_Location2 where location in ('a1','a2')
+delete from FMSSExport_Location3 where location in ('a1','a2')
+delete from FMSSExport_FRP where location in ('a1','a2')
+delete from FMSSExport_Asset where location in ('a1','a2','a3','a4','a5','a6','a7')
 
+
+As of 6/24/2020, there are two location records with location = '1216'
+select * from FMSSExport_Location1 where location = '1216'
+delete from FMSSExport_Location1 where location = '1216' and parent is null
 
 
 go to FMSS (need to request access from Scott Vantrees)
@@ -73,7 +91,7 @@ Delete all the columns between Location and NOLANE in the second report
 Delete at least two "empty" columns on the right (there are some empty cell values that will create two bad columns on the right)
 make sure all data is formatted as text
 Save as CSV
-Open in VS Code or Atom and change CRLF to LF and make sure there are leading zeros on some locations
+Open in VS Code or Atom and remove all N/A values; i.e. search and replace ",N/A," with ",,"
 Import to SQL Server as FMSSExport_Location2 and 3
   - allow null on all, no PK, all nvarchar(50) except PARKNAME and RTENAME = nvarchar(150)
 
@@ -86,7 +104,7 @@ Open in Excel, delete top 19 rows (everything above the column names)
 Keep all data columns, but delete at least two "empty" columns on the right
 make sure all data is formatted as text
 Save as CSV
-Open in VS Code or Atom and change CRLF to LF and make sure there are leading zeros on some locations
+Open in VS Code or Atom and remove all N/A values; i.e. search and replace ",N/A," with ",,"
 Import to SQL Server as FMSSExport_Location1
   - allow null on all, no PK, all nvarchar(50) except FCI = float, Long_Description = nvarchar(4000), Description = nvarchar(250)
 
@@ -102,7 +120,7 @@ Delete the extra columns; keep Location, DOI Code, Predominant Use, Asset Owners
 Delete at least two "empty" columns on the right (there are some empty cell values that will create two bad columns on the right)
 make sure all data is formatted as text
 Save as CSV
-Open in VS Code or Atom and change CRLF to LF and make sure there are leading zeros on some locations
+Open in VS Code or Atom and remove all N/A values; i.e. search and replace ",N/A," with ",,"
 Import to SQL Server as FMSSExport_FRP
   - allow null on all, no PK, all nvarchar(50) except FRP_Long_Description = nvarchar(4000)
 
@@ -150,3 +168,11 @@ For Assets
         GRANT SELECT ON FMSSExport_Asset TO akr_facility_editor AS dbo
         GRANT SELECT ON FMSSExport_Asset TO akr_reader_web AS dbo
         GRANT SELECT ON FMSSExport_Asset TO [nps\Domain Users] AS dbo
+
+
+Update the Citation publication and revision date and the lineage processing step date in the SDE metadata files for FMSSExport and FMSSExport_Assets
+
+Run the QC Checks, if there are errors, create a new version and correct any errors in GIS based on new FMSS values
+
+
+
