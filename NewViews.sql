@@ -3818,10 +3818,11 @@ select OBJECTID, 'Error: SHAPE must be valid' as Issue, NULL from gis.ROADS_LN_e
 union all
 -- Sum of lengths grouped by faclocid should be close to length FMSS.QTY (in miles)
 select oid, 'Error: Road length in GIS is more than 20% different from FMSS' as Issue,
-'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.miles) + ' miles in GIS, but ' + convert(nvarchar(200),t2.miles) + ' miles in FMSS (' + convert(nvarchar(200),100*(t1.miles - t2.miles)/ t2.miles) + '%)' as Details
+'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.miles) + ' miles in GIS, but ' + convert(nvarchar(200),t2.miles) + ' miles in FMSS (' + 
+    case when t2.miles = 0 then 'xx' else convert(nvarchar(200),100*(t1.miles - t2.miles)/ t2.miles) end + '%)' as Details
   from (select min(objectid) as oid, FACLOCID, sum(GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) * 0.000621371 as miles from gis.ROADS_LN_evw where faclocid is not null group by FACLOCID) as t1
   join (select Location, convert(real, Qty) as miles from FMSSExport where UM = 'mi') as t2 on t1.FACLOCID = t2.Location
-  where abs(t1.miles - t2.miles)/ t2.miles > 0.2
+  where t2.miles = 0 OR abs(t1.miles - t2.miles)/ t2.miles > 0.2
 union all
 select OBJECTID, 'Warning: Road segment is shorter than 10 meters' as Issue,
   'Length = ' + convert(nvarchar(200),GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) + ' meters' as Details
