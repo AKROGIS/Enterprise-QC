@@ -1078,11 +1078,14 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	  OR right(FEATUREID,1) <> '}'
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
+-- TODO: Fix for Lines (aggregate area will always be zero)
+/*
 select OBJECTID, 'Error: Features with the same FEATUREID are not close to each other' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
   from gis.AKR_ASSET_LN_evw where featureid in 
   (select FEATUREID from gis.AKR_ASSET_LN_evw group by FEATUREID having count(*) > 1 and
    geometry::ConvexHullAggregate(Shape).STArea()/geometry::CollectionAggregate(Shape).STArea() > 10)
 union all
+*/
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_LN_evw where MAPMETHOD is null or MAPMETHOD = ''
 union all
@@ -1108,13 +1111,16 @@ union all
 --    This can be checked and fixed automatically; no need to alert the user.
 -- 9) ASSETNAME is not required, but if it provided is it should not be an empty string
 --    This can be checked and fixed automatically; no need to alert the user.
---    Must use proper case - can only check for all upper or all lower case
-select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_LN_evw where ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI
+--    Must use proper case - can only check for all upper or all lower case; Ignore names less than 6 characters
+select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_LN_evw where  len(ASSETNAME) > 5 AND (ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI)
 union all
 -- 10) ASSETALTNAME is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
 -- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
+--     Must use proper case - can only check for all upper or all lower case; Ignore names less than 6 characters
+select OBJECTID, 'Error: MAPLABEL must use proper case' as Issue, NULL from gis.AKR_ASSET_LN_evw where len(MAPLABEL) > 5 AND (MAPLABEL = upper(MAPLABEL) Collate Latin1_General_CS_AI or MAPLABEL = lower(MAPLABEL) Collate Latin1_General_CS_AI)
+union all
 -- 12) ASSETTYPE must be in DOM_ASSETTYPE.
 select t1.OBJECTID, 'Error: ASSETTYPE is required' as Issue, NULL from gis.AKR_ASSET_LN_evw as t1
        where t1.ASSETTYPE is null or t1.ASSETTYPE = ''
@@ -1368,11 +1374,14 @@ select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	  OR right(FEATUREID,1) <> '}'
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
 union all
+-- TODO: Fix for points (aggregate area will always be zero)
+/*
 select OBJECTID, 'Error: Features with the same FEATUREID are not close to each other' as Issue, 'FEATUREID = ''' + FEATUREID + '''' as Details
   from gis.AKR_ASSET_PT_evw where featureid in 
   (select FEATUREID from gis.AKR_ASSET_PT_evw group by FEATUREID having count(*) > 1 and
    geometry::ConvexHullAggregate(Shape).STArea()/geometry::CollectionAggregate(Shape).STArea() > 10)
 union all
+*/
 -- 4) MAPMETHOD is required free text; AKR applies an additional constraint that it be a domain value
 select OBJECTID, 'Warning: MAPMETHOD is not provided, default value of *Unknown* will be used' as Issue, NULL from gis.AKR_ASSET_PT_evw where MAPMETHOD is null or MAPMETHOD = ''
 union all
@@ -1398,13 +1407,16 @@ union all
 --    This can be checked and fixed automatically; no need to alert the user.
 -- 9) ASSETNAME is not required, but if it provided is it should not be an empty string
 --    This can be checked and fixed automatically; no need to alert the user.
---    Must use proper case - can only check for all upper or all lower case
-select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_PT_evw where ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI
+--    Must use proper case - can only check for all upper or all lower case; Ignore names less than 6 characters
+select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_PT_evw where  len(ASSETNAME) > 10 AND (ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI)
 union all
 -- 10) ASSETALTNAME is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
 -- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
+--     Must use proper case - can only check for all upper or all lower case; Ignore names less than 6 characters
+select OBJECTID, 'Error: MAPLABEL must use proper case' as Issue, NULL from gis.AKR_ASSET_PT_evw where len(MAPLABEL) > 5 AND (MAPLABEL = upper(MAPLABEL) Collate Latin1_General_CS_AI or MAPLABEL = lower(MAPLABEL) Collate Latin1_General_CS_AI)
+union all
 -- 12) ASSETTYPE must be in DOM_ASSETTYPE.
 select t1.OBJECTID, 'Error: ASSETTYPE is required' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
        where t1.ASSETTYPE is null or t1.ASSETTYPE = ''
@@ -1545,9 +1557,6 @@ union all
 select t1.OBJECTID, 'Error: FACLOCID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 left join
   dbo.FMSSExport as t2 on t1.FACLOCID = t2.Location where t1.FACLOCID is not null and t1.FACLOCID <> '' and t2.Location is null
 union all
-select OBJECTID, 'Error: All records with the same FACLOCID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_PT_evw where FACLOCID in (
-    select FACLOCID from (select FACLOCID from gis.AKR_ASSET_PT_evw where FACLOCID is not null and FEATUREID is not null group by FEATUREID, FACLOCID) as t group by FACLOCID having count(*) > 1)
-union all
 -- 26) FACASSETID is optional free text, provided it must match a Parking Lot Location in the FMSS Assets Export
 --     All records with the same FACASSETID must have the same FEATUREID
 select t1.OBJECTID, 'Error: FACASSETID is not a valid ID' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 left join
@@ -1556,9 +1565,6 @@ union all
 select t1.OBJECTID, 'Error: FACASSETID.Location does not match FACLOCID' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1 join
   dbo.FMSSExport_Asset as t2 on t1.FACASSETID = t2.Asset join
   dbo.FMSSExport as t3 on t2.Location = t3.Location and t1.UNITCODE = t3.PARK where t1.FACLOCID <> t3.Location
-union all
-select OBJECTID, 'Error: All records with the same FACASSETID must have the same FEATUREID' as Issue, NULL from gis.AKR_ASSET_PT_evw where FACASSETID in (
-    select FACASSETID from (select FACASSETID from gis.AKR_ASSET_PT_evw where FACASSETID is not null and FEATUREID is not null group by FEATUREID, FACASSETID) as t group by FACASSETID having count(*) > 1)
 union all
 -- 27) ASSETCODE must be in DOM_ASSETCODE; if FACLOCID OR FACASSETID is provided this should match a valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: ASSETCODE is not a recognized value' as Issue, NULL from gis.AKR_ASSET_PT_evw as t1
@@ -1688,13 +1694,16 @@ union all
 --    This can be checked and fixed automatically; no need to alert the user.
 -- 9) ASSETNAME is not required, but if it provided is it should not be an empty string
 --    This can be checked and fixed automatically; no need to alert the user.
---    Must use proper case - can only check for all upper or all lower case
-select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_PY_evw where ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI
+--    Must use proper case - can only check for all upper or all lower case; Ignore names less than 6 characters
+select OBJECTID, 'Error: ASSETNAME must use proper case' as Issue, NULL from gis.AKR_ASSET_PY_evw where  len(ASSETNAME) > 5 AND (ASSETNAME = upper(ASSETNAME) Collate Latin1_General_CS_AI or ASSETNAME = lower(ASSETNAME) Collate Latin1_General_CS_AI)
 union all
 -- 10) ASSETALTNAME is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
 -- 11) MAPLABEL is not required, but if it provided is it should not be an empty string
 --     This can be checked and fixed automatically; no need to alert the user.
+--     Must use proper case - can only check for all upper or all lower case; Ignore names less than 6 characters
+select OBJECTID, 'Error: MAPLABEL must use proper case' as Issue, NULL from gis.AKR_ASSET_PY_evw where len(MAPLABEL) > 5 AND (MAPLABEL = upper(MAPLABEL) Collate Latin1_General_CS_AI or MAPLABEL = lower(MAPLABEL) Collate Latin1_General_CS_AI)
+union all
 -- 12) ASSETTYPE must be in DOM_ASSETTYPE.
 select t1.OBJECTID, 'Error: ASSETTYPE is required' as Issue, NULL from gis.AKR_ASSET_PY_evw as t1
        where t1.ASSETTYPE is null or t1.ASSETTYPE = ''
@@ -3451,6 +3460,7 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 CREATE VIEW [dbo].[QC_ISSUES_ROADS_LN] AS select I.Issue, I.Details, D.* from  gis.ROADS_LN_evw AS D
 join (
@@ -5919,7 +5929,7 @@ BEGIN
     merge into gis.ROADS_FEATURE_PT_evw as t1 using 
       (
         SELECT p.GEOMETRYID AS POINTID, LINEID
-        FROM gis.roads_feature_pt AS p
+        FROM gis.roads_feature_pt_evw AS p
         CROSS APPLY (
             SELECT TOP 1 GEOMETRYID AS LINEID
             FROM gis.ROADS_LN_evw AS l
