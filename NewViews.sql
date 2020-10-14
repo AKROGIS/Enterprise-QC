@@ -3821,7 +3821,8 @@ select oid, 'Error: Road length in GIS is more than 20% different from FMSS' as 
 'Location ' + FACLOCID + ' is ' + convert(nvarchar(200),t1.miles) + ' miles in GIS, but ' + convert(nvarchar(200),t2.miles) + ' miles in FMSS (' + convert(nvarchar(200),100*(t1.miles - t2.miles)/ t2.miles) + '%)' as Details
   from (select min(objectid) as oid, FACLOCID, sum(GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) * 0.000621371 as miles from gis.ROADS_LN_evw where faclocid is not null group by FACLOCID) as t1
   join (select Location, convert(real, Qty) as miles from FMSSExport where UM = 'mi') as t2 on t1.FACLOCID = t2.Location
-  where abs(t1.miles - t2.miles)/ t2.miles > 0.2
+  -- In Oct 2020, I noticed that several dozen FMSS records had the length truncated (not rounded) to 1 digit after the decimal, we'll do the same now.
+  where (t2.miles = 0 AND t2.miles <> round(t1.miles,1,1)) OR (t2.miles <> 0 AND abs(t1.miles - t2.miles) > 0.1 AND  abs(t1.miles - t2.miles)/t2.miles > 0.2)
 union all
 select OBJECTID, 'Warning: Road segment is shorter than 10 meters' as Issue,
   'Length = ' + convert(nvarchar(200),GEOGRAPHY::STGeomFromText(shape.STAsText(),4269).STLength()) + ' meters' as Details
