@@ -1,4 +1,15 @@
-﻿SELECT * FROM FMSSExport
+﻿-- These queries summarize the data imported from the FMSS databases
+-- and compare it to data in our enterprise GIS databases.
+-- These queries were developed and used during the development
+-- of our facilities2 SDE database.
+-- Some of the queries can be used to correct "broken" data in
+-- the GIS database.
+
+-- WARNING: This file is not intended to be run as a single script.
+-- useful lines (or sections) should be highlighted and run in SSMS
+-- or Azure Data Studio as needed.
+
+SELECT * FROM FMSSExport
 -- Standard Requirements (pg 10)
 -- FACLOCID
 SELECT Location, Count(*) FROM FMSSExport group by Location order by location
