@@ -53,7 +53,7 @@ Data Quality Improvements (Team):
 
 Issues to discuss (Team):
 -------------------------
-(See 'TODO's in [SQL code](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/NewViews.sql) for additional details on these issues)
+(See 'TODO's in [SQL code](https://github.com/AKROGIS/Enterprise-QC/blob/master/NewViews.sql) for additional details on these issues)
 * Define FEATUREID (What is a feature? Can this be a foriegn key?)
 * Are there any attributes that should be consistent for all segments of a feature?
 * Review UNITCODE QC/calculations: Spatial v. DOM v. FMSS?
@@ -66,7 +66,7 @@ Issues to discuss (Team):
   users; what good is 'Arbitrary line'?. Regardless, we should filter for 'Center line' in
   the layer definition query, or create a separate dataset for LINETYPE != 'Center line'
 * Review schema changes to TRAILS_LN
-  - TRLSTATUS: Consider removing 'Not Applicable', 'Unknown', and 'Abandoned'  
+  - TRLSTATUS: Consider removing 'Not Applicable', 'Unknown', and 'Abandoned'
     (use decommissioned instead) to match domain of roads/buildings
   - Renamed: TRLUSE_SOCIALTRL, TRLUSE_ANIMALTRL to TRLISSOCIAL, TRLISANIMAL
   - Removed: TRLUSE_OTHER (Y/N), TRLUSE_UNKNOWN (Y/N)

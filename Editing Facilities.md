@@ -1,7 +1,7 @@
 Updating the Facilities GIS
 ===========================
 
-_[The master copy of this document can be found at https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md]_
+_[The master copy of this document can be found at https://github.com/AKROGIS/Enterprise-QC/blob/master/Editing%20Facilities.md]_
 
 The Alaska Region facilities GIS lives in SDE on INPAKROVMAIS
 in the akr_acility2 SQL Server database.
@@ -9,23 +9,23 @@ Updates are controlled by the regional GIS data manager (DM)
 and go through a rigorous quality control (QC) process.
 In general the following process is applied:
 
-1) [User edits a new version](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#user-editing)
-2) [DM reviews the version](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#dm-review)
-3) [DM updates from FMSS](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#fmss-update)
-4) [DM runs QC checks](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#quality-check)
-5) [DM/User address QC Issues](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#quality-control-fixes)
+1) [User edits a new version](./Editing%20Facilities.md#user-editing)
+2) [DM reviews the version](./Editing%20Facilities.md#dm-review)
+3) [DM updates from FMSS](./Editing%20Facilities.md#fmss-update)
+4) [DM runs QC checks](./Editing%20Facilities.md#quality-check)
+5) [DM/User address QC Issues](./Editing%20Facilities.md#quality-control-fixes)
 6) Repeat steps 4 and 5 as needed
-7) [DM calculates fields](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#calculate-fields)
-8) [DM posts to default](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#post-to-default)
-9) [DM Updates Metadata](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#update-metadata)
-9) [DM publishes copy to PDS](https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Editing%20Facilities.md#publish-to-pds)
+7) [DM calculates fields](./Editing%20Facilities.md#calculate-fields)
+8) [DM posts to default](./Editing%20Facilities.md#post-to-default)
+9) [DM Updates Metadata](./Editing%20Facilities.md#update-metadata)
+9) [DM publishes copy to PDS](./Editing%20Facilities.md#publish-to-pds)
 
 This document does not cover bulk updates with new data, such as a
 new trail data collection effort.  It also does not cover updating
 the facilities web application
-(see https://github.com/regan-sarwas/Building-QC/tree/master/Photo%20Processing/scripts)
+(see https://github.com/AKROGIS/Facility-Processing/tree/master/Photo%20Processing/scripts)
 or facility related photo processing
-(see https://github.com/regan-sarwas/Building-QC/tree/master/Photo%20Processing)
+(see https://github.com/AKROGIS/Facility-Processing/tree/master/Photo%20Processing)
 
 User Editing
 ------------
@@ -83,7 +83,7 @@ FMSS Update
 Until such time as the FMSS tables (**dbo.FMSSExport** and **dbo.FMSSExport_Asset**)
 can be automatically updated nightly, the DM must update them manually.
 Instructions for doing this are at
-https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/FMSS%20Export%20instructions.txt
+https://github.com/AKROGIS/Enterprise-QC/blob/master/FMSS%20Export%20instructions.txt
 and take about 1 hour to complete if you are familiar with the process.
 This process will update the FMSS tables in SDE with the latest updates
 in the master tables of FMSS.
@@ -108,7 +108,7 @@ before additional processing can occur.
 Quality Check
 -------------
 The DM edits and runs a SQL script
-(https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Do%20Quality%20Control%20Checks.sql)
+(https://github.com/AKROGIS/Enterprise-QC/blob/master/Do%20Quality%20Control%20Checks.sql)
 to check the changes to a given feature class.  The script can
 be run on all feature classes, but only needs to be run on the
 feature classes with changes (as identified in the DM Review section
@@ -166,7 +166,7 @@ and _Feature_class_ attributes cannot be empty.
 Calculate Fields
 ----------------
 The DM edits and runs a SQL script
-(https://github.com/regan-sarwas/Building-QC/blob/master/New%20Schema%20Migration/Do%20Calculation.sql)
+(https://github.com/AKROGIS/Enterprise-QC/blob/master/Do%20Calculation.sql)
 to calculate missing values and correct and make other minor
 corrections like replacing empty or all space strings with null.
 This script must be run against the user's version, and it will
@@ -233,7 +233,7 @@ short order.  However the user will not be able to see
 their hard work in Theme Manager until this step is done.
 
 Instructions are at
-https://github.com/regan-sarwas/pds-reorg/blob/master/Facility-Sync/Instructions.txt,
+https://github.com/AKROGIS/PDS-Data-Management/blob/master/Facility-Sync/Instructions.txt,
 and the script is in the same folder.
 This process takes less than 15 minutes when familiar
 with the process.
