@@ -97,13 +97,12 @@ the issue go away.
 
 The FMSS tables are not versioned and they will effect the QC results
 for all versions including `DEFAULT`.  After the FMSS tables have been
-updated  A complete QC check must be done against`DEFAULT`.  If there
+updated  A complete QC check must be done against `DEFAULT`.  If there
 are issues (they must be new and due to recent changes in the FMSS data),
-they need to be corrected in a new maintenance version.
-That version should be QC checked following this same process and then
-posted to `DEFAULT`.
-The user's version then needs to reconciled with the updated `DEFAULT`
-before additional processing can occur.
+they need to be corrected in a new maintenance version. That version should
+be QC checked following this same process and then posted to `DEFAULT`. The
+user's version then needs to reconciled with the updated `DEFAULT` before
+additional processing can occur.
 
 
 ## Quality Check
@@ -245,8 +244,8 @@ especially if there are additional updates pending in
 short order.  However the user will not be able to see
 their hard work in Theme Manager until this step is done.
 
-Instructions are at
-https://github.com/AKROGIS/PDS-Data-Management/blob/master/Facility-Sync/Instructions.txt,
-and the script is in the same folder.
+[Instructions](https://github.com/AKROGIS/PDS-Data-Management/blob/master/Facility-Sync/Instructions.md)
+and a script are in the Facility-Sync folder of the
+[PDS Data Management](https://github.com/AKROGIS/PDS-Data-Management/blob/master/Facility-Sync).
 This process takes less than 15 minutes when familiar
 with the process.
