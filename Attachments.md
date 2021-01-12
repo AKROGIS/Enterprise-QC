@@ -1,6 +1,8 @@
 Facility Attachments
 ====================
-This information is supplemental to the Appendix in the NPS Building Spatial Data Standard, dated 2018-04-10 (https://ir.sharepoint.nps.gov/GIS/DataMgmt/StandardsDocs/Buildings/NPS_BuildingSpatialDataStandard.pdf).
+This information is supplemental to the Appendix in the NPS Building Spatial Data Standard, dated 2018-04-10
+(https://ir.sharepoint.nps.gov/GIS/DataMgmt/StandardsDocs/Buildings/NPS_BuildingSpatialDataStandard.pdf)
+[Internal to NPS].
 
 AKR_ATTACH
 ----------
