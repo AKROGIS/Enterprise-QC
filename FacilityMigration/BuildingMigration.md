@@ -1,22 +1,27 @@
-in ArcCatalog
- * ArcToolbox -> Data Management Tools -> Geodatabase Administration -> Create Enterprise Geodatabase
-   * this will create the database, and the SDE user
-   * See T:\GIS\PROJECTS\AKR\ArcSDE Deployment\Guidance Documents\Create Enterprise Geodatabase.png for details
-   * browse to Authorization file (\\inpakrovmXXX\c$\Program Files\ESRI\License<release#>\sysgen
+# Migrate Buildings
+
+Notes and design concepts for migrating the Alaska Region buildings database
+from the old data standard to the new data standard.
+
+## Build the database
+
+* In ArcCatalog
+  * ArcToolbox -> Data Management Tools -> Geodatabase Administration -> Create Enterprise Geodatabase
+    * this will create the database, and the SDE user
+    * See T:\GIS\PROJECTS\AKR\ArcSDE Deployment\Guidance Documents\Create Enterprise Geodatabase.png for details
+    * browse to Authorization file (\\inpakrovmXXX\c$\Program Files\ESRI\License<release#>\sysgen
      or \\inpakrovmgis\transfer\keycodes or T:\GIS\PROJECTS\AKR\ArcSDE Deployment\keycodes
-in SSMS
- * Create a new database user gis with login gis and schema gis
- * make this user members for th db_datareaders, db_datawriters, and db_ddladmins
-in ArcCatalog
- * create a new database connection with GIS
- * right click import multiple.. and copy feature classes from old to new
- * Add/edit permissions (new should be same as old)
- * Enable archiving, versioning, editor tracking on the following feature classes
+* In SSMS
+  * Create a new database user gis with login gis and schema gis
+  * make this user members for th db_datareaders, db_datawriters, and db_ddladmins
+* In ArcCatalog
+  * create a new database connection with GIS
+  * right click import multiple.. and copy feature classes from old to new
+  * Add/edit permissions (new should be same as old)
+  * Enable archiving, versioning, editor tracking on the following feature classes
 
 Create server logins & database users (sde, gis, akr_editor_web, akr_reader_web, nps\Domain Users)
 Create windows logins & database users for domain accts (abaltensperger, bjsorbel, jjcusik, jsrose, resarwas, alsouthwould, smdevenny)
-
-
 
 ## Building QC
 
@@ -27,9 +32,12 @@ the following attributes must be the same for all `BUILDINGID`s (all point types
 Edit building centroids (has all attributes).  Each structure must have one and only one centroid.
 A building may have other building points
 
-I Propose AKR_BLDG_pt and AKR_BLDG_py are not editable views build from the following tables
-      (could be a table, built whenever posting to default, if view is too slow)
-      
+## New Tables
+
+I propose that `AKR_BLDG_pt` and `AKR_BLDG_py` are not tables, but editable views
+built from the following tables. (They could be tables that are built whenever
+posting to default, if view is too slow.)
+
 ```
   AKR_BLDG_center_pt     (pointtype == 'Center point')
   AKR_BLDG_other_pt      (pointtype != 'Center point'; not null)
@@ -39,8 +47,10 @@ I Propose AKR_BLDG_pt and AKR_BLDG_py are not editable views build from the foll
 
 ## `AKR_BLDG_center_pt`
 
-has all the attributes of AKR_BLDG_pt/py.  These attributes are only in the center_pt feature class, and apply
-to all features that share a common FEATUREID
+This table has all the shared attributes of `AKR_BLDG_pt` and `AKR_BLDG_py`.
+These attributes are only in the `AKR_BLDG_center_pt` feature class, and apply
+to all features that share a common `FEATUREID`.  In the following table
+`o` is for optional, `c` is for calculated, and `*` is for required.
 
 ```
     bldgname       o (optional free text)
@@ -77,6 +87,10 @@ to all features that share a common FEATUREID
 ``` 
 
 ## `AKR_BLDG_*`
+
+These features have distinct geometry from the building center point, and only
+have attributes related to that distinct geometry.  All shared building
+attributes are obtained by joining to `AKR_BLDG_center_pt` on the `FEATUREID`.
 
 ```
     objectid           (esri managed)
