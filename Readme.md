@@ -1,17 +1,17 @@
 Enterprise Database QC Tools
 ============================
 
-This repo contains tools and instructions for maintaining the integrity
-of the Alaska Region enterprise geospatial databases. These are in esri 
-geodatabases with the esri Spatial Database Engine (SDE) model.
+This repository contains tools and instructions for maintaining the integrity
+of the Alaska Region's enterprise geospatial databases. These are esri 
+geodatabases within the Spatial Database Engine (SDE).
 
-The contents of this repository are described below
+The contents of this repository are described below.
 
 ## Attachments.md
 
 The [Attachments](./Attachments.md) document describes the AKR additions to the
-NPS Data Standard for the attachments tables (AKR_ATTACH and AKR_ATTACH_PT) in
-the facilities database.
+NPS Data Standard for the attachments tables (`AKR_ATTACH` and `AKR_ATTACH_PT`)
+in the facilities database.
 
 ## Facility Migration
 
@@ -29,9 +29,9 @@ database, as well as tools (SQL scripts) for managing this workflow.  See the
 ## Facility Analysis
 
 SQL Scripts for manually checking for unusual issues in the facilities database.
-These are typically issues that cannot checked or corrected with more
-automated Quality Control tools in the Facility Editing folder.  This folder
-also contains some of list of outstanding issues (as CSV files).
+These are typically issues that cannot be checked or corrected with the
+standard Quality Control tools in the Facility Editing folder.  This folder
+also contains some lists of outstanding issues (as CSV files).
 
 ## FMSS Export
 
