@@ -1,3 +1,6 @@
+-- Selects buildings in FMSS that have less than one photo, and those for which
+-- the photos are older than 10 years.
+
 select f.PARK, COALESCE(g.cnt, 0) as Count, g.newest as Age, f.Location, f.description
 FROM akr_facility2.dbo.FMSSExport as f
 left JOIN
