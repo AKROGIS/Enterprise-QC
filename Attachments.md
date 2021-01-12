@@ -6,7 +6,7 @@ This information is supplemental to the Appendix in the NPS Building Spatial Dat
 
 AKR_ATTACH
 ----------
-This non-spatial table is for supplemental information (photos, pdfs, web pages, etc.)
+This non-spatial table is for supplemental information (photos, PDFs, web pages, etc.)
 documenting other spatial facility records.  These attachments do not have an explicit
 location of their own, rather they can be used with any (or all) location(s) of any
 facility in the database.

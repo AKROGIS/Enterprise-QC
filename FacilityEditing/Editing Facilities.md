@@ -6,7 +6,7 @@ Relative paths in this document can be found in the
 [Enterprise-QC repository](https://github.com/AKROGIS/Enterprise-QC/blob/master/FacilityEditing)_
 
 The Alaska Region facilities GIS lives in SDE on `INPAKROVMAIS`
-in the `akr_acility2` SQL Server database.
+in the `akr_facility2` SQL Server database.
 Updates are controlled by the regional GIS data manager (DM)
 and go through a rigorous quality control (QC) process.
 In general the following process is applied:

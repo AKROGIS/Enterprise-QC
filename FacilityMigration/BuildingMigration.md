@@ -18,23 +18,31 @@ Create windows logins & database users for domain accts (abaltensperger, bjsorbe
 
 
 
-Building QC
-geometryID is non-null, unique and wellformed for all pts and polys
-buildingid is non-null and unique for all "spatial locations", however all point_types and polys that represent a single structure must have the same id
-the following attributes must be the same for all buildingids (all point types, polys
+## Building QC
+
+geometryID is non-null, unique and well formed for all pts and polys
+`BUILDINGID` is non-null and unique for all "spatial locations", however all point_types and polys that represent a single structure must have the same id
+the following attributes must be the same for all `BUILDINGID`s (all point types, polys)
 
 Edit building centroids (has all attributes).  Each structure must have one and only one centroid.
 A building may have other building points
 
 I Propose AKR_BLDG_pt and AKR_BLDG_py are not editable views build from the following tables
       (could be a table, built whenever posting to default, if view is too slow)
+      
+```
   AKR_BLDG_center_pt     (pointtype == 'Center point')
   AKR_BLDG_other_pt      (pointtype != 'Center point'; not null)
   AKR_BLDG_footprint_py  (polygontype == 'Perimeter polygon')
   AKR_BLDG_other_py      (polygontype != 'Perimeter polygon'; not null)
+```
 
-  AKR_BLDG_center_pt - has all the attributes of AKR_BLDG_pt/py.  These attributes are only in the center_pt feature class, and apply
-             to all features that share a common FEATUREID
+## `AKR_BLDG_center_pt`
+
+has all the attributes of AKR_BLDG_pt/py.  These attributes are only in the center_pt feature class, and apply
+to all features that share a common FEATUREID
+
+```
     bldgname       o (optional free text)
     bldgaltname    o (optional free text)
     maplabel       o (optional free text)
@@ -66,9 +74,11 @@ I Propose AKR_BLDG_pt and AKR_BLDG_py are not editable views build from the foll
     cliid          o (if faclocid is non-null then populated from FMSS_Export.LocationSpecTemplate.CLINO)
     lcsid          o (if faclocid is non-null then populated from FMSS_Export.LocationSpecTemplate.CLASSSTR)
     firebldgid     o (optional foreign key to fire database)
-    
+``` 
 
-  AKR_BLDG_*
+## `AKR_BLDG_*`
+
+```
     objectid           (esri managed)
     createdate/user    (esri managed)
     editdate/user      (esri managed)
@@ -83,5 +93,5 @@ I Propose AKR_BLDG_pt and AKR_BLDG_py are not editable views build from the foll
     sourcedate	     o (optional null or valid date managed by user)
     notes            o (nullable free text)
     webuser/comment  o (only expose to web editors ? - revisit with enterprise editing workflow)
-
+```
     
