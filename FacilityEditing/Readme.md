@@ -12,7 +12,7 @@
 
 ## Editing Facilities
 
-This [document](./Editing Facilities.md)
+This [document](./Editing%20Facilities.md)
 describes the workflow for getting changes published in
 `DEFAULT`.
 

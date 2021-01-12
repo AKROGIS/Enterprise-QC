@@ -238,7 +238,7 @@ with the `SQL Server Import` extension.
 
 ## SQL Server Processing
 
-Open `fmss_import.sql` in SSMS or Azure Data Studio.  Highlight the code
+Open `Make_FMSSExport.sql` in SSMS or Azure Data Studio.  Highlight the code
 for each step below and run.  Do not run the whole file at once, as that can
 make it very difficult to troubleshoot and recover from any errors.
 

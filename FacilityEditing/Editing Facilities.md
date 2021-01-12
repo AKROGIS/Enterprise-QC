@@ -1,7 +1,10 @@
 Updating the Facilities GIS
 ===========================
 
-_[The master copy of this document can be found at https://github.com/AKROGIS/Enterprise-QC/blob/master/FacilityEditing/Editing%20Facilities.md]_
+_The master copy of this document can be found at
+https://github.com/AKROGIS/Enterprise-QC/blob/master/FacilityEditing/Editing%20Facilities.md.
+Relative paths in this document can be found in the
+[Enterprise-QC repository](https://github.com/AKROGIS/Enterprise-QC/blob/master/FacilityEditing)_
 
 The Alaska Region facilities GIS lives in SDE on INPAKROVMAIS
 in the akr_acility2 SQL Server database.
@@ -81,10 +84,9 @@ and then reimporting the features.
 FMSS Update
 -----------
 Until such time as the FMSS tables (**dbo.FMSSExport** and **dbo.FMSSExport_Asset**)
-can be automatically updated nightly, the DM must update them manually.
-Instructions for doing this are at
-https://github.com/AKROGIS/Enterprise-QC/blob/master/FMSS%20Export%20instructions.txt
-and take about 1 hour to complete if you are familiar with the process.
+can be automatically updated nightly, the DM must update them manually with
+these [instructions](../FMSSExport/FMSS%20Export%20instructions.md).
+The process takes about 1 hour to complete if you are familiar with it.
 This process will update the FMSS tables in SDE with the latest updates
 in the master tables of FMSS.
 
@@ -107,8 +109,7 @@ before additional processing can occur.
 
 Quality Check
 -------------
-The DM edits and runs a SQL script
-(https://github.com/AKROGIS/Enterprise-QC/blob/master/Do%20Quality%20Control%20Checks.sql)
+The DM edits and runs a [SQL script](./Do%20Quality%20Control%20Checks.sql)
 to check the changes to a given feature class.  The script can
 be run on all feature classes, but only needs to be run on the
 feature classes with changes (as identified in the DM Review section
@@ -165,8 +166,7 @@ and _Feature_class_ attributes cannot be empty.
 
 Calculate Fields
 ----------------
-The DM edits and runs a SQL script
-(https://github.com/AKROGIS/Enterprise-QC/blob/master/Do%20Calculation.sql)
+The DM edits and runs a [SQL script](./Do%20Calculation.sql)
 to calculate missing values and correct and make other minor
 corrections like replacing empty or all space strings with null.
 This script must be run against the user's version, and it will
