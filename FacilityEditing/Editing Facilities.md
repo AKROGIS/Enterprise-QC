@@ -1,7 +1,7 @@
 Updating the Facilities GIS
 ===========================
 
-_[The master copy of this document can be found at https://github.com/AKROGIS/Enterprise-QC/blob/master/Editing%20Facilities.md]_
+_[The master copy of this document can be found at https://github.com/AKROGIS/Enterprise-QC/blob/master/FacilityEditing/Editing%20Facilities.md]_
 
 The Alaska Region facilities GIS lives in SDE on INPAKROVMAIS
 in the akr_acility2 SQL Server database.
