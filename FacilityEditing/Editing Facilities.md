@@ -114,12 +114,18 @@ be run on all feature classes, but only needs to be run on the
 feature classes with changes (as identified in the DM Review section
 above).  Some feature classes, like
 attachments, run fairly quickly (a few seconds), while trails
-takes several minutes to run.
+takes several minutes to run.  It is important to also check related features,
+i.e. removing a trail may result in a QC issue in the trail_attributes.
 
 This script must be run against the user's version.
 There are comments in the script to help the DM edit the script
 for the version at hand.  There is no need to save the edits.
 The bulk of the QC logic is in saved views in the database.
+
+The DM should reconcile (pull changes from `DEFAULT` into the version) before
+running the quality control check to avoid spurious errors that are not
+caused by the user's edits, but because the version is out of date with
+other changes in `DEFAULT`.
 
 
 ## Quality Control Fixes
@@ -197,6 +203,14 @@ process, then this script must be run again.
 This script can be run repeatedly without concern.  When in doubt,
 run this script one final time after all changes are made and the QC
 check comes back clean.
+In general, an attribute will only be calculated if the value is null (or
+empty) an existing value that is different than what the calculated value
+would be will result in a QC issue needing resolution. 
+
+This query must be run on any edited feature classes in a version being QC
+checked to ensure there are not missing attributes. The QC check is often
+silent on missing values (i.e. `GEOMETRYID`) when it expect that this script
+will provide the missing values.
 
 
 ## Post To DEFAULT
