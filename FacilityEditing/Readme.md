@@ -35,14 +35,14 @@ only the tables, etc used for the calculated fields and qualtiy control.
 ## `Potential_QC_Checks.sql`
 
 These are queries that were considered for inclusion in the queries called by
-`Do Quality Control Checks.sql`.  However they are either:
+`Do Quality Control Checks.sql`.  However they were not included because:
 
-1) result in an overwhelming number of issues that would need to be researched
-   and edited in order to get a clean database.
-2) there is no requirement in the standard, when maybe an AKR requirement might
-   be nice to have.
-3) It is not clear how (or even if we can) define our requirements (i.e. a
-   spatial identification for `GROUPCODE`)
+* They result in an overwhelming number of issues that would need to be researched
+  and edited in order to get a clean database.
+* There is no requirement in the standard, but maybe there should be an AKR
+  requirement.
+* It is not clear how (or even if we can) define our requirements (i.e. a
+  spatial identification for `GROUPCODE`).
 
 ## Editing Facilities
 
