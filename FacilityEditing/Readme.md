@@ -32,6 +32,10 @@ for instructions on recreating this file whenever the schema in the database
 is changed.  **NOTE:** this file does not track changes to the feature classes
 only the tables, etc used for the calculated fields and qualtiy control.
 
+Other tools in this folder assume that the facilities database has the database
+objects (functions, stored procedures, etc) declared in this file.  This file
+could be executed in a new database to create the necessary database objects.
+
 ## `Potential_QC_Checks.sql`
 
 These are queries that were considered for inclusion in the queries called by
