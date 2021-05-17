@@ -7,6 +7,10 @@ comments in the individual script files which might provide additional details.
 
 They contain CSV lists of issues as described in the folder and file names.
 
+## `DENA_Trail_Asset_Analysis.sql`
+
+Queries for comparing GIS to FMSS for the trail side features in Denali.
+
 ## `FMSS-GIS_Check_and_Fix.sql`
 
 These queries summarize the data imported from the FMSS databases and compare

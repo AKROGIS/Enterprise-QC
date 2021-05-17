@@ -1,0 +1,105 @@
+ASSET Descriptions
+==================
+
+There are several assets where the trail name (in the asset description) does not match the trail name in the Location description.
+❌ Concern is that some Assets may be under the wrong location, e.g. Some Savage Alpine (19980) wall assets may be under 19970 (Roadside).
+See the attached CSV file (from this SQL) for details.
+
+--Report: DENA trail name in asset description does not match name in location description
+select a.asset, a.[Description], a.location, f.DESCRIPTION as [location Description] from FMSSExport_Asset as a join FMSSExport as f on a.[Location] = f.[Location]
+where f.Park = 'DENA'  AND f.Asset_Code = '2100' and a.[Description] not like '%' + f.DESCRIPTION + '%'
+and a.asset <> '583085%'
+and a.asset in (1494138,1502607,1492737,1492736,1492735,1494129,1494119,1494120,1494121,1494122,1494123,1494124,1494125,1494126,1494127,1494129)
+order by f.location, a.asset
+
+
+Photo QC
+========
+
+All Photo files have a point in the DENA_AllPhotos feature class.
+All features (1222) in DENA_feat align with a feature in SDE features.
+There are more features in SDE features than in DENA_feat.
+ - Check for extra features on the trails mapped in 2015, and delete extras
+
+There are 1222 features (collected in 2015), but only 1203 (file and location),
+so I would expect 19 features to not have a photo.
+A spatial query reveals that there are 63 features without a photo.  What happened?
+
+✔  Oxbow trail (103121) has 3 features, 0 photos, and spatially 3 features do not have a photo
+✔  HQ trail (111187) has 6 features, 6 photos, but spatially 1 feature does not have a photo
+   - found 1 dup ✔
+   - The south trail end has two photos 12:09:48 and 12:15:58. 
+   - The second photo belongs on the Kennels 19970 trail head feature @12:15:56 without a photo
+   - Sign at north end has no photo (It is on the trail end of the Kennel Trail)
+   - FIXED: Moved dup to Kennel folder/feature
+✔  Mountain Vista Trail (113057) has 32 features, 32 photos, but spatially 9 features do not have a photo
+   - Found 8 dups ✔
+   - Typically there are adjacent to the feature missing the photo
+   - At time 1:13:4x, there are two nearly identical photos of the same sign (one is blurry)
+   - There is no photo of the trail end (it is a missing photo point with no nearby dup)
+   - The geojot report says there is no GPS point for the knack box (food locker), this is not true.
+   - FIXED: Moved 8 dups to adjacent features without photo; deleted blurry photo
+✔  Healy Overlook trail (19975) has 78 features, 78 photos, but spatially 1 feature does not have a photo
+   - found 1 dup ✔
+   - The next feature (downhill) has two different photos on it.
+   - FIXED: Moved dup to adjacent featurs without photo
+✔  Savage Cabin Interpretive Trail (19977) has 25 features, 25 photos, and spatially 3 features do not have a photo
+   - found 3 dups ✔
+   - Two photos (sign and culvert) were put the sign, the culvert point is very close, @ 3:08:04 (West access point)
+   - Two culvert photos were put on the East culvert, an none on the west culvert @ time 3:20 (middle north side of loop)
+   - Two photos were put on the SE feature leaving the NW feature sans photo; @ 3:34 intersection of roadside trail.
+   - FIXED: Moved 3 dups to adjacent features without photo
+✔  Savage Canyon Trail (19978) has 112 features, 110 photos, and spatially 2 features do not have a photo
+   - There are indeed two photos missing near the east parking lot; There are no dups.
+   - Photo SAM_520 (I&M signs) not at the right location, needs to move from the trailhead feature to the west
+   - Based on timestamps and photo content, there is no photo for the trailhead @1:19:24
+   - Photo SAM_525 is correct, the feature is a 13 step stair, field crew incorrectly called it a 13 step water bar drain
+   - There is no photo for the 42'x1' wood wall @1:30:36 adjacent to the stairs (SAM_525) - based on timestamps and photo content
+   - I think this is an erroneos feature that should be removed (they thought the side rails for the stairs was a retaining wall)
+   - Report says some photos mis-tagged; does not say any are missing.
+   - FIXED: SAM_520 Moved; incorrect wall feature removed.
+✔  Savage Alpine trail (19980) has 207 features, 209 photos, but spatially 24 features do not have a photo
+   - The west side of the trail, done 8/24 matches well, checking timestamps, count, and content.
+   - The east side (8/25) is a mess.  There are ~24 dups and 1 triple.  This is 26 extra photos (for 24 missing w/ 2 extra)
+   - Time stamps do not match very well, many photos were close in time/location and content is similar.
+   - They were manually reviewed in order taken, with the features in the order collected, and the match was fairly obvious, with the following exceptions:
+   - There is a source photo called SAM_EXTRA between SAM_1643 and SAM_1644 (with an appropriate date taken time).  How does that happen?
+   - Photo SAM_EXTRA is a duplicate of SAM_1641, and is in error, and will be removed.
+   - Photo SAM_1733 @2:15 has no feature. It appears to be a swale in the trail it is just uphill of SAM_1732 (a rock is in both)
+   - A new manual feature should be created for SAM_1733, or both photos added to the same feature, or deleted.
+   - 98 photos SAM_1640 to SAM_1739 (100) minus SAM_1683 and SAM_1732 are assigned to 98 sequential features.
+   - Photo SAM_1683 does not exist; SAM_EXTRA is extra, which matches the 100 photos in the filesystem.
+   - FIXED: All photos on 8/25 reassigned to correct feature, one feature has two photos.
+✔  Kennels Trail (19986) has 15 features, 15 photos, but spatially, 1 feature does not have a photo
+   - found 1 dup ✔
+   - Kennels trail end has two photos; and the trail head is missing a photo.
+   - Kennels photo (19986__7-7-2015 12-50-28 PM.JPG) belongs on the HQ sign feature without a photo.
+   - The extra HQ photo belongs on the Kennels trail head
+   - FIXED: Moved dup to HQ folder/feature
+✔  Blueberry Hill Trail (19989) has 9 features, 8 photos, and spatially 1 feature does not have a photo
+   - One trail end (intermediate access point) does not have a photo (that is correct)
+   - However, there are two nearly identical pictures of the wood walkway near the NW end @12:20 (last two photos).
+   - The NW trail end should have no photo, but it has the wood walk photo attached.
+   - FIXED: move photo of wood walk from trail end to wood walk (feature now has two photos)
+✔  Eielson Alpine Trail (19993) has 62 features, 62 photos, and spatially 1 feature does not have a photo
+   - No photo at 12:16:00 (rock drain near top of trail); no dups nearby.
+   - Photo 19993_469082_8-13-2015 11-16-12 AM.JPG, does not have a REAL GPS location.  It was incorrectly attached to the prior GPS point
+   - FIXED: Created a new feature based on photo and moved photo to feature.
+✔  Savage Roadside Trail (231390) has 10 features, 8 photos, and spatially 2 features do not have a photo
+   - One feature was added manually after the fact and has no photo.
+   - No photo taken at the trail end
+   - GeoJot report says 2 photos are missing.
+✔  Denali bike trail (83277) has 46 features, 31 photos, and spatially 15 features do not have a photo
+   - Note the geojot report says 14 photos are missing, I think that is a typo
+
+
+All of these photo repairs were done in SDE on the ATTACH table, the DENA_AllPhotos working FC is now obsolete.
+
+
+Miscellaneous QC
+================
+
+❌ At intersection of Rock Creek Trail and Meadow View Trail (83278), there are two signs 1494137 (meadow view is not mapped)
+   Not sure it the sign belongs to Rock Creek or Meadow View, and both trails currently GIS matches FMSS (2 signs for Rock Creek, and 1 for Meadow View)
+✔  Remove Mountain vista shelter from trail features (it is a location) - reassign/retag photos.
+❌ Trail 19970 (C Camp to HQ) has been rerouted to stay on the north side of the bridge since 2015 survey.  Fix GIS.
