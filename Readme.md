@@ -2,7 +2,7 @@ Enterprise Database QC Tools
 ============================
 
 This repository contains tools and instructions for maintaining the integrity
-of the Alaska Region's enterprise geospatial databases. These are esri 
+of the Alaska Region's enterprise geospatial databases. These are esri
 geodatabases within the Spatial Database Engine (SDE).
 
 ## Contents
@@ -35,6 +35,10 @@ These are typically issues that cannot be checked or corrected with the
 standard Quality Control tools in the Facility Editing folder.  This folder
 also contains some lists of outstanding issues (as CSV files).
 
+### POI Analysis
+
+SQL Scripts for analyzing the POI database (in akr_socio).
+
 ### FMSS Export
 
 This folder contains instructions and SQL scripts for exporting data from the
@@ -57,12 +61,12 @@ to a local file system.
 ### Python
 
 Before executing a python script, open it in a text editor and check any
-path or file names in the script that should be edited to reflect the 
+path or file names in the script that should be edited to reflect the
 file system where the script and data are deployed.  The script can then
 be run in a CMD/Powershell window, with the
 [IDLE](https://en.wikipedia.org/wiki/IDLE) application,
 with the
-[Python extension to VS Code](https://code.visualstudio.com/docs/languages/python), 
+[Python extension to VS Code](https://code.visualstudio.com/docs/languages/python),
 or any other Python execution environment.
 
 ### SQL Scripts
