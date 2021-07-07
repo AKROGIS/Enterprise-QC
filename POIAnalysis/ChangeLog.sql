@@ -150,4 +150,18 @@ exec sde.edit_version @version3, 2; -- 2 to stop edits
 
 
 
-
+-- Changes to do
+-- 0) Add MapLabel from POI (and history) where bldg.maplabel is null
+-- 1) remove isextant='False'
+-- 2) resolve duplicate FeatureID (remove larger OID)
+-- 3) Write general QC query
+-- 3a) resolve issues
+-- 4) write query for QC comparing facilities to POOI
+-- 4a) resolve issues
+-- 4b) Add POITYPE to bldgs and trail_features
+-- 5) write calcs to update poi for diffs with facilities
+-- 5a) update pois
+-- 6) query for missing and extra POIs
+-- 7) query to create a missing POI
+-- 8) when adding new building w/o POITYPE, raise question do you want to add to POI?
+-- 9) query about changes to public properties and public display (changes that should be reviewed)
