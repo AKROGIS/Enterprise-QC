@@ -197,6 +197,24 @@ merge into gis.TRAILS_FEATURE_PT_evw as b using
        and p.MAPLABEL is not null and b.maplabel is null
     when matched then update set b.MAPLABEL = p.MAPLABEL;
 
+
+-- I need to close out all existing versions before I make the scheme change to akr_facility
+
+-- The KATM version has conflicts due to the recent changes to the MAPLABEL
+select MAPLABEL from akr_facility2.GIS.AKR_BLDG_CENTER_PT_evw where OBJECTID in (745,786,2277)
+-- Reset MAPLABEL to avoid conflicts with KATM version
+-- OID  | Old Facilities Value    | POI                     | Alyssa's Edits
+-- 745  | Housing Unit 150        | NPS Housing Unit 150    | NPS House
+-- 786  | 3rd Cabin East (Palace) | 3rd Cabin               | 3rd Cabin East (Princess Palace)
+-- 2277 | <NULL>                  | King Salmon Housing 161 | NPS House
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec sde.set_current_version @version4
+exec sde.edit_version @version4, 1 -- 1 to start edits
+Update akr_facility2.GIS.AKR_BLDG_CENTER_PT_evw set MAPLABEL = 'Housing Unit 150' where OBJECTID = 745
+Update akr_facility2.GIS.AKR_BLDG_CENTER_PT_evw set MAPLABEL = '3rd Cabin East (Palace)' where OBJECTID = 786
+Update akr_facility2.GIS.AKR_BLDG_CENTER_PT_evw set MAPLABEL = NULL where OBJECTID = 2277
+exec sde.edit_version @version4, 2; -- 2 to stop edits
+
 -- Changes to do
 -- 1) remove isextant='False'
 -- 2) resolve duplicate FeatureID (remove larger OID)
