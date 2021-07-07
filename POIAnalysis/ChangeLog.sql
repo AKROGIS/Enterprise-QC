@@ -150,8 +150,54 @@ exec sde.edit_version @version3, 2; -- 2 to stop edits
 
 
 
+-- 2021-07-07
+
+-- I missed the map labels where bldg.maplabel is null and poi.maplabel is not null; I need to grab these from the history now
+
+-- Missing Building map labels
+select p.MAPLABEL, b.MAPLABEL
+from akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+join akr_socio.gis.POI_PT_H as p
+on p.SRCDBIDVAL = b.FEATUREID and p.ISEXTANT = b.ISEXTANT
+and SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+and p.SRCDBIDVAL <> '{2E473C2F-500C-47B7-A4C9-1D6E72F4EC7E}'  --duplicate POI will screw up the update command
+and p.MAPLABEL is not null and b.maplabel is null
+select SRCDBIDVAL, MAPLABEL, ISEXTANT, PUBLICDISPLAY from akr_socio.gis.POI_PT_H where SRCDBIDVAL = '{2E473C2F-500C-47B7-A4C9-1D6E72F4EC7E}'
+
+-- Missing Trails Feature map labels
+select p.MAPLABEL, b.MAPLABEL
+from akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+join akr_socio.gis.POI_PT_H as p
+on p.SRCDBIDVAL = b.GEOMETRYID and p.ISEXTANT = b.ISEXTANT
+and SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+and p.MAPLABEL is not null and b.maplabel is null
+
+-- Add Missing map labels to a new version
+USE akr_facility2;
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec sde.set_current_version @version4
+exec sde.edit_version @version4, 1 -- 1 to start edits
+-- Buildings
+update gis.AKR_BLDG_CENTER_PT_evw set MAPLABEL = 'Richard L. Proenneke Cabin (Historic)' where FEATUREID = '{2E473C2F-500C-47B7-A4C9-1D6E72F4EC7E}'
+exec sde.edit_version @version4, 2; -- 2 to stop edits
+
+
+merge into gis.AKR_BLDG_CENTER_PT_evw as b using 
+    akr_socio.gis.POI_PT_H as p
+    on p.SRCDBIDVAL = b.FEATUREID and p.ISEXTANT = b.ISEXTANT
+       and SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+       and p.MAPLABEL is not null and b.maplabel is null
+       and p.SRCDBIDVAL <> '{2E473C2F-500C-47B7-A4C9-1D6E72F4EC7E}'
+    when matched then update set b.MAPLABEL = p.MAPLABEL;
+-- Trail Features
+merge into gis.TRAILS_FEATURE_PT_evw as b using 
+    akr_socio.gis.POI_PT_H as p
+    on p.SRCDBIDVAL = b.GEOMETRYID and p.ISEXTANT = b.ISEXTANT
+       and SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+       and p.MAPLABEL is not null and b.maplabel is null
+    when matched then update set b.MAPLABEL = p.MAPLABEL;
+
 -- Changes to do
--- 0) Add MapLabel from POI (and history) where bldg.maplabel is null
 -- 1) remove isextant='False'
 -- 2) resolve duplicate FeatureID (remove larger OID)
 -- 3) Write general QC query
