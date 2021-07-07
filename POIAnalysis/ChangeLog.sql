@@ -216,15 +216,15 @@ Update akr_facility2.GIS.AKR_BLDG_CENTER_PT_evw set MAPLABEL = NULL where OBJECT
 exec sde.edit_version @version4, 2; -- 2 to stop edits
 
 -- Changes to do
--- 1) remove isextant='False'
--- 2) resolve duplicate FeatureID (remove larger OID)
+-- 2) Add POITYPE to bldgs and trail_features
 -- 3) Write general QC query
--- 3a) resolve issues
--- 4) write query for QC comparing facilities to POOI
+-- 3a) remove isextant='False'
+-- 3b) resolve duplicate FeatureID (remove larger OID)
+-- 3c) resolve other issues
+-- 4) write query for QC comparing facilities to POI
 -- 4a) resolve issues
--- 4b) Add POITYPE to bldgs and trail_features
 -- 5) write calcs to update poi for diffs with facilities
--- 5a) update pois
+-- 5a) update POIs
 -- 6) query for missing and extra POIs
 -- 7) query to create a missing POI
 -- 8) when adding new building w/o POITYPE, raise question do you want to add to POI?
