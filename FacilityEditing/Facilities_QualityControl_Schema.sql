@@ -221,7 +221,7 @@ BEGIN
     CASE @b WHEN 'Yes' THEN '|Bicycle' ELSE NULL END,
     CASE @c WHEN 'Yes' THEN '|Pack and Saddle' ELSE NULL END,
     CASE @d WHEN 'Yes' THEN '|All-Terrain Vehicle' ELSE NULL END,
-    CASE @e WHEN 'Yes' THEN '|Four-Wheel Drive Vehicle > 50ï¿½ in Tread Width' ELSE NULL END,
+    CASE @e WHEN 'Yes' THEN '|Four-Wheel Drive Vehicle > 50” in Tread Width' ELSE NULL END,
     CASE @f WHEN 'Yes' THEN '|Motorcycle' ELSE NULL END,
     CASE @g WHEN 'Yes' THEN '|Snowmobile' ELSE NULL END,
     CASE @h WHEN 'Yes' THEN '|Snowshoe' ELSE NULL END,
@@ -278,7 +278,7 @@ BEGIN
     CASE @b WHEN 'Yes' THEN '|Bicycle' WHEN 'No' THEN '|No Bicycle' ELSE NULL END,
     CASE @c WHEN 'Yes' THEN '|Pack and Saddle' WHEN 'No' THEN '|No Pack and Saddle' ELSE NULL END,
     CASE @d WHEN 'Yes' THEN '|All-Terrain Vehicle' WHEN 'No' THEN '|No All-Terrain Vehicle' ELSE NULL END,
-    CASE @e WHEN 'Yes' THEN '|Four-Wheel Drive Vehicle > 50ï¿½ in Tread Width' WHEN 'No' THEN '|No Four-Wheel Drive Vehicle > 50ï¿½ in Tread Width' ELSE NULL END,
+    CASE @e WHEN 'Yes' THEN '|Four-Wheel Drive Vehicle > 50” in Tread Width' WHEN 'No' THEN '|No Four-Wheel Drive Vehicle > 50” in Tread Width' ELSE NULL END,
     CASE @f WHEN 'Yes' THEN '|Motorcycle' WHEN 'No' THEN '|No Motorcycle' ELSE NULL END,
     CASE @g WHEN 'Yes' THEN '|Snowmobile' WHEN 'No' THEN '|No Snowmobile' ELSE NULL END,
     CASE @h WHEN 'Yes' THEN '|Snowshoe' WHEN 'No' THEN '|No Snowshoe' ELSE NULL END,
@@ -298,23 +298,6 @@ BEGIN
   END
   RETURN @result
 END
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE VIEW [dbo].[QC_ALL_FC_DOMAIN_VALUES] AS
--- Codes/Values specified in the ArcGIS domains
-SELECT
-  Name,
-  codedValue.value('Code[1]', 'nvarchar(max)') AS "Code",
-  codedValue.value('Name[1]', 'nvarchar(max)') AS "Value"
-FROM
-   sde.GDB_ITEMS
-CROSS APPLY
-   Definition.nodes('/GPCodedValueDomain2/CodedValues/CodedValue') AS CodedValues(codedValue)
-WHERE
-   type = '8C368B12-A12E-4C7E-9638-C9C64E69E98F'  -- Item Type Name = 'Coded Value Domain' from sde.GDB_ITEMTYPES
 GO
 SET ANSI_NULLS ON
 GO
@@ -397,6 +380,23 @@ select 'DOM_YES_NO_UNK_NA' as TableName, 'DOM_YES_NO_UNK_NA_NPSAKR2016' as Domai
 union all
 select 'DOM_YES_NO_UNK_OTH' as TableName, 'DOM_YES_NO_UNK_OTH_NPS2016' as DomainName, Code, Code as Value from DOM_YES_NO_UNK_OTH
 ) as d
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE VIEW [dbo].[QC_ALL_FC_DOMAIN_VALUES] AS
+-- Codes/Values specified in the ArcGIS domains
+SELECT
+  Name,
+  codedValue.value('Code[1]', 'nvarchar(max)') AS "Code",
+  codedValue.value('Name[1]', 'nvarchar(max)') AS "Value"
+FROM
+   sde.GDB_ITEMS
+CROSS APPLY
+   Definition.nodes('/GPCodedValueDomain2/CodedValues/CodedValue') AS CodedValues(codedValue)
+WHERE
+   type = '8C368B12-A12E-4C7E-9638-C9C64E69E98F'  -- Item Type Name = 'Coded Value Domain' from sde.GDB_ITEMTYPES
 GO
 SET ANSI_NULLS ON
 GO
@@ -2682,6 +2682,13 @@ union all
 select c.OBJECTID, 'Error: SHAPE must be within the footprint' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as c
   join gis.AKR_BLDG_FOOTPRINT_PY_evw as f on c.FEATUREID = f.FEATUREID
   where c.Shape.STWithin(f.Shape) <> 1
+union all
+
+-- POITYPE
+--    Can be null (but not empty - will be converted to a null in calcs)
+--    If provided (and not empty), must be in akr_socio.gis.DOM_POICONTAINER_POITYPE_ALTNAMES
+select t1.OBJECTID, 'Error: POITYPE is not a recognized value' as Issue, NULL from gis.AKR_BLDG_CENTER_PT_evw as t1
+       left join akr_socio.gis.DOM_POICONTAINER_POITYPE_ALTNAMES as t2 on t1.POITYPE = t2.Code where t1.POITYPE is not null and t1.POITYPE <> '' and t2.Code is null
 
 
 
@@ -4376,6 +4383,14 @@ select a.OBJECTID, 'Error: SHAPE is more than 20m from SEGMENTID in TRAILS_LN' a
   join gis.TRAILS_LN_evw as t on a.SEGMENTID = t.GEOMETRYID
   where GEOGRAPHY::STGeomFromText(a.shape.STAsText(),4269).STDistance(GEOGRAPHY::STGeomFromText(t.shape.STAsText(),4269)) > 20
 */
+union all
+
+-- POITYPE
+--    Can be null (but not empty - will be converted to a null in calcs)
+--    If provided (and not empty), must be in akr_socio.gis.DOM_POICONTAINER_POITYPE_ALTNAMES
+select t1.OBJECTID, 'Error: POITYPE is not a recognized value' as Issue, NULL from gis.TRAILS_FEATURE_PT_evw as t1
+       left join akr_socio.gis.DOM_POICONTAINER_POITYPE_ALTNAMES as t2 on t1.POITYPE = t2.Code where t1.POITYPE is not null and t1.POITYPE <> '' and t2.Code is null
+
 
 
 -- ???????????????????????????????????
@@ -5718,6 +5733,9 @@ BEGIN
       on t1.GEOMETRYID = t2.GEOMETRYID and (t1.ISOUTPARK is null or CASE WHEN t2.uShape.STContains(fShape) = 1 THEN  'No' ELSE CASE WHEN t2.fShape.STIntersects(t2.uShape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
       when matched then update set ISOUTPARK = CASE WHEN t2.uShape.STContains(fShape) = 1 THEN  'No' ELSE CASE WHEN t2.fShape.STIntersects(t2.uShape) = 1 THEN 'Both' ELSE 'Yes' END END;
 
+    -- POITYPE - if it is an empty string, change to NULL
+    update gis.AKR_BLDG_CENTER_PT_evw set POITYPE = NULL where POITYPE = ''
+
     -- Stop editing
     exec sde.edit_version @version, 2; -- 2 to stop edits
 
@@ -6306,6 +6324,9 @@ BEGIN
     merge into gis.TRAILS_FEATURE_PT_evw as t1 using gis.AKR_UNIT as t2
       on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
       when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+
+    -- POITYPE - if it is an empty string, change to NULL
+    update gis.TRAILS_FEATURE_PT_evw set POITYPE = NULL where POITYPE = ''
 
     -- Stop editing
     exec sde.edit_version @version, 2; -- 2 to stop edits
