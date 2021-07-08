@@ -1,3 +1,6 @@
+exec sde.set_default
+--exec sde.set_current_version 'dbo.res'
+
 -- List of POI Sources, ordered by popularity
 select srcDBname, srcdbidfld, srcdbnmfld, count(*) as Count from gis.akr_POI_PT_evw
 group by srcDBname, srcdbidfld, srcdbnmfld
@@ -55,6 +58,22 @@ left join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
 on p.SRCDBIDVAL = b.FEATUREID
 where p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
 order by p.SRCDBIDVAL
+
+-- Compare POIs with buildings - ISEXTANT Issues (5 of 324)
+select p.SRCDBIDVAL, b.FEATUREID, p.MAPLABEL, b.MAPlabel, p.poiname, b.BLDGNAME, p.poialtname, b.BLDGALTNAME, p.POITYPE, b.POITYPE, b.BLDGTYPE, p.ISEXTANT, b.ISEXTANT
+from akr_socio.gis.akr_POI_PT_evw as p
+left join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+on p.SRCDBIDVAL = b.FEATUREID
+where p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+and (b.isextant is null or b.isextant <> 'True' or p.isextant is null or p.isextant <> 'True')
+order by p.SRCDBIDVAL
+
+-- Non-unique GUIDS (2)
+select FEATUREID, count(FEATUREID) from akr_socio.GIS.akr_POI_PT_evw group by FEATUREID having count(FEATUREID) > 1
+select GEOMETRYID, count(GEOMETRYID) from akr_socio.GIS.akr_POI_PT_evw group by GEOMETRYID having count(GEOMETRYID) > 1
+select srcdbname, SRCDBIDVAL, count(*) from akr_socio.GIS.akr_POI_PT_evw group by srcdbname, SRCDBIDVAL having count(*) > 1 and srcdbname like 'akr%'
+select * from akr_socio.GIS.akr_POI_PT_evw where featureid = '{DDC4471D-2A47-487F-A9B1-CD0611B5F24A}'
+
 
 -- building map labels that do not match poi map label (5) by choice
 -- Recommend updating buidings map label with the value in POI map label

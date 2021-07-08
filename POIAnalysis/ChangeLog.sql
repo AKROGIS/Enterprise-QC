@@ -178,10 +178,6 @@ DECLARE @version4 nvarchar(255) = 'dbo.res'
 exec sde.set_current_version @version4
 exec sde.edit_version @version4, 1 -- 1 to start edits
 -- Buildings
-update gis.AKR_BLDG_CENTER_PT_evw set MAPLABEL = 'Richard L. Proenneke Cabin (Historic)' where FEATUREID = '{2E473C2F-500C-47B7-A4C9-1D6E72F4EC7E}'
-exec sde.edit_version @version4, 2; -- 2 to stop edits
-
-
 merge into gis.AKR_BLDG_CENTER_PT_evw as b using 
     akr_socio.gis.POI_PT_H as p
     on p.SRCDBIDVAL = b.FEATUREID and p.ISEXTANT = b.ISEXTANT
@@ -189,6 +185,7 @@ merge into gis.AKR_BLDG_CENTER_PT_evw as b using
        and p.MAPLABEL is not null and b.maplabel is null
        and p.SRCDBIDVAL <> '{2E473C2F-500C-47B7-A4C9-1D6E72F4EC7E}'
     when matched then update set b.MAPLABEL = p.MAPLABEL;
+update gis.AKR_BLDG_CENTER_PT_evw set MAPLABEL = 'Richard L. Proenneke Cabin (Historic)' where FEATUREID = '{2E473C2F-500C-47B7-A4C9-1D6E72F4EC7E}'
 -- Trail Features
 merge into gis.TRAILS_FEATURE_PT_evw as b using 
     akr_socio.gis.POI_PT_H as p
@@ -196,6 +193,7 @@ merge into gis.TRAILS_FEATURE_PT_evw as b using
        and SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
        and p.MAPLABEL is not null and b.maplabel is null
     when matched then update set b.MAPLABEL = p.MAPLABEL;
+exec sde.edit_version @version4, 2; -- 2 to stop edits
 
 
 -- I need to close out all existing versions before I make the scheme change to akr_facility
@@ -215,8 +213,53 @@ Update akr_facility2.GIS.AKR_BLDG_CENTER_PT_evw set MAPLABEL = '3rd Cabin East (
 Update akr_facility2.GIS.AKR_BLDG_CENTER_PT_evw set MAPLABEL = NULL where OBJECTID = 2277
 exec sde.edit_version @version4, 2; -- 2 to stop edits
 
+
+-- Add a new POITYPE column
+-- WARNING: this must be done with the esri tools to add the column to the history table and other GDB tables
+-- alter table akr_facility2.GIS.AKR_BLDG_CENTER_PT add POITYPE nvarchar(50)
+-- alter table akr_facility2.GIS.AKR_BLDG_CENTER_PT add POITYPE nvarchar(50)
+
+-- Add the POITYPE data from POI_PT to akr_facility2
+exec sde.set_default
+select p.ISEXTANT, b.ISEXTANT, b.MAPLABEL, b.POITYPE, p.POITYPE from akr_facility2.GIS.AKR_BLDG_CENTER_PT_evw as b
+join akr_socio.GIS.AKR_POI_pt_evw as p
+on b.FEATUREID = p.SRCDBIDVAL
+and p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+and p.ISEXTANT <> b.ISEXTANT
+
+select b.MAPLABEL, b.POITYPE, p.POITYPE from akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+join akr_socio.GIS.AKR_POI_pt_evw as p
+on b.GEOMETRYID = p.SRCDBIDVAL
+and p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+
+USE akr_facility2;
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec sde.set_current_version @version4
+exec sde.edit_version @version4, 1 -- 1 to start edits
+-- Buildings
+merge into gis.AKR_BLDG_CENTER_PT_evw as b using 
+    akr_socio.gis.akr_POI_PT_evw as p
+    on p.SRCDBIDVAL = b.FEATUREID --and p.ISEXTANT = b.ISEXTANT
+       and SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+    when matched then update set b.POITYPE = p.POITYPE;
+-- Trail Features
+merge into gis.TRAILS_FEATURE_PT_evw as b using 
+    akr_socio.gis.akr_POI_PT_evw as p
+    on p.SRCDBIDVAL = b.GEOMETRYID and p.ISEXTANT = b.ISEXTANT
+       and SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+    when matched then update set b.POITYPE = p.POITYPE;
+exec sde.edit_version @version4, 2; -- 2 to stop edits
+
+-- Add a missing MAPLABEL values due to ISEXTANT differences
+USE akr_facility2;
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec sde.set_current_version @version4
+exec sde.edit_version @version4, 1 -- 1 to start edits
+-- Buildings
+update gis.AKR_BLDG_CENTER_PT_evw set MAPLABEL = 'Baked Mountain Hut' where FEATUREID = '{48D40CE5-8EA9-4912-89B6-C6A69E093499}'
+exec sde.edit_version @version4, 2; -- 2 to stop edits
+
 -- Changes to do
--- 2) Add POITYPE to bldgs and trail_features
 -- 3) Write general QC query
 -- 3a) remove isextant='False'
 -- 3b) resolve duplicate FeatureID (remove larger OID)
@@ -229,3 +272,6 @@ exec sde.edit_version @version4, 2; -- 2 to stop edits
 -- 7) query to create a missing POI
 -- 8) when adding new building w/o POITYPE, raise question do you want to add to POI?
 -- 9) query about changes to public properties and public display (changes that should be reviewed)
+
+-- Check buildings with POI and with Public dispaly = "No" or isextant <> "True"
+-- idea: Add all POI.POITYPES to BLDGS; only sync if BLDG.POITYPE is not null and PUBLIC DISPLAY = "Yes"
