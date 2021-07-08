@@ -10,6 +10,11 @@ join (
 -- gis.POI_PT
 -------------------------
 
+-- NOTE: We could ignore problems with attributes coming from a QC'd SRCDBNAME like facilities
+--       as these attributes will be automatically overwritten by the "Do calculations" process
+--       ignoring them will eliminate a lot of false positives during development (which will go away).
+--       Not ignoring them will catch errors in the calculations process (more important)
+
 -- OBJECTID - managed by ArcGIS no QC or Calculations required
 
 -- POI Attributes
@@ -56,7 +61,7 @@ select t1.OBJECTID, 'Error: SEASONAL is not a recognized value' as Issue, NULL f
 union all
 select p.OBJECTID, 'Error: SEASONAL does not match FMSS.OPSEAS' as Issue,
   'Location ' + FACLOCID + ' has OPSEAS = ' + f.OPSEAS + ' when GIS has SEASONAL = ' + isnull(p.SEASONAL,'NULL') as Details
-  from gis.AKR_POI_PT_evw as p join 
+  from gis.AKR_POI_PT_evw as p join
   (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM akr_facility2.dbo.FMSSExport) as f
   on f.Location = p.FACLOCID where p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
 union all
@@ -82,7 +87,7 @@ select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
   'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
-  from gis.AKR_POI_PT_evw as p join 
+  from gis.AKR_POI_PT_evw as p join
   akr_facility2.dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from akr_facility2.dbo.DOM_MAINTAINER where FMSS = f.FAMARESP)
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
@@ -148,17 +153,17 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_POI_PT_evw as t1 left join
   gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
-select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
+select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue,
   'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from akr_facility2.gis.AKR_UNIT as t1
   left join gis.AKR_POI_PT_evw as t2 on t1.shape.Filter(t2.shape) = 1 and t2.UNITCODE <> t1.Unit_Code where t1.Shape.STIntersects(t2.Shape) = 1
 union all
-select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue,
   'Location ' + FACLOCID + ' has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
-  from gis.AKR_POI_PT_evw as p join 
+  from gis.AKR_POI_PT_evw as p join
   (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from gis.DOM_UNITCODE)) as f
   on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
-select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
+select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue,
   'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
   from gis.AKR_POI_PT_evw as p
   join akr_facility2.dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
@@ -195,7 +200,7 @@ union all
 ----  2) it will generate spurious errors when outside the group location e.g. WEAR, but still within a network
 --select t1.OBJECTID, 'Error: GROUPCODE does not match the boundary it is within' as Issue, NULL from gis.AKR_POI_PT_evw as t1
 --  left join gis.AKR_GROUP as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.GROUPCODE <> t2.Group_Code
---  and t1.OBJECTID not in (select t3.OBJECTID from gis.AKR_POI_PT_evw as t3 left join 
+--  and t1.OBJECTID not in (select t3.OBJECTID from gis.AKR_POI_PT_evw as t3 left join
 --  gis.AKR_GROUP as t4 on t3.Shape.STIntersects(t4.Shape) = 1 where t3.GROUPCODE = t4.Group_Code)
 --union all
 
@@ -265,13 +270,13 @@ union all
 -- FEATUREID
 --     must be well-formed or null/empty (in which case we will generate a unique well-formed value)
 --     Each POI should be unique; therefore all FeatureIDs should be unique
-select OBJECTID, 'Error: FEATUREID is not unique' as Issue, NULL from gis.AKR_POI_PT_evw where FEATUREID in 
+select OBJECTID, 'Error: FEATUREID is not unique' as Issue, NULL from gis.AKR_POI_PT_evw where FEATUREID in
        (select FEATUREID from gis.AKR_POI_PT_evw where FEATUREID is not null and FEATUREID <> '' group by FEATUREID having count(*) > 1)
 union all
 select OBJECTID, 'Error: FEATUREID is not well-formed' as Issue, NULL
 	from gis.AKR_POI_PT_evw where
-	  -- Will ignore FEATUREID = NULL 
-	  len(FEATUREID) <> 38 
+	  -- Will ignore FEATUREID = NULL
+	  len(FEATUREID) <> 38
 	  OR left(FEATUREID,1) <> '{'
 	  OR right(FEATUREID,1) <> '}'
 	  OR FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
@@ -279,17 +284,17 @@ union all
 
 -- GEOMETRYID
 --     must be unique and well-formed or null/empty (in which case we will generate a unique well-formed value)
-select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue, NULL from gis.AKR_POI_PT_evw where GEOMETRYID in 
+select OBJECTID, 'Error: GEOMETRYID is not unique' as Issue, NULL from gis.AKR_POI_PT_evw where GEOMETRYID in
        (select GEOMETRYID from gis.AKR_POI_PT_evw where GEOMETRYID is not null and GEOMETRYID <> '' group by GEOMETRYID having count(*) > 1)
 union all
 select OBJECTID, 'Error: GEOMETRYID is not well-formed' as Issue, NULL
 	from gis.AKR_POI_PT_evw where
-	  -- Will ignore GEOMETRYID = NULL 
-	  len(GEOMETRYID) <> 38 
+	  -- Will ignore GEOMETRYID = NULL
+	  len(GEOMETRYID) <> 38
 	  OR left(GEOMETRYID,1) <> '{'
 	  OR right(GEOMETRYID,1) <> '}'
 	  OR GEOMETRYID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
-union 
+union
 
 -- NOTES
 --     is not required, but if it provided is it should not be an empty string
@@ -311,7 +316,7 @@ select OBJECTID, 'Error: SHAPE must not be empty' as Issue, NULL from gis.AKR_PO
 union all
 select OBJECTID, 'Error: SHAPE must be valid' as Issue, NULL from gis.AKR_POI_PT_evw where shape.STIsValid() = 0
 -- Overlaps are possible (even exepcted among SITES)
--- Size checks are difficult because of variation in QTY units; May try later when trends are identified 
+-- Size checks are difficult because of variation in QTY units; May try later when trends are identified
 
 ) AS I
 on D.OBJECTID = I.OBJECTID
