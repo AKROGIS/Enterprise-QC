@@ -259,8 +259,13 @@ exec sde.edit_version @version4, 1 -- 1 to start edits
 update gis.AKR_BLDG_CENTER_PT_evw set MAPLABEL = 'Baked Mountain Hut' where FEATUREID = '{48D40CE5-8EA9-4912-89B6-C6A69E093499}'
 exec sde.edit_version @version4, 2; -- 2 to stop edits
 
+-- Create a new versioned GDB table called GIS.QC_ISSUES_EXPLAINED (using ArcCatalog)
+-- with the same structure as akr_facility2.GIS.QC_ISSUES_EXPLAINED
+-- Create a new QC view called DBO.QC_ISSUES_POI_PT based on a similar view in akr_facility2
+
+
 -- Changes to do
--- 3) Write general QC query
+-- 3) Write general QC and Calc queries
 -- 3a) remove isextant='False'
 -- 3b) resolve duplicate FeatureID (remove larger OID)
 -- 3c) resolve other issues
