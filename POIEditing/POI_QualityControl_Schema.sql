@@ -326,3 +326,424 @@ LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
 ON E.feature_oid = D.OBJECTID AND E.Issue = I.Issue AND E.Feature_class = 'POI_PT'
 WHERE E.Explanation IS NULL or E.Explanation = ''
 GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2021-07-08
+-- Description:	Calculated properties for POI_PT
+--
+-- These calcs are largely for records that are maintained (and synced) from a source database (like facilities)
+-- Nevertheless, synced attributes will also be calced if not synced first.
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_POI_Pt] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- POINAME
+    --     if it is an empty string, change to NULL
+    update gis.AKR_POI_PT_evw set POINAME = NULL where POINAME = ''
+
+    -- POIALTNAME
+    --     if it is an empty string, change to NULL
+    update gis.AKR_POI_PT_evw set POIALTNAME = NULL where POIALTNAME = ''
+    
+    -- MAPLABEL
+    --     if it is an empty string, change to NULL
+    update gis.AKR_POI_PT_evw set MAPLABEL = NULL where MAPLABEL = ''
+    
+    -- POITYPE
+    --     No calcs; NULL, Empty and not in DOM trigger QC Error
+    
+    -- POIDESC
+    --     if it is an empty string, change to NULL
+    update gis.AKR_POI_PT_evw set POIDESC = NULL where POIDESC = ''
+
+    -- SEASONAL
+    --     if it is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_POI_PT_evw as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM akr_facility2.dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    merge into gis.AKR_POI_PT_evw as p
+      using (SELECT case when t2.OPSEAS = 'Y' then 'Yes' when t2.OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, t1.Asset
+            FROM akr_facility2.dbo.FMSSExport_Asset as t1 JOIN akr_facility2.dbo.FMSSExport as t2 on t1.Location = t2.Location) as f
+      on f.Asset = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+
+    -- SEASDESC
+    --     if it is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.AKR_POI_PT_evw set SEASDESC = NULL where SEASDESC = ''
+    update gis.AKR_POI_PT_evw set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+
+    -- MAINTAINER
+    --     if it is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.AKR_POI_PT_evw as p
+      using (SELECT d.Code as FAMARESP, location FROM akr_facility2.dbo.FMSSExport as t join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    merge into gis.AKR_POI_PT_evw as p
+      using (SELECT d.Code as FAMARESP, a.Asset FROM akr_facility2.dbo.FMSSExport_Asset as a join akr_facility2.dbo.FMSSExport as t on a.Location = t.Location
+             join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+
+    -- ISEXTANT
+    --     it defaults to 'True' with a warning (during QC)
+    update gis.AKR_POI_PT_evw set ISEXTANT = 'True' where ISEXTANT is NULL
+
+    -- POINTTYPE
+    --     if it is NULL or empty, set to 'Arbitrary point'
+    update gis.AKR_POI_PT_evw set POINTTYPE = 'Arbitrary point' where POINTTYPE is null or POINTTYPE = '' 
+
+    -- ISCURRENTGEO -- No calcs; it is obsolete and will be removed shortly
+
+    -- ISOUTPARK
+    --     it is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.AKR_POI_PT_evw as t1 using akr_facility2.gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+
+    -- PUBLICDISPLAY
+    --     it defaults to No Public Map Display
+    update gis.AKR_POI_PT_evw set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+
+    -- DATAACCESS
+    --     it defaults to No Public Map Display
+    update gis.AKR_POI_PT_evw set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+
+    -- UNITCODE
+    --     it is a spatial calc if null
+    merge into gis.AKR_POI_PT_evw as t1 using akr_facility2.gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+
+    -- UNITNAME
+    --     it is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.AKR_POI_PT_evw set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.AKR_POI_PT_evw as t1 using akr_facility2.dbo.DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+
+    -- GROUPCODE
+    --     if it is an empty string, change to NULL
+    update gis.AKR_POI_PT_evw set GROUPCODE = NULL where GROUPCODE = ''
+
+    -- GROUPNAME
+    --     it is always calc'd from GROUPCODE
+    update gis.AKR_POI_PT_evw set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.AKR_POI_PT_evw as t1 using akr_facility2.gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+
+    -- REGIONCODE
+    --     it is always set to AKR
+    update gis.AKR_POI_PT_evw set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+
+    -- CREATEUSER, CREATEDATE, EDITUSER, EDITDATE -- No Calcs (managed by system)
+
+    -- MAPMETHOD
+    --     if it is NULL or an empty string, change to Unknown
+    update gis.AKR_POI_PT_evw set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+
+    -- MAPSOURCE
+    --     if it is NULL or an empty string, change to Unknown
+    --     by SQL Magic '' is the same as any string of just white space
+    update gis.AKR_POI_PT_evw set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+
+    -- SOURCEDATE: Nothing to do.
+
+    -- XYACCURACY
+    --     if it is NULL or an empty string, change to Unknown
+    update gis.AKR_POI_PT_evw set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+
+    -- FACLOCID
+    --     if it is empty string change to null
+    update gis.AKR_POI_PT_evw set FACLOCID = NULL where FACLOCID = ''
+
+    -- FACASSETID
+    --     if it is empty string change to null
+    update gis.AKR_POI_PT_evw set FACASSETID = NULL where FACASSETID = ''
+
+    -- FEATUREID
+    --     if it if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.AKR_POI_PT_evw set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+
+    -- GEOMETRYID
+    --     if it is null/empty
+    update gis.AKR_POI_PT_evw set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+
+    -- NOTES
+    --     if it is an empty string, change to NULL
+    update gis.AKR_POI_PT_evw set NOTES = NULL where NOTES = ''
+
+    -- SRCDBNAME is for internal information only; No Calcs possible or required
+    -- SRCDBIDFLD is for internal information only; No Calcs possible or required
+    -- SRCDBIDVAL is for internal information only; No Calcs possible or required
+    -- SRCDBNMFLD is for internal information only; No Calcs possible or required
+    -- SRCDBNMVAL is for internal information only; No Calcs possible or required
+
+    -- WEBEDITUSER -- No calcs; it is obsolete and will be removed shortly
+    -- WEBCOMMENT -- No calcs; it is obsolete and will be removed shortly
+
+    -- Shape -- No Calcs
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2021-07-08
+-- Description:	Sync attributes with a source table
+--
+-- These calcs replace attributes with the source attributes for records that are maintained in a source database (like facilities)
+-- =============================================
+
+CREATE PROCEDURE [dbo].[Sync_POI_Pt_with_Buildings] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500),
+    @source_version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the source version
+    exec akr_facility2.sde.set_current_version @source_version
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- POINAME
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.POINAME <> b.BLDGNAME or (p.POINAME is null and b.BLDGNAME is not null) or (p.POINAME is not null and b.BLDGNAME is null))
+      when matched then update set POINAME = b.BLDGNAME;
+
+    -- POIALTNAME
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.POIALTNAME <> b.BLDGALTNAME or (p.POIALTNAME is null and b.BLDGALTNAME is not null) or (p.POIALTNAME is not null and b.BLDGALTNAME is null))
+      when matched then update set POIALTNAME = b.BLDGALTNAME;
+    
+    -- MAPLABEL
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.MAPLABEL <> b.MAPLABEL or (p.MAPLABEL is null and b.MAPLABEL is not null) or (p.MAPLABEL is not null and b.MAPLABEL is null))
+      when matched then update set MAPLABEL = b.MAPLABEL;
+    
+    -- POITYPE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.POITYPE <> b.POITYPE or (p.POITYPE is null and b.POITYPE is not null) or (p.POITYPE is not null and b.POITYPE is null))
+      when matched then update set POITYPE = b.POITYPE;
+    
+    -- POIDESC
+    --     No source value in buildings
+
+    -- SEASONAL
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.SEASONAL <> b.SEASONAL or (p.SEASONAL is null and b.SEASONAL is not null) or (p.SEASONAL is not null and b.SEASONAL is null))
+      when matched then update set SEASONAL = b.SEASONAL;
+
+    -- SEASDESC
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.SEASDESC <> b.SEASDESC or (p.SEASDESC is null and b.SEASDESC is not null) or (p.SEASDESC is not null and b.SEASDESC is null))
+      when matched then update set SEASDESC = b.SEASDESC;
+
+    -- MAINTAINER
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.MAINTAINER <> b.FACMAINTAIN or (p.MAINTAINER is null and b.FACMAINTAIN is not null) or (p.MAINTAINER is not null and b.FACMAINTAIN is null))
+      when matched then update set MAINTAINER = b.FACMAINTAIN;
+
+    -- ISEXTANT
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.ISEXTANT <> b.ISEXTANT or (p.ISEXTANT is null and b.ISEXTANT is not null) or (p.ISEXTANT is not null and b.ISEXTANT is null))
+      when matched then update set ISEXTANT = b.ISEXTANT;
+
+    -- POINTTYPE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.POINTTYPE <> b.POINTTYPE or (p.POINTTYPE is null and b.POINTTYPE is not null) or (p.POINTTYPE is not null and b.POINTTYPE is null))
+      when matched then update set POINTTYPE = b.POINTTYPE;
+
+    -- ISCURRENTGEO -- No calcs; it is obsolete and will be removed shortly
+
+    -- ISOUTPARK
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.ISOUTPARK <> b.ISOUTPARK or (p.ISOUTPARK is null and b.ISOUTPARK is not null) or (p.ISOUTPARK is not null and b.ISOUTPARK is null))
+      when matched then update set ISOUTPARK = b.ISOUTPARK;
+
+    -- PUBLICDISPLAY
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.PUBLICDISPLAY <> b.PUBLICDISPLAY or (p.PUBLICDISPLAY is null and b.PUBLICDISPLAY is not null) or (p.PUBLICDISPLAY is not null and b.PUBLICDISPLAY is null))
+      when matched then update set PUBLICDISPLAY = b.PUBLICDISPLAY;
+
+    -- DATAACCESS
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.DATAACCESS <> b.DATAACCESS or (p.DATAACCESS is null and b.DATAACCESS is not null) or (p.DATAACCESS is not null and b.DATAACCESS is null))
+      when matched then update set DATAACCESS = b.DATAACCESS;
+
+    -- UNITCODE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.UNITCODE <> b.UNITCODE or (p.UNITCODE is null and b.UNITCODE is not null) or (p.UNITCODE is not null and b.UNITCODE is null))
+      when matched then update set UNITCODE = b.UNITCODE;
+
+    -- UNITNAME
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.UNITNAME <> b.UNITNAME or (p.UNITNAME is null and b.UNITNAME is not null) or (p.UNITNAME is not null and b.UNITNAME is null))
+      when matched then update set UNITNAME = b.UNITNAME;
+
+    -- GROUPCODE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.GROUPCODE <> b.GROUPCODE or (p.GROUPCODE is null and b.GROUPCODE is not null) or (p.GROUPCODE is not null and b.GROUPCODE is null))
+      when matched then update set GROUPCODE = b.GROUPCODE;
+
+    -- GROUPNAME
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.GROUPNAME <> b.GROUPNAME or (p.GROUPNAME is null and b.GROUPNAME is not null) or (p.GROUPNAME is not null and b.GROUPNAME is null))
+      when matched then update set GROUPNAME = b.GROUPNAME;
+
+    -- REGIONCODE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.REGIONCODE <> b.REGIONCODE or (p.REGIONCODE is null and b.REGIONCODE is not null) or (p.REGIONCODE is not null and b.REGIONCODE is null))
+      when matched then update set REGIONCODE = b.REGIONCODE;
+
+    -- CREATEUSER, CREATEDATE, EDITUSER, EDITDATE -- No Calcs (managed by system)
+
+    -- MAPMETHOD
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.MAPMETHOD <> b.MAPMETHOD or (p.MAPMETHOD is null and b.MAPMETHOD is not null) or (p.MAPMETHOD is not null and b.MAPMETHOD is null))
+      when matched then update set MAPMETHOD = b.MAPMETHOD;
+
+    -- MAPSOURCE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.MAPSOURCE <> b.MAPSOURCE or (p.MAPSOURCE is null and b.MAPSOURCE is not null) or (p.MAPSOURCE is not null and b.MAPSOURCE is null))
+      when matched then update set MAPSOURCE = b.MAPSOURCE;
+
+    -- SOURCEDATE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.SOURCEDATE <> b.SOURCEDATE or (p.SOURCEDATE is null and b.SOURCEDATE is not null) or (p.SOURCEDATE is not null and b.SOURCEDATE is null))
+      when matched then update set SOURCEDATE = b.SOURCEDATE;
+
+    -- XYACCURACY
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.XYACCURACY <> b.XYACCURACY or (p.XYACCURACY is null and b.XYACCURACY is not null) or (p.XYACCURACY is not null and b.XYACCURACY is null))
+      when matched then update set XYACCURACY = b.XYACCURACY;
+
+    -- FACLOCID
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.FACLOCID <> b.FACLOCID or (p.FACLOCID is null and b.FACLOCID is not null) or (p.FACLOCID is not null and b.FACLOCID is null))
+      when matched then update set FACLOCID = b.FACLOCID;
+
+    -- FACASSETID
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.FACASSETID <> b.FACASSETID or (p.FACASSETID is null and b.FACASSETID is not null) or (p.FACASSETID is not null and b.FACASSETID is null))
+      when matched then update set FACASSETID = b.FACASSETID;
+
+    -- FEATUREID
+    --     This is unique to the POI feature
+
+    -- GEOMETRYID
+    --     This is unique to the this geometry
+
+    -- NOTES
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.NOTES <> b.NOTES or (p.NOTES is null and b.NOTES is not null) or (p.NOTES is not null and b.NOTES is null))
+      when matched then update set NOTES = b.NOTES;
+
+    -- SRCDBNAME is for internal information only; No Calcs possible or required
+    -- SRCDBIDFLD is for internal information only; No Calcs possible or required
+    -- SRCDBIDVAL is for internal information only; No Calcs possible or required
+    -- SRCDBNMFLD is for internal information only; No Calcs possible or required
+    -- SRCDBNMVAL is for internal information only; No Calcs possible or required
+
+    -- WEBEDITUSER -- No calcs; it is obsolete and will be removed shortly
+    -- WEBCOMMENT -- No calcs; it is obsolete and will be removed shortly
+
+    -- Shape
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.Shape.STY <> b.Shape.STY or p.Shape.STX <> b.Shape.STY)
+      when matched then update set Shape = Geometry::Point(b.Shape.STX, b.Shape.STY, b.Shape.STSrid);
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
