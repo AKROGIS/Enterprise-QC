@@ -279,4 +279,9 @@ exec sde.edit_version @version4, 2; -- 2 to stop edits
 -- 9) query about changes to public properties and public display (changes that should be reviewed)
 
 -- Check buildings with POI and with Public dispaly = "No" or isextant <> "True"
+-- Review/Fix buildings with POITYPE is not NULL and No public map display (4)
+-- select * from gis.AKR_BLDG_CENTER_PT_evw where POITYPE is not NULL and PUBLICDISPLAY like 'No%'
+
 -- idea: Add all POI.POITYPES to BLDGS; only sync if BLDG.POITYPE is not null and PUBLIC DISPLAY = "Yes"
+--   Compare PublicDisplay (bldgs to POIs), along with POITYPE to see exceptions to this idea
+--   Too many (2029) mismatches with this idea; only 6 mismatches with current plan

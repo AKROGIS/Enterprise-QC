@@ -68,6 +68,21 @@ where p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
 and (b.isextant is null or b.isextant <> 'True' or p.isextant is null or p.isextant <> 'True')
 order by p.SRCDBIDVAL
 
+-- Compare bldgs to POIs based on Public Display and POITYPE; use history (before purge on 7/7/21)
+-- 2029 bldg items in POI with POITYPE and No Public Map Display where bldg has Public Map Display
+-- 4 bldgs with POITYPE and No Public Map Display where (POI has Public Map Display)
+-- 7 mis matches in PUBLICDISPLAY when building has a POITYPE
+select p.PUBLICDISPLAY, b.PUBLICDISPLAY, p.POITYPE, b.POITYPE, p.SRCDBIDVAL, b.FEATUREID, p.MAPLABEL, b.MAPlabel,
+       p.poiname, b.BLDGNAME, p.poialtname, b.BLDGALTNAME, b.BLDGTYPE, p.ISEXTANT, b.ISEXTANT
+from akr_socio.gis.POI_PT_H as p
+join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+on p.SRCDBIDVAL = b.FEATUREID
+where p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+and p.GDB_FROM_DATE < '2021-07-06' and p.GDB_TO_DATE > '2021-07-06'
+and p.PUBLICDISPLAY <> b.PUBLICDISPLAY
+and b.POITYPE is not null
+order by b.PUBLICDISPLAY
+
 -- Non-unique GUIDS (2)
 select FEATUREID, count(FEATUREID) from akr_socio.GIS.akr_POI_PT_evw group by FEATUREID having count(FEATUREID) > 1
 select GEOMETRYID, count(GEOMETRYID) from akr_socio.GIS.akr_POI_PT_evw group by GEOMETRYID having count(GEOMETRYID) > 1
