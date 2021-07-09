@@ -917,6 +917,8 @@ GO
 -- Description:	Sync attributes with a source table
 --
 -- These calcs replace attributes with the source attributes for records that are maintained in a source database (like facilities)
+-- 
+-- This file is nearly identical to Sync_POI_Pt_with_TrailFeatures; changes made to one should likely be made to the other
 -- =============================================
 
 CREATE PROCEDURE [dbo].[Sync_POI_Pt_with_Buildings] 
@@ -1134,6 +1136,236 @@ BEGIN
     merge into gis.AKR_POI_PT_evw as p
       using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
       on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.Shape.STY <> b.Shape.STY or p.Shape.STX <> b.Shape.STY)
+      when matched then update set Shape = Geometry::Point(b.Shape.STX, b.Shape.STY, b.Shape.STSrid);
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2021-07-08
+-- Description:	Sync attributes with a source table
+--
+-- These calcs replace attributes with the source attributes for records that are maintained in a source database (like facilities)
+-- 
+-- This file is nearly identical to Sync_POI_Pt_with_Buildings; changes made to one should likely be made to the other
+-- =============================================
+
+CREATE PROCEDURE [dbo].[Sync_POI_Pt_with_TrailFeatures] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500),
+    @source_version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the source version
+    exec akr_facility2.sde.set_current_version @source_version
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- POINAME
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.POINAME <> b.TRLFEATNAME or (p.POINAME is null and b.TRLFEATNAME is not null) or (p.POINAME is not null and b.TRLFEATNAME is null))
+      when matched then update set POINAME = b.TRLFEATNAME;
+
+    -- POIALTNAME
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.POIALTNAME <> b.TRLFEATALTNAME or (p.POIALTNAME is null and b.TRLFEATALTNAME is not null) or (p.POIALTNAME is not null and b.TRLFEATALTNAME is null))
+      when matched then update set POIALTNAME = b.TRLFEATALTNAME;
+    
+    -- MAPLABEL
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.MAPLABEL <> b.MAPLABEL or (p.MAPLABEL is null and b.MAPLABEL is not null) or (p.MAPLABEL is not null and b.MAPLABEL is null))
+      when matched then update set MAPLABEL = b.MAPLABEL;
+    
+    -- POITYPE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.POITYPE <> b.POITYPE or (p.POITYPE is null and b.POITYPE is not null) or (p.POITYPE is not null and b.POITYPE is null))
+      when matched then update set POITYPE = b.POITYPE;
+    
+    -- POIDESC
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.POIDESC <> b.TRLFEATDESC or (p.POIDESC is null and b.TRLFEATDESC is not null) or (p.POIDESC is not null and b.TRLFEATDESC is null))
+      when matched then update set POIDESC = b.TRLFEATDESC;
+
+    -- SEASONAL
+    --     No source value in Trail Features
+
+    -- SEASDESC
+    --     No source value in Trail Features
+
+    -- MAINTAINER
+    --     No source value in Trail Features
+
+    -- ISEXTANT
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.ISEXTANT <> b.ISEXTANT or (p.ISEXTANT is null and b.ISEXTANT is not null) or (p.ISEXTANT is not null and b.ISEXTANT is null))
+      when matched then update set ISEXTANT = b.ISEXTANT;
+
+    -- POINTTYPE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.POINTTYPE <> b.POINTTYPE or (p.POINTTYPE is null and b.POINTTYPE is not null) or (p.POINTTYPE is not null and b.POINTTYPE is null))
+      when matched then update set POINTTYPE = b.POINTTYPE;
+
+    -- ISCURRENTGEO -- No calcs; it is obsolete and will be removed shortly
+
+    -- ISOUTPARK
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.ISOUTPARK <> b.ISOUTPARK or (p.ISOUTPARK is null and b.ISOUTPARK is not null) or (p.ISOUTPARK is not null and b.ISOUTPARK is null))
+      when matched then update set ISOUTPARK = b.ISOUTPARK;
+
+    -- PUBLICDISPLAY
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.PUBLICDISPLAY <> b.PUBLICDISPLAY or (p.PUBLICDISPLAY is null and b.PUBLICDISPLAY is not null) or (p.PUBLICDISPLAY is not null and b.PUBLICDISPLAY is null))
+      when matched then update set PUBLICDISPLAY = b.PUBLICDISPLAY;
+
+    -- DATAACCESS
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.DATAACCESS <> b.DATAACCESS or (p.DATAACCESS is null and b.DATAACCESS is not null) or (p.DATAACCESS is not null and b.DATAACCESS is null))
+      when matched then update set DATAACCESS = b.DATAACCESS;
+
+    -- UNITCODE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.UNITCODE <> b.UNITCODE or (p.UNITCODE is null and b.UNITCODE is not null) or (p.UNITCODE is not null and b.UNITCODE is null))
+      when matched then update set UNITCODE = b.UNITCODE;
+
+    -- UNITNAME
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.UNITNAME <> b.UNITNAME or (p.UNITNAME is null and b.UNITNAME is not null) or (p.UNITNAME is not null and b.UNITNAME is null))
+      when matched then update set UNITNAME = b.UNITNAME;
+
+    -- GROUPCODE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.GROUPCODE <> b.GROUPCODE or (p.GROUPCODE is null and b.GROUPCODE is not null) or (p.GROUPCODE is not null and b.GROUPCODE is null))
+      when matched then update set GROUPCODE = b.GROUPCODE;
+
+    -- GROUPNAME
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.GROUPNAME <> b.GROUPNAME or (p.GROUPNAME is null and b.GROUPNAME is not null) or (p.GROUPNAME is not null and b.GROUPNAME is null))
+      when matched then update set GROUPNAME = b.GROUPNAME;
+
+    -- REGIONCODE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.REGIONCODE <> b.REGIONCODE or (p.REGIONCODE is null and b.REGIONCODE is not null) or (p.REGIONCODE is not null and b.REGIONCODE is null))
+      when matched then update set REGIONCODE = b.REGIONCODE;
+
+    -- CREATEUSER, CREATEDATE, EDITUSER, EDITDATE -- No Calcs (managed by system)
+
+    -- MAPMETHOD
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.MAPMETHOD <> b.MAPMETHOD or (p.MAPMETHOD is null and b.MAPMETHOD is not null) or (p.MAPMETHOD is not null and b.MAPMETHOD is null))
+      when matched then update set MAPMETHOD = b.MAPMETHOD;
+
+    -- MAPSOURCE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.MAPSOURCE <> b.MAPSOURCE or (p.MAPSOURCE is null and b.MAPSOURCE is not null) or (p.MAPSOURCE is not null and b.MAPSOURCE is null))
+      when matched then update set MAPSOURCE = b.MAPSOURCE;
+
+    -- SOURCEDATE
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.SOURCEDATE <> b.SOURCEDATE or (p.SOURCEDATE is null and b.SOURCEDATE is not null) or (p.SOURCEDATE is not null and b.SOURCEDATE is null))
+      when matched then update set SOURCEDATE = b.SOURCEDATE;
+
+    -- XYACCURACY
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.XYACCURACY <> b.XYACCURACY or (p.XYACCURACY is null and b.XYACCURACY is not null) or (p.XYACCURACY is not null and b.XYACCURACY is null))
+      when matched then update set XYACCURACY = b.XYACCURACY;
+
+    -- FACLOCID
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.FACLOCID <> b.FACLOCID or (p.FACLOCID is null and b.FACLOCID is not null) or (p.FACLOCID is not null and b.FACLOCID is null))
+      when matched then update set FACLOCID = b.FACLOCID;
+
+    -- FACASSETID
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.FACASSETID <> b.FACASSETID or (p.FACASSETID is null and b.FACASSETID is not null) or (p.FACASSETID is not null and b.FACASSETID is null))
+      when matched then update set FACASSETID = b.FACASSETID;
+
+    -- FEATUREID
+    --     This is unique to the POI feature
+
+    -- GEOMETRYID
+    --     This is unique to the this geometry
+
+    -- NOTES
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.NOTES <> b.NOTES or (p.NOTES is null and b.NOTES is not null) or (p.NOTES is not null and b.NOTES is null))
+      when matched then update set NOTES = b.NOTES;
+
+    -- SRCDBNAME is for internal information only; No Calcs possible or required
+    -- SRCDBIDFLD is for internal information only; No Calcs possible or required
+    -- SRCDBIDVAL is for internal information only; No Calcs possible or required
+    -- SRCDBNMFLD is for internal information only; No Calcs possible or required
+    -- SRCDBNMVAL is for internal information only; No Calcs possible or required
+
+    -- WEBEDITUSER -- No calcs; it is obsolete and will be removed shortly
+    -- WEBCOMMENT -- No calcs; it is obsolete and will be removed shortly
+
+    -- Shape
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
       and (p.Shape.STY <> b.Shape.STY or p.Shape.STX <> b.Shape.STY)
       when matched then update set Shape = Geometry::Point(b.Shape.STX, b.Shape.STY, b.Shape.STSrid);
 
