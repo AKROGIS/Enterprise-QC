@@ -25,10 +25,17 @@ select owner, name from sde.SDE_versions where parent_version_id is not null ord
 --    Alternatively, replace all occurrances of @version with the appropriate 'owner.name' version text,
 ---   then execute one statement (or a group of statements) at a time.
 DECLARE @version nvarchar(255) = 'owner.name'
+DECLARE @facility_version nvarchar(255) = 'owner.name'
 
 exec dbo.Calc_POI_PT @version
 exec dbo.Calc_POI_LN @version
 exec dbo.Calc_POI_PY @version
+
+-- Run the following querries to ensure that records that have a source in facilities are current
+-- They can be run anytime without harm, however they must be run if related records are changed.
+exec dbo.Sync_POI_Pt_with_Buildings @version, @facility_version
+exec dbo.Sync_POI_Pt_with_TrailFeatures @version, @facility_version
+
 
 -- Calcs to fix The fact that DBOs have to edit as SDE and not Domain User (with ArcGIS 10.x)
 exec sde.set_current_version @version

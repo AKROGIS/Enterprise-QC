@@ -265,14 +265,14 @@ exec sde.edit_version @version4, 2; -- 2 to stop edits
 
 
 -- Changes to do
--- 3) Write general QC and Calc queries
--- 3a) remove isextant='False'
--- 3b) resolve duplicate FeatureID (remove larger OID)
--- 3c) resolve other issues
--- 4) write query for QC comparing facilities to POI
--- 4a) resolve issues
--- 5) write calcs to update poi for diffs with facilities
--- 5a) update POIs
+-- 4) write temp queries for checking POI values that will be overwritten by facilities
+-- 4a) make sure any values we want are saved back to buildings/trails
+-- 4b) Check on POIs with isextant='False'
+-- 4b) Check on buildings related to POIs with "no map display"
+-- 4c) resolve duplicate FeatureID (remove larger OID)
+-- 4d) resolve other issues
+-- 5a) Sync POIs with facilities
+-- 5b) Run calc queries
 -- 6) query for missing and extra POIs
 -- 7) query to create a missing POI
 -- 8) when adding new building w/o POITYPE, raise question do you want to add to POI?
@@ -285,3 +285,8 @@ exec sde.edit_version @version4, 2; -- 2 to stop edits
 -- idea: Add all POI.POITYPES to BLDGS; only sync if BLDG.POITYPE is not null and PUBLIC DISPLAY = "Yes"
 --   Compare PublicDisplay (bldgs to POIs), along with POITYPE to see exceptions to this idea
 --   Too many (2029) mismatches with this idea; only 6 mismatches with current plan
+
+-- What to do about POIDESC when related to a building (no matching field)
+-- POI_LN needs better geometry tyoe for Shape
+-- ISEXTANT is using the old domain.  Upgrade?
+--
