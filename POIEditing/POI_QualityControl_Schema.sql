@@ -334,10 +334,213 @@ GO
 -- =============================================
 -- Author:		Regan Sarwas
 -- Create date: 2021-07-08
+-- Description:	Calculated properties for POI_LN
+--
+-- These calcs are largely for records that are maintained (and synced) from a source database (like facilities)
+-- Nevertheless, synced attributes will also be calced if not synced first.
+--
+-- NOTE: the versioned view of `POI_ln` is `POI_ln_evw0` (not `POI_ln_evw` as expected)
+--
+-- This file is identical to dbo.Calc_POI_Pt except for:
+--  1) Copy/replace `gis.AKR_POI_PT_evw` with `gis.POI_ln_evw0`
+--  2) Replace POINTTYPE with LINETYPE and 'Arbitrary point' with 'Arbitrary line'
+--  3) Commented out the calcs from ISOUTPARK and UNITCODE
+--     Spatial operation in SQL not possible with SDE binary geometry - uncomment when replaced with SQLServer geometry
+-- Future changes to calc_poi_pt should be included in this file as well
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_POI_LN] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- POINAME
+    --     if it is an empty string, change to NULL
+    update gis.POI_ln_evw0 set POINAME = NULL where POINAME = ''
+
+    -- POIALTNAME
+    --     if it is an empty string, change to NULL
+    update gis.POI_ln_evw0 set POIALTNAME = NULL where POIALTNAME = ''
+    
+    -- MAPLABEL
+    --     if it is an empty string, change to NULL
+    update gis.POI_ln_evw0 set MAPLABEL = NULL where MAPLABEL = ''
+    
+    -- POITYPE
+    --     No calcs; NULL, Empty and not in DOM trigger QC Error
+    
+    -- POIDESC
+    --     if it is an empty string, change to NULL
+    update gis.POI_ln_evw0 set POIDESC = NULL where POIDESC = ''
+
+    -- SEASONAL
+    --     if it is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.POI_ln_evw0 as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM akr_facility2.dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    merge into gis.POI_ln_evw0 as p
+      using (SELECT case when t2.OPSEAS = 'Y' then 'Yes' when t2.OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, t1.Asset
+            FROM akr_facility2.dbo.FMSSExport_Asset as t1 JOIN akr_facility2.dbo.FMSSExport as t2 on t1.Location = t2.Location) as f
+      on f.Asset = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+
+    -- SEASDESC
+    --     if it is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.POI_ln_evw0 set SEASDESC = NULL where SEASDESC = ''
+    update gis.POI_ln_evw0 set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+
+    -- MAINTAINER
+    --     if it is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.POI_ln_evw0 as p
+      using (SELECT d.Code as FAMARESP, location FROM akr_facility2.dbo.FMSSExport as t join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    merge into gis.POI_ln_evw0 as p
+      using (SELECT d.Code as FAMARESP, a.Asset FROM akr_facility2.dbo.FMSSExport_Asset as a join akr_facility2.dbo.FMSSExport as t on a.Location = t.Location
+             join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+
+    -- ISEXTANT
+    --     it defaults to 'True' with a warning (during QC)
+    update gis.POI_ln_evw0 set ISEXTANT = 'True' where ISEXTANT is NULL
+
+    -- POINTTYPE
+    --     if it is NULL or empty, set to 'Arbitrary line'
+    update gis.POI_ln_evw0 set LINETYPE = 'Arbitrary line' where LINETYPE is null or LINETYPE = '' 
+
+    -- ISCURRENTGEO -- No calcs; it is obsolete and will be removed shortly
+
+    -- ISOUTPARK
+    --     it is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    -- Not possible with SDE binary geometry - uncomment when replaced with SQLServer Geometry
+/*
+    merge into gis.POI_ln_evw0 as t1 using akr_facility2.gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+*/
+    -- PUBLICDISPLAY
+    --     it defaults to No Public Map Display
+    update gis.POI_ln_evw0 set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+
+    -- DATAACCESS
+    --     it defaults to No Public Map Display
+    update gis.POI_ln_evw0 set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+
+    -- UNITCODE
+    --     it is a spatial calc if null
+    -- Not possible with SDE binary geometry - uncomment when replaced with SQLServer Geometry
+/*
+    merge into gis.POI_ln_evw0 as t1 using akr_facility2.gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+*/
+
+    -- UNITNAME
+    --     it is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.POI_ln_evw0 set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.POI_ln_evw0 as t1 using akr_facility2.dbo.DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+
+    -- GROUPCODE
+    --     if it is an empty string, change to NULL
+    update gis.POI_ln_evw0 set GROUPCODE = NULL where GROUPCODE = ''
+
+    -- GROUPNAME
+    --     it is always calc'd from GROUPCODE
+    update gis.POI_ln_evw0 set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.POI_ln_evw0 as t1 using akr_facility2.gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+
+    -- REGIONCODE
+    --     it is always set to AKR
+    update gis.POI_ln_evw0 set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+
+    -- CREATEUSER, CREATEDATE, EDITUSER, EDITDATE -- No Calcs (managed by system)
+
+    -- MAPMETHOD
+    --     if it is NULL or an empty string, change to Unknown
+    update gis.POI_ln_evw0 set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+
+    -- MAPSOURCE
+    --     if it is NULL or an empty string, change to Unknown
+    --     by SQL Magic '' is the same as any string of just white space
+    update gis.POI_ln_evw0 set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+
+    -- SOURCEDATE: Nothing to do.
+
+    -- XYACCURACY
+    --     if it is NULL or an empty string, change to Unknown
+    update gis.POI_ln_evw0 set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+
+    -- FACLOCID
+    --     if it is empty string change to null
+    update gis.POI_ln_evw0 set FACLOCID = NULL where FACLOCID = ''
+
+    -- FACASSETID
+    --     if it is empty string change to null
+    update gis.POI_ln_evw0 set FACASSETID = NULL where FACASSETID = ''
+
+    -- FEATUREID
+    --     if it if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.POI_ln_evw0 set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+
+    -- GEOMETRYID
+    --     if it is null/empty
+    update gis.POI_ln_evw0 set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+
+    -- NOTES
+    --     if it is an empty string, change to NULL
+    update gis.POI_ln_evw0 set NOTES = NULL where NOTES = ''
+
+    -- SRCDBNAME is for internal information only; No Calcs possible or required
+    -- SRCDBIDFLD is for internal information only; No Calcs possible or required
+    -- SRCDBIDVAL is for internal information only; No Calcs possible or required
+    -- SRCDBNMFLD is for internal information only; No Calcs possible or required
+    -- SRCDBNMVAL is for internal information only; No Calcs possible or required
+
+    -- WEBEDITUSER -- No calcs; it is obsolete and will be removed shortly
+    -- WEBCOMMENT -- No calcs; it is obsolete and will be removed shortly
+
+    -- Shape -- No Calcs
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2021-07-08
 -- Description:	Calculated properties for POI_PT
 --
 -- These calcs are largely for records that are maintained (and synced) from a source database (like facilities)
 -- Nevertheless, synced attributes will also be calced if not synced first.
+--
+-- NOTE: the versioned view of `POI_pt` is `akr_POI_pt_evw` (not `POI_pt_evw` as expected)
+-- 
+-- NOTE: Calc_POI_PY and Calc_POI_LN are nearly identical copies of this file; changes should be synced across all scripts
 -- =============================================
 CREATE PROCEDURE [dbo].[Calc_POI_Pt] 
     -- Add the parameters for the stored procedure here
@@ -494,6 +697,198 @@ BEGIN
     -- NOTES
     --     if it is an empty string, change to NULL
     update gis.AKR_POI_PT_evw set NOTES = NULL where NOTES = ''
+
+    -- SRCDBNAME is for internal information only; No Calcs possible or required
+    -- SRCDBIDFLD is for internal information only; No Calcs possible or required
+    -- SRCDBIDVAL is for internal information only; No Calcs possible or required
+    -- SRCDBNMFLD is for internal information only; No Calcs possible or required
+    -- SRCDBNMVAL is for internal information only; No Calcs possible or required
+
+    -- WEBEDITUSER -- No calcs; it is obsolete and will be removed shortly
+    -- WEBCOMMENT -- No calcs; it is obsolete and will be removed shortly
+
+    -- Shape -- No Calcs
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2021-07-08
+-- Description:	Calculated properties for POI_PY
+--
+-- These calcs are largely for records that are maintained (and synced) from a source database (like facilities)
+-- Nevertheless, synced attributes will also be calced if not synced first.
+--
+-- NOTE: the versioned view of `POI_py` is `POI_py_evw0` (not `POI_py_evw` as expected)
+--
+-- This file is identical to dbo.Calc_POI_Pt except for:
+--  1) Copy/replace `gis.AKR_POI_PT_evw` with `gis.POI_py_evw0`
+--  2) Replace POINTTYPE with POLYGONTYPE and 'Arbitrary point' with 'Circumscribed polygon'
+-- Future changes to calc_poi_pt should be included in this file as well
+-- =============================================
+CREATE PROCEDURE [dbo].[Calc_POI_PY] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- POINAME
+    --     if it is an empty string, change to NULL
+    update gis.POI_py_evw0 set POINAME = NULL where POINAME = ''
+
+    -- POIALTNAME
+    --     if it is an empty string, change to NULL
+    update gis.POI_py_evw0 set POIALTNAME = NULL where POIALTNAME = ''
+    
+    -- MAPLABEL
+    --     if it is an empty string, change to NULL
+    update gis.POI_py_evw0 set MAPLABEL = NULL where MAPLABEL = ''
+    
+    -- POITYPE
+    --     No calcs; NULL, Empty and not in DOM trigger QC Error
+    
+    -- POIDESC
+    --     if it is an empty string, change to NULL
+    update gis.POI_py_evw0 set POIDESC = NULL where POIDESC = ''
+
+    -- SEASONAL
+    --     if it is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.POI_py_evw0 as p
+      using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM akr_facility2.dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+    merge into gis.POI_py_evw0 as p
+      using (SELECT case when t2.OPSEAS = 'Y' then 'Yes' when t2.OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, t1.Asset
+            FROM akr_facility2.dbo.FMSSExport_Asset as t1 JOIN akr_facility2.dbo.FMSSExport as t2 on t1.Location = t2.Location) as f
+      on f.Asset = p.FACLOCID and (p.SEASONAL is null and f.OPSEAS is not null)
+      when matched then update set SEASONAL = f.OPSEAS;
+
+    -- SEASDESC
+    --     if it is an empty string, change to NULL
+    --     Provide a default of "Winter seasonal closure" if null and SEASONAL = 'Yes'
+    update gis.POI_py_evw0 set SEASDESC = NULL where SEASDESC = ''
+    update gis.POI_py_evw0 set SEASDESC = 'Winter seasonal closure' where SEASDESC is null and SEASONAL = 'Yes'
+
+    -- MAINTAINER
+    --     if it is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
+    merge into gis.POI_py_evw0 as p
+      using (SELECT d.Code as FAMARESP, location FROM akr_facility2.dbo.FMSSExport as t join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+    merge into gis.POI_py_evw0 as p
+      using (SELECT d.Code as FAMARESP, a.Asset FROM akr_facility2.dbo.FMSSExport_Asset as a join akr_facility2.dbo.FMSSExport as t on a.Location = t.Location
+             join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      when matched then update set MAINTAINER = f.FAMARESP;
+
+    -- ISEXTANT
+    --     it defaults to 'True' with a warning (during QC)
+    update gis.POI_py_evw0 set ISEXTANT = 'True' where ISEXTANT is NULL
+
+    -- POINTTYPE
+    --     if it is NULL or empty, set to 'Arbitrary point'
+    update gis.POI_py_evw0 set POLYGONTYPE = 'Circumscribed polygon' where POLYGONTYPE is null or POLYGONTYPE = '' 
+
+    -- ISCURRENTGEO -- No calcs; it is obsolete and will be removed shortly
+
+    -- ISOUTPARK
+    --     it is always calced based on the features location; assumes UNITCODE is QC'd and missing values populated
+    merge into gis.POI_py_evw0 as t1 using akr_facility2.gis.AKR_UNIT as t2
+      on t1.UNITCODE = t2.Unit_Code and (t1.ISOUTPARK is null or CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END <> t1.ISOUTPARK)
+      when matched then update set ISOUTPARK = CASE WHEN t2.Shape.STContains(t1.Shape) = 1 THEN  'No' ELSE CASE WHEN t1.Shape.STIntersects(t2.Shape) = 1 THEN 'Both' ELSE 'Yes' END END;
+
+    -- PUBLICDISPLAY
+    --     it defaults to No Public Map Display
+    update gis.POI_py_evw0 set PUBLICDISPLAY = 'No Public Map Display' where PUBLICDISPLAY is NULL or PUBLICDISPLAY = ''
+
+    -- DATAACCESS
+    --     it defaults to No Public Map Display
+    update gis.POI_py_evw0 set DATAACCESS = 'Internal NPS Only' where DATAACCESS is NULL or DATAACCESS = ''
+
+    -- UNITCODE
+    --     it is a spatial calc if null
+    merge into gis.POI_py_evw0 as t1 using akr_facility2.gis.AKR_UNIT as t2
+      on t1.Shape.STIntersects(t2.Shape) = 1 and t1.UNITCODE is null and t2.Unit_Code is not null
+      when matched then update set UNITCODE = t2.Unit_Code;
+
+    -- UNITNAME
+    --     it is always calc'd from UNITCODE
+    --     We use DOM_UNITCODE because it is a superset of AKR_UNIT.  (UNITNAME has been standardized to values in AKR_UNIT)
+    update gis.POI_py_evw0 set UNITNAME = NULL where UNITCODE is null and UNITNAME is not null
+    merge into gis.POI_py_evw0 as t1 using akr_facility2.dbo.DOM_UNITCODE as t2
+      on t1.UNITCODE = t2.Code and (t1.UNITNAME <> t2.UNITNAME or (t1.UNITNAME is null and t2.UNITNAME is not null))
+      when matched then update set UNITNAME = t2.UNITNAME;
+
+    -- GROUPCODE
+    --     if it is an empty string, change to NULL
+    update gis.POI_py_evw0 set GROUPCODE = NULL where GROUPCODE = ''
+
+    -- GROUPNAME
+    --     it is always calc'd from GROUPCODE
+    update gis.POI_py_evw0 set GROUPNAME = NULL where GROUPCODE is null and GROUPNAME is not null
+    merge into gis.POI_py_evw0 as t1 using akr_facility2.gis.AKR_GROUP as t2
+      on t1.GROUPCODE = t2.Group_Code and t1.GROUPNAME <> t2.Group_Name
+      when matched then update set GROUPNAME = t2.Group_Name;
+
+    -- REGIONCODE
+    --     it is always set to AKR
+    update gis.POI_py_evw0 set REGIONCODE = 'AKR' where REGIONCODE is null or REGIONCODE <> 'AKR'
+
+    -- CREATEUSER, CREATEDATE, EDITUSER, EDITDATE -- No Calcs (managed by system)
+
+    -- MAPMETHOD
+    --     if it is NULL or an empty string, change to Unknown
+    update gis.POI_py_evw0 set MAPMETHOD = 'Unknown' where MAPMETHOD is NULL or MAPMETHOD = ''
+
+    -- MAPSOURCE
+    --     if it is NULL or an empty string, change to Unknown
+    --     by SQL Magic '' is the same as any string of just white space
+    update gis.POI_py_evw0 set MAPSOURCE = 'Unknown' where MAPSOURCE is NULL or MAPSOURCE = ''
+
+    -- SOURCEDATE: Nothing to do.
+
+    -- XYACCURACY
+    --     if it is NULL or an empty string, change to Unknown
+    update gis.POI_py_evw0 set XYACCURACY = 'Unknown' where XYACCURACY is NULL or XYACCURACY = ''
+
+    -- FACLOCID
+    --     if it is empty string change to null
+    update gis.POI_py_evw0 set FACLOCID = NULL where FACLOCID = ''
+
+    -- FACASSETID
+    --     if it is empty string change to null
+    update gis.POI_py_evw0 set FACASSETID = NULL where FACASSETID = ''
+
+    -- FEATUREID
+    --     if it if null/empty in gis.AKR_BLDG_CENTER_PT
+    update gis.POI_py_evw0 set FEATUREID = '{' + convert(varchar(max),newid()) + '}' where FEATUREID is null or FEATUREID = ''
+
+    -- GEOMETRYID
+    --     if it is null/empty
+    update gis.POI_py_evw0 set GEOMETRYID = '{' + convert(varchar(max),newid()) + '}' where GEOMETRYID is null or GEOMETRYID = ''
+
+    -- NOTES
+    --     if it is an empty string, change to NULL
+    update gis.POI_py_evw0 set NOTES = NULL where NOTES = ''
 
     -- SRCDBNAME is for internal information only; No Calcs possible or required
     -- SRCDBIDFLD is for internal information only; No Calcs possible or required
