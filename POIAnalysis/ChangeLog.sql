@@ -264,13 +264,57 @@ exec sde.edit_version @version4, 2; -- 2 to stop edits
 -- Create a new QC view called DBO.QC_ISSUES_POI_PT based on a similar view in akr_facility2
 
 
+-- 2021-07-12
+
+-- Update buildings (and trails) with poiname -> bldgname (or trlname) when facility value is null and poiname is not null
+-- Update buildings (and trails) with poialtname -> bldgaltname (or trlaltname) when facility value is null and poiname is not null
+
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec akr_socio.sde.set_current_version @version4
+exec akr_facility2.sde.set_current_version @version4
+exec akr_facility2.sde.edit_version @version4, 1 -- 1 to start edits
+-- Buildings (1 bldgname, 8 bldgaltname)
+merge into akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b using 
+    akr_socio.gis.akr_POI_PT_evw as p
+    on p.SRCDBIDVAL = b.FEATUREID --and p.ISEXTANT = b.ISEXTANT
+       and SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+       and b.bldgname is null and p.poiname is not null
+    when matched then update set b.bldgname = p.poiname;
+merge into akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b using 
+    akr_socio.gis.akr_POI_PT_evw as p
+    on p.SRCDBIDVAL = b.FEATUREID --and p.ISEXTANT = b.ISEXTANT
+       and SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+       and b.bldgaltname is null and p.poialtname is not null
+    when matched then update set b.bldgaltname = p.poialtname;
+-- Trail Features (49 changes)
+merge into akr_facility2.gis.TRAILS_FEATURE_PT_evw as b using 
+    akr_socio.gis.akr_POI_PT_evw as p
+    on p.SRCDBIDVAL = b.GEOMETRYID and p.ISEXTANT = b.ISEXTANT
+       and SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+       and ((b.TRLFEATNAME is null and p.poiname is not null) or b.TRLFEATNAME <> p.poiname)
+    when matched then update set b.TRLFEATNAME = p.poiname;
+exec akr_facility2.sde.edit_version @version4, 2; -- 2 to stop edits
+
+-- A miscellaneous missing Map Label (skipped before because ISEXTANT = 'False')
+
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec akr_socio.sde.set_current_version @version4
+exec akr_facility2.sde.set_current_version @version4
+exec akr_facility2.sde.edit_version @version4, 1 -- 1 to start edits
+update akr_facility2.gis.AKR_BLDG_CENTER_PT_evw  set MAPLABEL = 'Frye-Bruhn Refrigerated Warehouse (Historic)' where MAPLABEL = 'Frye-Bruhn Cold Storage Building (Historic)'
+exec akr_facility2.sde.edit_version @version4, 2; -- 2 to stop edits
+
+-- Differences in ISEXTANT and PUBLICDISPLAY; Assume buildings is more accurate (it is always has a newer editdate)
+-- FEATUREID                                MAPLABEL                                        POI     BLDG    POI                 BLDG
+-- {244F1EBC-5994-4662-84C4-8C2F8368A206}	Crescent Lake Ranger Station	                True	True	Public Map Display	No Public Map Display
+-- {48D40CE5-8EA9-4912-89B6-C6A69E093499}	Baked Mountain Hut	                            True	Partial	Public Map Display	No Public Map Display
+-- {4AAFC217-F711-4E96-8DDE-9E8EB619B767}	Baked Mountain Hut #2	                        True	True	Public Map Display	No Public Map Display
+-- {4DB86383-B88A-4DB7-9B84-A99A319889BB}	Baked Mountain Hut Outhouse	                    True	True	Public Map Display	No Public Map Display
+-- {716D9BD2-EDB2-4688-B4E4-F62F06FBBF4A}	Frye-Bruhn Refrigerated Warehouse (Historic)	False	True	Public Map Display	Public Map Display
+
+
 -- Changes to do
--- 4) write temp queries for checking POI values that will be overwritten by facilities
--- 4a) make sure any values we want are saved back to buildings/trails
--- 4b) Check on POIs with isextant='False'
--- 4b) Check on buildings related to POIs with "no map display"
 -- 4c) resolve duplicate FeatureID (remove larger OID)
--- 4d) resolve other issues
 -- 5a) Sync POIs with facilities
 -- 5b) Run calc queries
 -- 6) query for missing and extra POIs

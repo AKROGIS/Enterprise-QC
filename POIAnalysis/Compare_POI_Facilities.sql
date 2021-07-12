@@ -1,5 +1,6 @@
 exec sde.set_default
---exec sde.set_current_version 'dbo.res'
+--exec akr_socio.sde.set_current_version 'dbo.res'
+--exec akr_facility2.sde.set_current_version 'dbo.res'
 
 -- List of POI Sources, ordered by popularity
 select srcDBname, srcdbidfld, srcdbnmfld, count(*) as Count from gis.akr_POI_PT_evw
@@ -62,10 +63,11 @@ order by p.SRCDBIDVAL
 -- Compare POIs with buildings - ISEXTANT Issues (5 of 324)
 select p.SRCDBIDVAL, b.FEATUREID, p.MAPLABEL, b.MAPlabel, p.poiname, b.BLDGNAME, p.poialtname, b.BLDGALTNAME, p.POITYPE, b.POITYPE, b.BLDGTYPE, p.ISEXTANT, b.ISEXTANT
 from akr_socio.gis.akr_POI_PT_evw as p
-left join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
 on p.SRCDBIDVAL = b.FEATUREID
 where p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
-and (b.isextant is null or b.isextant <> 'True' or p.isextant is null or p.isextant <> 'True')
+and ((p.isextant is null and b.isextant is not null) or p.isextant <> b.isextant or (p.isextant is not null or b.isextant is null)
+  OR (p.PUBLICDISPLAY is null and b.PUBLICDISPLAY is not null) or p.PUBLICDISPLAY <> b.PUBLICDISPLAY or (p.PUBLICDISPLAY is not null or b.PUBLICDISPLAY is null))
 order by p.SRCDBIDVAL
 
 -- Compare bldgs to POIs based on Public Display and POITYPE; use history (before purge on 7/7/21)
@@ -99,6 +101,36 @@ on p.SRCDBIDVAL = b.FEATUREID
 where SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
 and ((p.MAPLABEL is null and b.MAPLABEL is not null) or p.MAPLABEL <> b.MAPLABEL) --  or (p.MAPLABEL is not null and b.MAPLABEL is null))
 
+-- building names that do not match poiname (133 total, 1 where bldgname is null)
+-- Recommend updating bldgname when null and poiname is not null
+-- otherwise, all poinmames get replaced with the bldgname
+select p.poiname, b.bldgname from akr_socio.gis.akr_POI_PT_evw as p
+join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+on p.SRCDBIDVAL = b.FEATUREID
+where SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+and ((p.poiname is not null and b.bldgname is null) or p.poiname <> b.bldgname) --  or (p.poiname is null and b.bldgname is not null))
+order by b.bldgname
+
+-- building alt names that do not match poi alt name (8 total, all where bldgaltname is null)
+-- Recommend updating bldgaltname when null and poialtname is not null
+-- otherwise, all poialtnames get replaced with the bldgaltnames
+select p.poialtname, b.bldgaltname from akr_socio.gis.akr_POI_PT_evw as p
+join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+on p.SRCDBIDVAL = b.FEATUREID
+where SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+and ((p.poialtname is not null and b.bldgaltname is null) or p.poialtname <> b.bldgaltname) --  or (p.poialtname is null and b.bldgaltname is not null))
+order by b.bldgaltname
+
+-- Public Display and IsExtant differences between buildings and POIs (5 of 324)
+select b.FEATUREID, p.MAPLABEL, p.ISEXTANT, b.ISEXTANT, p.PUBLICDISPLAY, b.PUBLICDISPLAY, p.EDITDATE, b.editdate
+from akr_socio.gis.akr_POI_PT_evw as p
+join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+on p.SRCDBIDVAL = b.FEATUREID
+where p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+and ((p.isextant is null and b.isextant is not null) or p.isextant <> b.isextant or (p.isextant is not null and b.isextant is null)
+  OR (p.PUBLICDISPLAY is null and b.PUBLICDISPLAY is not null) or p.PUBLICDISPLAY <> b.PUBLICDISPLAY or (p.PUBLICDISPLAY is not null and b.PUBLICDISPLAY is null))
+order by p.SRCDBIDVAL
+
 
 -- building names that do not match poi map label (133)
 -- Recommend updating POI with the values in buildings
@@ -117,6 +149,15 @@ join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
 on p.SRCDBIDVAL = b.FEATUREID
 where SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
 group by p.POITYPE, b.BLDGTYPE
+
+-- building POITYPE that do not match poi POITYPE (0)
+-- Recommend updating POI with the values in buildings
+-- Terefore I am ignoring null POI Names
+select p.POITYPE, b.POITYPE from akr_socio.gis.akr_POI_PT_evw as p
+join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+on p.SRCDBIDVAL = b.FEATUREID
+where SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+and ((p.POITYPE is not null and b.POITYPE is null) or p.POITYPE <> b.POITYPE or (p.POITYPE is null and b.POITYPE is not null))
 
 -- Compare Location (67 issues, 22 significant)
 select p.featureid, p.poiname, p.poitype,
@@ -162,7 +203,7 @@ select p.MAPLABEL as [POI map label], t.MAPlabel as [trail map label] from akr_s
 join akr_facility2.gis.TRAILS_FEATURE_PT_evw  as t
 on p.SRCDBIDVAL = t.GEOMETRYID
 where SRCDBNAME =  'akr_facility2.GIS.TRAILS_Feature_pt'
-and t.MAPLABEL is not null and p.maplabel <> t.maplabel
+and ((p.MAPLABEL is null and t.MAPLABEL is not null) or p.MAPLABEL <> t.MAPLABEL) --  or (p.MAPLABEL is not null and t.MAPLABEL is null))
 
 -- fix poiname (24)
 select p.POINAME, TRLFEATNAME from akr_socio.gis.akr_POI_PT_evw as p
@@ -171,12 +212,50 @@ on p.SRCDBIDVAL = t.GEOMETRYID
 where SRCDBNAME =  'akr_facility2.GIS.TRAILS_Feature_pt'
 and t.TRLFEATNAME is not null and p.POINAME <> t.TRLFEATNAME
 
+-- Trail feature names that do not match poiname (49 total, 25 where bldgname is null)
+-- Recommend updating TRLFEATNAME in all cases, in the future, 
+-- poinmames get replaced with the TRLFEATNAME
+select p.poiname, b.TRLFEATNAME from akr_socio.gis.akr_POI_PT_evw as p
+join akr_facility2.gis.TRAILS_FEATURE_PT_evw as b 
+on p.SRCDBIDVAL = b.GEOMETRYID
+where SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+and ((p.poiname is not null and b.TRLFEATNAME is null) or p.poiname <> b.TRLFEATNAME) --  or (p.poiname is null and b.TRLFEATNAME is not null))
+order by b.TRLFEATNAME
+
+-- trail feature alt names that do not match poi alt name (0)
+-- IN the future all poialtnames get replaced with the TRLFEATALTNAME
+select p.poialtname, b.TRLFEATALTNAME from akr_socio.gis.akr_POI_PT_evw as p
+join akr_facility2.gis.TRAILS_FEATURE_PT_evw as b 
+on p.SRCDBIDVAL = b.GEOMETRYID
+where SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+and ((p.poialtname is not null and b.TRLFEATALTNAME is null) or p.poialtname <> b.TRLFEATALTNAME) --  or (p.poialtname is null and b.TRLFEATALTNAME is not null))
+order by b.TRLFEATALTNAME
+
+-- trail feature desc that do not match poi desc (0)
+-- In the future all poidesc get replaced with the TRLFEATDESC
+select p.poidesc, b.TRLFEATDESC from akr_socio.gis.akr_POI_PT_evw as p
+join akr_facility2.gis.TRAILS_FEATURE_PT_evw as b 
+on p.SRCDBIDVAL = b.GEOMETRYID
+where SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+and ((p.poidesc is not null and b.TRLFEATDESC is null) or p.poidesc <> b.TRLFEATDESC) --  or (p.poidesc is null and b.TRLFEATDESC is not null))
+order by b.TRLFEATDESC
+
 -- Compare type
-select p.POITYPE, TRLFEATTYPE, count(*) as Qty from akr_socio.gis.akr_POI_PT_evw as p
+select p.POITYPE, TRLFEATTYPE, t.poitype, count(*) as Qty from akr_socio.gis.akr_POI_PT_evw as p
 join akr_facility2.gis.TRAILS_FEATURE_PT_evw  as t
 on p.SRCDBIDVAL = t.GEOMETRYID
 where SRCDBNAME =  'akr_facility2.GIS.TRAILS_Feature_pt'
-group by p.POITYPE, TRLFEATTYPE
+group by p.POITYPE, TRLFEATTYPE, t.poitype
+
+-- Public Display and IsExtant differences between trail features and POIs (0)
+select b.FEATUREID, p.MAPLABEL, p.ISEXTANT, b.ISEXTANT, p.PUBLICDISPLAY, b.PUBLICDISPLAY
+from akr_socio.gis.akr_POI_PT_evw as p
+join akr_facility2.gis.TRAILS_Feature_pt_evw as b 
+on p.SRCDBIDVAL = b.FEATUREID
+where p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_Feature_pt'
+and ((p.isextant is null and b.isextant is not null) or p.isextant <> b.isextant or (p.isextant is not null and b.isextant is null)
+  OR (p.PUBLICDISPLAY is null and b.PUBLICDISPLAY is not null) or p.PUBLICDISPLAY <> b.PUBLICDISPLAY or (p.PUBLICDISPLAY is not null and b.PUBLICDISPLAY is null))
+order by p.SRCDBIDVAL
 
 -- Compare Location (15 issues, 4 significant)
 select p.featureid, p.poiname, p.poitype,
