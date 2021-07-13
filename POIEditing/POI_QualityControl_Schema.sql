@@ -109,10 +109,10 @@ select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL f
   left join gis.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
 union all
 
--- POINTTYPE
+-- LINETYPE
 --     must be an recognized value; if it is null/empty, then it will default to 'arbitrary point' without a warning
 select t1.OBJECTID, 'Error: LINETYPE is not a recognized value' as Issue, NULL from gis.POI_LN_evw0 as t1
-  left join gis.DOM_POINTTYPE as t2 on t1.LINETYPE = t2.Code where t1.LINETYPE is not null and t1.LINETYPE <> '' and t2.Code is null
+  left join gis.DOM_LINETYPE as t2 on t1.LINETYPE = t2.Code where t1.LINETYPE is not null and t1.LINETYPE <> '' and t2.Code is null
 union all
 
 -- ISCURRENTGEO - is obsolete and will be removed shortly
@@ -775,10 +775,10 @@ select t1.OBJECTID, 'Error: ISEXTANT is not a recognized value' as Issue, NULL f
   left join gis.DOM_ISEXTANT as t2 on t1.ISEXTANT = t2.code where t1.ISEXTANT is not null and t2.code is null
 union all
 
--- POINTTYPE
+-- POLYGONTYPE
 --     must be an recognized value; if it is null/empty, then it will default to 'arbitrary point' without a warning
 select t1.OBJECTID, 'Error: POLYGONTYPE is not a recognized value' as Issue, NULL from gis.POI_PY_evw0 as t1
-  left join gis.DOM_POINTTYPE as t2 on t1.POLYGONTYPE = t2.Code where t1.POLYGONTYPE is not null and t1.POLYGONTYPE <> '' and t2.Code is null
+  left join gis.DOM_POLYGONTYPE as t2 on t1.POLYGONTYPE = t2.Code where t1.POLYGONTYPE is not null and t1.POLYGONTYPE <> '' and t2.Code is null
 union all
 
 -- ISCURRENTGEO - is obsolete and will be removed shortly
