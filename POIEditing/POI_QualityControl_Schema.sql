@@ -155,12 +155,12 @@ select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a 
 union all
 */
 
--- TODO: Should this non-spatial query use gis.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+-- TODO: Should this non-spatial query use akr_facility2.dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
 --   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.POI_LN_evw0 as t1 left join
 --     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
 --   union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.POI_LN_evw0 as t1 left join
-  gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+  akr_facility2.dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
 
 -- TODO: replace SDE binary geometry with SQL Server Geometry and uncomment the following check
@@ -174,23 +174,23 @@ union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
   'Location ' + FACLOCID + ' has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
   from gis.POI_LN_evw0 as p join 
-  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from gis.DOM_UNITCODE)) as f
+  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from akr_facility2.dbo.DOM_UNITCODE)) as f
   on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
   'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
   from gis.POI_LN_evw0 as p
   join akr_facility2.dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
-  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from gis.DOM_UNITCODE)) as f
+  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from akr_facility2.dbo.DOM_UNITCODE)) as f
   on f.Location = a.Location where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
 
 -- UNITNAME
 --     is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
 select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.POI_LN_evw0 as t1 join
-  gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+  akr_facility2.dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
 union all
--- TODO: Should we use gis.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+-- TODO: Should we use akr_facility2.dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
 --   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.POI_LN_evw0 as t1 join
 --     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
 --   union all
@@ -199,15 +199,15 @@ union all
 --     is optional free text; AKR restriction: if provided must be in AKR_GROUP
 --     it can be null and not spatially within a group (this check is problematic, see discussion below),
 --     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
---     GROUPCODE must match related UNITCODE in gis.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
--- TODO: Should these checks use gis.AKR_GROUP or gis.DOM_UNITCODE
----- gis.DOM_UNITCODE does not allow UNIT in multiple groups
+--     GROUPCODE must match related UNITCODE in akr_facility2.dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or akr_facility2.dbo.DOM_UNITCODE
+---- akr_facility2.dbo.DOM_UNITCODE does not allow UNIT in multiple groups
 ---- gis.AKR_GROUP does not try to match group and unit
 select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.POI_LN_evw0 as t1 left join
   akr_facility2.gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
 union all
 select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.POI_LN_evw0 as t1 left join
-  gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+  akr_facility2.dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
 union all
 -- TODO: Consider doing a spatial check.  There are several problems with the current approach:
 ----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
@@ -490,12 +490,12 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue, NULL from gis.AKR_POI_PT_evw as t1
   left join akr_facility2.gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
 union all
--- TODO: Should this non-spatial query use gis.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+-- TODO: Should this non-spatial query use akr_facility2.dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
 --   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_POI_PT_evw as t1 left join
 --     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
 --   union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.AKR_POI_PT_evw as t1 left join
-  gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+  akr_facility2.dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
 select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
   'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from akr_facility2.gis.AKR_UNIT as t1
@@ -504,23 +504,23 @@ union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
   'Location ' + FACLOCID + ' has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
   from gis.AKR_POI_PT_evw as p join 
-  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from gis.DOM_UNITCODE)) as f
+  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from akr_facility2.dbo.DOM_UNITCODE)) as f
   on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
   'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
   from gis.AKR_POI_PT_evw as p
   join akr_facility2.dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
-  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from gis.DOM_UNITCODE)) as f
+  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from akr_facility2.dbo.DOM_UNITCODE)) as f
   on f.Location = a.Location where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
 
 -- UNITNAME
 --     is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
 select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_POI_PT_evw as t1 join
-  gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+  akr_facility2.dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
 union all
--- TODO: Should we use gis.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+-- TODO: Should we use akr_facility2.dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
 --   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.AKR_POI_PT_evw as t1 join
 --     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
 --   union all
@@ -529,15 +529,15 @@ union all
 --     is optional free text; AKR restriction: if provided must be in AKR_GROUP
 --     it can be null and not spatially within a group (this check is problematic, see discussion below),
 --     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
---     GROUPCODE must match related UNITCODE in gis.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
--- TODO: Should these checks use gis.AKR_GROUP or gis.DOM_UNITCODE
----- gis.DOM_UNITCODE does not allow UNIT in multiple groups
+--     GROUPCODE must match related UNITCODE in akr_facility2.dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or akr_facility2.dbo.DOM_UNITCODE
+---- akr_facility2.dbo.DOM_UNITCODE does not allow UNIT in multiple groups
 ---- gis.AKR_GROUP does not try to match group and unit
 select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.AKR_POI_PT_evw as t1 left join
   akr_facility2.gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
 union all
 select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.AKR_POI_PT_evw as t1 left join
-  gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+  akr_facility2.dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
 union all
 -- TODO: Consider doing a spatial check.  There are several problems with the current approach:
 ----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
@@ -816,12 +816,12 @@ union all
 select t1.OBJECTID, 'Error: UNITCODE is required when the point is not within a unit boundary' as Issue, NULL from gis.POI_PY_evw0 as t1
   left join akr_facility2.gis.AKR_UNIT as t2 on t1.Shape.STIntersects(t2.Shape) = 1 where t1.UNITCODE is null and t2.Unit_Code is null
 union all
--- TODO: Should this non-spatial query use gis.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+-- TODO: Should this non-spatial query use akr_facility2.dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
 --   select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.POI_PY_evw0 as t1 left join
 --     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITCODE is not null and t2.Unit_Code is null
 --   union all
 select t1.OBJECTID, 'Error: UNITCODE is not a recognized value' as Issue, NULL from gis.POI_PY_evw0 as t1 left join
-  gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
+  akr_facility2.dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITCODE is not null and t2.Code is null
 union all
 select t2.OBJECTID, 'Error: UNITCODE does not match the boundary it is within' as Issue, 
   'UNITCODE = ' + t2.UNITCODE + ' but it intersects ' + t1.Unit_Code as Details from akr_facility2.gis.AKR_UNIT as t1
@@ -830,23 +830,23 @@ union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
   'Location ' + FACLOCID + ' has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
   from gis.POI_PY_evw0 as p join 
-  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from gis.DOM_UNITCODE)) as f
+  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from akr_facility2.dbo.DOM_UNITCODE)) as f
   on f.Location = p.FACLOCID where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
 select p.OBJECTID, 'Error: UNITCODE does not match FMSS.Park' as Issue, 
   'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has PARK = ' + f.Park + ' when GIS has UNITCODE = ' + p.UNITCODE as Details
   from gis.POI_PY_evw0 as p
   join akr_facility2.dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
-  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from gis.DOM_UNITCODE)) as f
+  (SELECT Park, Location FROM akr_facility2.dbo.FMSSExport where Park in (select Code from akr_facility2.dbo.DOM_UNITCODE)) as f
   on f.Location = a.Location where p.UNITCODE <> f.Park and f.Park = 'WEAR' and p.UNITCODE not in ('CAKR', 'KOVA', 'NOAT')
 union all
 
 -- UNITNAME
 --     is calc'd from UNITCODE.  Issue a warning if not null and doesn't match the calc'd value
 select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.POI_PY_evw0 as t1 join
-  gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
+  akr_facility2.dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.UNITNAME
 union all
--- TODO: Should we use gis.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
+-- TODO: Should we use akr_facility2.dbo.DOM_UNITCODE or AKR_UNIT?  the list of codes is different
 --   select t1.OBJECTID, 'Warning: UNITNAME will be overwritten by a calculated value' as Issue, NULL from gis.POI_PY_evw0 as t1 join
 --     gis.AKR_UNIT as t2 on t1.UNITCODE = t2.Unit_Code where t1.UNITNAME is not null and t1.UNITNAME <> t2.Unit_Name
 --   union all
@@ -855,15 +855,15 @@ union all
 --     is optional free text; AKR restriction: if provided must be in AKR_GROUP
 --     it can be null and not spatially within a group (this check is problematic, see discussion below),
 --     however if it is not null and within a group, the codes must match (this check is problematic, see discussion below)
---     GROUPCODE must match related UNITCODE in gis.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
--- TODO: Should these checks use gis.AKR_GROUP or gis.DOM_UNITCODE
----- gis.DOM_UNITCODE does not allow UNIT in multiple groups
+--     GROUPCODE must match related UNITCODE in akr_facility2.dbo.DOM_UNITCODE (can fail. i.e if unit is KOVA and group is ARCN, as KOVA is in WEAR)
+-- TODO: Should these checks use gis.AKR_GROUP or akr_facility2.dbo.DOM_UNITCODE
+---- akr_facility2.dbo.DOM_UNITCODE does not allow UNIT in multiple groups
 ---- gis.AKR_GROUP does not try to match group and unit
 select t1.OBJECTID, 'Error: GROUPCODE is not a recognized value' as Issue, NULL from gis.POI_PY_evw0 as t1 left join
   akr_facility2.gis.AKR_GROUP as t2 on t1.GROUPCODE = t2.Group_Code where t1.GROUPCODE is not null and t2.Group_Code is null
 union all
 select t1.OBJECTID, 'Error: GROUPCODE does not match the UNITCODE' as Issue, NULL from gis.POI_PY_evw0 as t1 left join
-  gis.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
+  akr_facility2.dbo.DOM_UNITCODE as t2 on t1.UNITCODE = t2.Code where t1.GROUPCODE <> t2.GROUPCODE
 union all
 -- TODO: Consider doing a spatial check.  There are several problems with the current approach:
 ----  1) it will generate multiple errors if point's group code is in multiple groups, and none match
