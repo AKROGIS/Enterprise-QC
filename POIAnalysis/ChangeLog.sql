@@ -420,10 +420,58 @@ insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, I
 exec akr_socio.sde.edit_version @version4, 2; -- 2 to stop edits
 
 
+-- 2021-07-14
+
+
+-- Update ISCURRENTGEO on records that need attention.
+--   In all cases, the records already have ISCURRENTGEO = 'Yes' (and this field is deprecated)
+--   BB = Broken link to a building record (3)
+--   BT = Broken link to a trail feature record (27)
+--   MB = Location (Shape) is different than the related building (28 of 67, the others are close enough < ~5m)
+--   MT = Location (Shape) is different than the related trail feature (7 of 15, the others are close enough < ~5m)
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec akr_socio.sde.set_current_version @version4
+exec akr_socio.sde.edit_version @version4, 1 -- 1 to start edits
+
+-- BB
+merge into akr_socio.gis.akr_POI_PT_evw as Target
+  using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as Source 
+  on Target.SRCDBNAME is null or Target.SRCDBNAME <> 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' or Target.SRCDBIDVAL = Source.FEATUREID
+  WHEN NOT MATCHED BY Source THEN update set Target.ISCURRENTGEO = 'BB';
+
+-- BT
+merge into akr_socio.gis.akr_POI_PT_evw as Target
+  using akr_facility2.gis.TRAILS_FEATURE_PT_evw as Source 
+  on Target.SRCDBNAME is null or Target.SRCDBNAME <> 'akr_facility2.GIS.TRAILS_FEATURE_PT' or Target.SRCDBIDVAL = Source.GEOMETRYID
+  WHEN NOT MATCHED BY Source THEN update set Target.ISCURRENTGEO = 'BT';
+
+--MB
+merge into akr_socio.gis.akr_POI_PT_evw as p
+  using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+  on p.SRCDBIDVAL = b.FEATUREID and SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+  and (p.Shape.STX <> b.Shape.STX or p.Shape.STY <> b.Shape.STY)
+  and abs(p.Shape.STX - b.Shape.STX)/2 + abs(p.Shape.STY - b.Shape.STY) > 5E-05
+  when matched then update set ISCURRENTGEO = 'MB';
+
+--MT
+merge into akr_socio.gis.akr_POI_PT_evw as p
+  using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b 
+  on p.SRCDBIDVAL = b.GEOMETRYID and SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+  and (p.Shape.STX <> b.Shape.STX or p.Shape.STY <> b.Shape.STY)
+  and abs(p.Shape.STX - b.Shape.STX)/2 + abs(p.Shape.STY - b.Shape.STY) > 5E-05
+  when matched then update set ISCURRENTGEO = 'MT';
+
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec akr_socio.sde.edit_version @version4, 2; -- 2 to stop edits
+
+select * from akr_socio.dbo.QC_ISSUES_POI_PT_for_angie_on_20210713
+
+-- POST these changes to DEFAULT
+
+
 -- Changes to do
--- 4) Resolve outstanding QC issues (see QC queries)
--- 5) Identify (add code to ISCURRENTGEO) POIS that have bad shapes, and POIs not linked)
--- 5a) resolve the missing and shape issues
+-- 4) Resolve outstanding QC issues (see akr_socio.dbo.QC_ISSUES_POI_PT_for_angie_on_20210713 or akr_socio.dbo.QC_ISSUES_POI_PT)
+-- 5) Resolve the missing and shape issues
 -- 6) New views for missing and extra POIs, Add to QC file
 -- 7) query to create a missing POI
 -- 8) when adding new building w/o POITYPE, raise question do you want to add to POI?
@@ -437,3 +485,41 @@ exec akr_socio.sde.edit_version @version4, 2; -- 2 to stop edits
 -- What to do about POIDESC when related to a building (no matching field)
 -- did not check for or correct errors in SRCDBNMVAL (maybe can be used to identify matches between bldg and POI)
 -- POI_LN needs better geometry tyoe for Shape
+
+/*
+To do for Angie and/or Marty
+
+Create a new version and do the following
+
+Fix broken links (where ISCURRENTGEO like 'B%'); three options are:
+ 1) delete record
+ 2) correct SRCDBIDVAL
+ 3) remove SRCDB values (independent POI)
+
+Research Moves (where ISCURRENTGEO like 'M%')
+  Assume the source location is correct and POI location will be updated
+  identify location where source bldg or trailhead is in the wrong location
+  identify records where we need two different locations (I don't know how we will handle that yet)
+
+Fix 37 QC Issues in QC_ISSUES_POI_PT_for_angie_on_20210713
+    4  Error: FACLOCID is not a valid ID
+    2  Error: FEATUREID is not unique
+    7  Error: POITYPE is not a recognized value
+    17 Error: PUBLICDISPLAY cannot be public while DATAACCESS is restricted
+    1  Warning: SOURCEDATE is unexpectedly old (before 1995)
+and all records in POI_LN with POITYPE = 'Road' or 'Boundary' (not a known POITYPE)
+by doing either of the following:
+ 1) Fixing the offending value(s) in POI
+ 2) adding an exception in 
+ 3) adding missing values to the relevant DOM table
+
+
+NOTES: 
+* ISEXTANT and MAINTAINER have the bad domains in the GDB
+  (that is the database is validated against a differnt set of domain values than ArcGIS will use)
+* See akr_socio.dbo.POITYPES_OF_FACILITY_ITEMS_REMOVED_FROM_POI_PT_20210706 for POITYPES of buildings not in POI
+* A building (or trail feature) that has a POITYPE but PUBLICDISPLAY = 'No public map display' may be retained in POI_PT, but will not be displayed
+* If a building (or trail feature) gets a POITYPE (i.e POITYPE was null and is now not null), then the facility feature should be added to POI_PT
+* If a building (or trail feature) loses a POITYPE (i.e POITYPE was not null and is now null), then the facility feature should be removed from POI_PT
+
+*/
