@@ -313,11 +313,67 @@ exec akr_facility2.sde.edit_version @version4, 2; -- 2 to stop edits
 -- {716D9BD2-EDB2-4688-B4E4-F62F06FBBF4A}	Frye-Bruhn Refrigerated Warehouse (Historic)	False	True	Public Map Display	Public Map Display
 
 
+
+-- 2021-07-13
+
+-- Run the calculation ueries to sync POI with buildings/trails
+-- NOTE, due to an apparent bug, values from akr_facility2 are not read from the requested view, but from the base table
+--       so we need to compress akr_facility2 to state 0 before running these calcs
+-- NOTE2: these calcs have the shape calcs commented out, since those will get a manual review before a bulk update
+DECLARE @version5 nvarchar(255) = 'dbo.res'
+DECLARE @facility_version nvarchar(255) = 'dbo.res'
+exec akr_socio.dbo.Sync_POI_Pt_with_Buildings @version5, @facility_version
+exec akr_socio.dbo.Sync_POI_Pt_with_TrailFeatures @version5, @facility_version
+
+-- POST the 371 records to DEFAULT, so they are a distinct set of changes in the history snapshot
+
+-- Do some one time domain fixes (upgrades) that are not part of the calcs, but will create QC problems
+-- replace DATAACCESS = 'Public' with DATAACCESS = 'Unrestricted'
+-- Replace MAINTAINER = 'Unknown' with NULL; MAINTAINER will be assumed to contain values conistent with FACMAINTAIN (to match buildings)
+--   FACMAINTAIN uses the domain akr_facility2.DOM_FACOCCUMAINT  (which does not have 'Unknown'), not akr_socio_DOM_MAINTAINER (which has Unknown)
+-- Replace ISEXTANT = 'Yes' with 'True', and 'No' with 'False' to match new domain (and values in buildings)
+exec akr_facility2.sde.set_current_version 'dbo.res'
+exec akr_socio.sde.set_current_version 'dbo.res'
+exec akr_socio.sde.set_default
+select DATAACCESS, count(*) from akr_socio.gis.AKR_POI_PT_evw group by DATAACCESS
+select ISEXTANT, count(*) from akr_socio.gis.AKR_POI_PT_evw group by ISEXTANT
+select ISEXTANT, count(*) from akr_socio.gis.POI_PY_evw0 group by ISEXTANT
+select ISEXTANT, count(*) from akr_socio.gis.POI_LN_evw0 group by ISEXTANT
+select MAINTAINER, count(*) from akr_socio.gis.AKR_POI_PT_evw group by MAINTAINER
+select MAINTAINER, count(*) from akr_socio.gis.POI_PY_evw0 group by MAINTAINER
+select MAINTAINER, count(*) from akr_socio.gis.POI_LN_evw0 group by MAINTAINER
+
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec akr_socio.sde.set_current_version @version4
+exec akr_socio.sde.edit_version @version4, 1 -- 1 to start edits
+update akr_socio.gis.AKR_POI_PT_evw set DATAACCESS = 'Unrestricted' where DATAACCESS = 'Public' -- 17 rows
+update akr_socio.gis.POI_PY_evw0 set ISEXTANT = 'True' where ISEXTANT = 'Yes' -- 52 rows
+update akr_socio.gis.POI_LN_evw0 set ISEXTANT = 'True' where ISEXTANT = 'Yes' -- 58 rows
+update akr_socio.gis.POI_LN_evw0 set ISEXTANT = 'False' where ISEXTANT = 'No' -- 1 row
+update akr_socio.gis.AKR_POI_PT_evw set MAINTAINER = NULL where MAINTAINER = 'Unknown' -- 1737 rows
+update akr_socio.gis.POI_PY_evw0 set MAINTAINER = NULL where MAINTAINER = 'Unknown'  -- 57 rows
+update akr_socio.gis.POI_LN_evw0 set MAINTAINER = NULL where MAINTAINER = 'Unknown' -- 60 rows
+exec akr_socio.sde.edit_version @version4, 2; -- 2 to stop edits
+
+
+-- Run the queries to clean up calculated values
+--  skipping POI_PT for now, because it is generating an error: Cannot insert duplicate key in object 'gis.a23'. The duplicate key value is (4641, 12556).
+exec akr_socio.dbo.Calc_POI_LN @version4  -- Adds missing FEATUREID GUIDS, replaces some empty strings with NULL
+exec akr_socio.dbo.Calc_POI_PY @version4 -- Adds missing FEATUREID GUIDS, fixes some incorrect UNITNAMES, corrects ISOUTPARK
+
+-- POST all these changes to default to simplify debugging the POI_PT calc query
+
+-- The problem with calc_poi_pt was in the MAINTAINER field it was using the wrong domain and a single poi could have multiple FMSS Maintainers, which
+-- resulted in multiple joined values
+-- Fixed the queries and then ran the calc queries for POI_PT and POST to default
+exec akr_socio.dbo.Calc_POI_PY @version4 
+
+
 -- Changes to do
--- 4c) resolve duplicate FeatureID (remove larger OID)
--- 5a) Sync POIs with facilities
--- 5b) Run calc queries
--- 6) query for missing and extra POIs
+-- 4) Resolve outstanding QC issues (see QC queries)
+-- 5) Identify (add code to ISCURRENTGEO) POIS that have bad shapes, and POIs not linked)
+-- 5a) resolve the missing and shape issues
+-- 6) New views for missing and extra POIs, Add to QC file
 -- 7) query to create a missing POI
 -- 8) when adding new building w/o POITYPE, raise question do you want to add to POI?
 -- 9) query about changes to public properties and public display (changes that should be reviewed)
