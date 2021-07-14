@@ -366,7 +366,58 @@ exec akr_socio.dbo.Calc_POI_PY @version4 -- Adds missing FEATUREID GUIDS, fixes 
 -- The problem with calc_poi_pt was in the MAINTAINER field it was using the wrong domain and a single poi could have multiple FMSS Maintainers, which
 -- resulted in multiple joined values
 -- Fixed the queries and then ran the calc queries for POI_PT and POST to default
-exec akr_socio.dbo.Calc_POI_PY @version4 
+exec akr_socio.dbo.Calc_POI_PT @version4 
+
+
+
+-- Fix the malformed GUIDS in POI_PT (from the QC query)
+--   10 have a few random lowercase letters in the FEATUREID
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec akr_socio.sde.set_current_version @version4
+exec akr_socio.sde.edit_version @version4, 1 -- 1 to start edits
+
+--select FEATUREID, upper(FEATUREID) from gis.AKR_POI_PT_evw where FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+update gis.AKR_POI_PT_evw set FEATUREID = upper(FEATUREID) where FEATUREID like '{%[^0123456789ABCDEF-]%}' Collate Latin1_General_CS_AI
+
+-- Fix the seasonal flags that conflict with FMSS in POI_PT (use value in FMSS)
+--  150 records (mostly "No" that should be "Yes") will be assigned the value in FMSS
+merge into gis.AKR_POI_PT_evw as p 
+  using (SELECT case when OPSEAS = 'Y' then 'Yes' when OPSEAS = 'N' then 'No' else 'Unknown' end as OPSEAS, location FROM akr_facility2.dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID and p.SEASONAL <> f.OPSEAS and f.OPSEAS <> 'Unknown'
+  when matched then update set SEASONAL = f.OPSEAS;
+
+exec akr_socio.sde.edit_version @version4, 2; -- 2 to stop edits
+
+-- Run the calcs to add a default Seasonal description for the records that went from No to Yes
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec akr_socio.dbo.Calc_POI_PT @version4 
+
+--  Run the sync again.  Some of the seasonal may have
+exec dbo.Sync_POI_Pt_with_Buildings 'dbo.res', 'dbo.res'
+exec dbo.Sync_POI_Pt_with_TrailFeatures 'dbo.res', 'dbo.res'
+
+-- When an error originates in a building or trail feature, then there is likely an exception for the issue in akr_facility2
+--   Those exceptions will need to be repeated in akr_socio
+--   We could skip the QC for these related records, but that might miss other issues, so this is safer
+-- The following issues are documented as issues in akr_facility2, and are repeated in akr_socio
+DECLARE @version4 nvarchar(255) = 'dbo.res'
+exec akr_socio.sde.set_current_version @version4
+exec akr_socio.sde.edit_version @version4, 1 -- 1 to start edits
+
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT',646 , 'Error: UNITCODE is not a recognized value', 'Issue derives from akr_facility2 and is documented there')
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT',967 , 'Error: UNITCODE is not a recognized value', 'Issue derives from akr_facility2 and is documented there')
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT',2321 , 'Error: UNITCODE is not a recognized value', 'Issue derives from akr_facility2 and is documented there')
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT',2322 , 'Error: UNITCODE is not a recognized value', 'Issue derives from akr_facility2 and is documented there')
+
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT', 2379, 'Error: MAINTAINER does not match FMSS.FAMARESP', 'FMSS is out of date as documented in the building exceptions')
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT', 2388, 'Error: MAINTAINER does not match FMSS.FAMARESP', 'FMSS is out of date as documented in the building exceptions')
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT', 2389, 'Error: MAINTAINER does not match FMSS.FAMARESP', 'FMSS is out of date as documented in the building exceptions')
+
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT', 2379, 'Error: SEASONAL does not match FMSS.OPSEAS', 'FMSS is out of date as documented in the building exceptions')
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT', 2388, 'Error: SEASONAL does not match FMSS.OPSEAS', 'FMSS is out of date as documented in the building exceptions')
+insert into akr_socio.gis.QC_ISSUES_EXPLAINED_evw (Feature_class, Feature_oid, Issue, Explanation) VALUES ('POI_PT', 2389, 'Error: SEASONAL does not match FMSS.OPSEAS', 'FMSS is out of date as documented in the building exceptions')
+
+exec akr_socio.sde.edit_version @version4, 2; -- 2 to stop edits
 
 
 -- Changes to do
@@ -378,15 +429,11 @@ exec akr_socio.dbo.Calc_POI_PY @version4
 -- 8) when adding new building w/o POITYPE, raise question do you want to add to POI?
 -- 9) query about changes to public properties and public display (changes that should be reviewed)
 
--- Check buildings with POI and with Public dispaly = "No" or isextant <> "True"
--- Review/Fix buildings with POITYPE is not NULL and No public map display (4)
--- select * from gis.AKR_BLDG_CENTER_PT_evw where POITYPE is not NULL and PUBLICDISPLAY like 'No%'
 
 -- idea: Add all POI.POITYPES to BLDGS; only sync if BLDG.POITYPE is not null and PUBLIC DISPLAY = "Yes"
 --   Compare PublicDisplay (bldgs to POIs), along with POITYPE to see exceptions to this idea
 --   Too many (2029) mismatches with this idea; only 6 mismatches with current plan
 
 -- What to do about POIDESC when related to a building (no matching field)
+-- did not check for or correct errors in SRCDBNMVAL (maybe can be used to identify matches between bldg and POI)
 -- POI_LN needs better geometry tyoe for Shape
--- ISEXTANT is using the old domain.  Upgrade?
---
