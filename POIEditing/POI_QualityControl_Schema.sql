@@ -85,20 +85,23 @@ select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a def
 union all
 
 -- MAINTAINER
---     is a optional domain value; if FACLOCID is provided this should match a valid value in FMSS Lookup.
+--     is a optional domain value; if provided must be in DOM_FACOCCUMAINT (assume it is a facility maintainer (FACMAINTAIN), not a GIS MAINTAINER)
+--     if FACLOCID or FACASSEETID is provided this should match a valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.POI_LN_evw0 as t1
-       left join gis.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+       left join akr_facility2.dbo.DOM_FACOCCUMAINT as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
   'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
   from gis.POI_LN_evw0 as p join 
-  akr_facility2.dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from akr_facility2.dbo.DOM_MAINTAINER where FMSS = f.FAMARESP)
+  (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM akr_facility2.dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.MAINTAINER <> f.FAMARESP
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
   'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
   from gis.POI_LN_evw0 as p
-  join akr_facility2.dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
-  akr_facility2.dbo.FMSSExport as f on f.Location = a.Location where f.FAMARESP is not null and p.MAINTAINER not in (select code from akr_facility2.dbo.DOM_MAINTAINER where FMSS = f.FAMARESP)
+  join akr_facility2.dbo.FMSSExport_Asset as a on p.FACASSETID = a.Asset join
+  (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM akr_facility2.dbo.FMSSExport) as f
+  on f.Location = a.[Location] where p.MAINTAINER <> f.FAMARESP
 union all
 
 -- ISEXTANT
@@ -425,20 +428,23 @@ select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a def
 union all
 
 -- MAINTAINER
---     is a optional domain value; if FACLOCID is provided this should match a valid value in FMSS Lookup.
+--     is a optional domain value; if provided must be in DOM_FACOCCUMAINT (assume it is a facility maintainer (FACMAINTAIN), not a GIS MAINTAINER)
+--     if FACLOCID or FACASSEETID is provided this should match a valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.AKR_POI_PT_evw as t1
-       left join gis.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+       left join akr_facility2.dbo.DOM_FACOCCUMAINT as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
   'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
   from gis.AKR_POI_PT_evw as p join 
-  akr_facility2.dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from akr_facility2.dbo.DOM_MAINTAINER where FMSS = f.FAMARESP)
+  (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM akr_facility2.dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.MAINTAINER <> f.FAMARESP
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
   'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
   from gis.AKR_POI_PT_evw as p
-  join akr_facility2.dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
-  akr_facility2.dbo.FMSSExport as f on f.Location = a.Location where f.FAMARESP is not null and p.MAINTAINER not in (select code from akr_facility2.dbo.DOM_MAINTAINER where FMSS = f.FAMARESP)
+  join akr_facility2.dbo.FMSSExport_Asset as a on p.FACASSETID = a.Asset join
+  (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM akr_facility2.dbo.FMSSExport) as f
+  on f.Location = a.[Location] where p.MAINTAINER <> f.FAMARESP
 union all
 
 -- ISEXTANT
@@ -751,20 +757,23 @@ select  p.OBJECTID, 'Warning: SEASDESC is required when SEASONAL is *Yes*, a def
 union all
 
 -- MAINTAINER
---     is a optional domain value; if FACLOCID is provided this should match a valid value in FMSS Lookup.
+--     is a optional domain value; if provided must be in DOM_FACOCCUMAINT (assume it is a facility maintainer (FACMAINTAIN), not a GIS MAINTAINER)
+--     if FACLOCID or FACASSEETID is provided this should match a valid value in FMSS Lookup.
 select t1.OBJECTID, 'Error: MAINTAINER is not a recognized value' as Issue, NULL from gis.POI_PY_evw0 as t1
-       left join gis.DOM_MAINTAINER as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
+       left join akr_facility2.dbo.DOM_FACOCCUMAINT as t2 on t1.MAINTAINER = t2.Code where t1.MAINTAINER is not null and t2.Code is null
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
   'Location ' + FACLOCID + ' has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
   from gis.POI_PY_evw0 as p join 
-  akr_facility2.dbo.FMSSExport as f on f.Location = p.FACLOCID where f.FAMARESP is not null and p.MAINTAINER not in (select code from akr_facility2.dbo.DOM_MAINTAINER where FMSS = f.FAMARESP)
+  (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM akr_facility2.dbo.FMSSExport) as f
+  on f.Location = p.FACLOCID where p.MAINTAINER <> f.FAMARESP
 union all
 select p.OBJECTID, 'Error: MAINTAINER does not match FMSS.FAMARESP' as Issue,
   'Location ' + a.Location + '(for Asset ' + p.FACASSETID + ') has FAMARESP = ' + f.FAMARESP + ' when GIS has MAINTAINER = ' + p.MAINTAINER as Details
   from gis.POI_PY_evw0 as p
-  join akr_facility2.dbo.FMSSExport_Asset as a on a.Asset = p.FACASSETID join
-  akr_facility2.dbo.FMSSExport as f on f.Location = a.Location where f.FAMARESP is not null and p.MAINTAINER not in (select code from akr_facility2.dbo.DOM_MAINTAINER where FMSS = f.FAMARESP)
+  join akr_facility2.dbo.FMSSExport_Asset as a on p.FACASSETID = a.Asset join
+  (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM akr_facility2.dbo.FMSSExport) as f
+  on f.Location = a.[Location] where p.MAINTAINER <> f.FAMARESP
 union all
 
 -- ISEXTANT
