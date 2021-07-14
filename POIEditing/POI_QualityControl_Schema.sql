@@ -668,6 +668,25 @@ select OBJECTID, 'Error: SHAPE must be valid' as Issue, NULL from gis.AKR_POI_PT
 -- Overlaps are possible (even exepcted among SITES)
 -- Size checks are difficult because of variation in QTY units; May try later when trends are identified 
 
+
+-- Related records in souce databases
+-- These queries assume selct source table configurations; it is not safe to create "dynamic" queries based on
+-- The values in a table.  This section will need to be updated as the source tables change
+
+-- Check for missing building center pointns
+union all
+select p.OBJECTID, 'Error: Related building center point is missing.' as Issue, Null
+from akr_socio.gis.akr_POI_PT_evw as p left join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+on p.SRCDBIDVAL = b.FEATUREID where b.FEATUREID is null and p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT'
+
+-- Check for missing trail feature points
+union all
+select p.OBJECTID, 'Error: Related trail feature point is missing.' as Issue, Null
+from akr_socio.gis.akr_POI_PT_evw as p left join akr_facility2.gis.TRAILS_FEATURE_PT_evw as b 
+on p.SRCDBIDVAL = b.GEOMETRYID where b.GEOMETRYID is null and p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT'
+
+
+
 ) AS I
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E

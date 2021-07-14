@@ -470,9 +470,6 @@ select * from akr_socio.dbo.QC_ISSUES_POI_PT_for_angie_on_20210713
 
 
 -- Changes to do
--- 4) Resolve outstanding QC issues (see akr_socio.dbo.QC_ISSUES_POI_PT_for_angie_on_20210713 or akr_socio.dbo.QC_ISSUES_POI_PT)
--- 5) Resolve the missing and shape issues
--- 6) New views for missing and extra POIs, Add to QC file
 -- 7) query to create a missing POI
 -- 8) when adding new building w/o POITYPE, raise question do you want to add to POI?
 -- 9) query about changes to public properties and public display (changes that should be reviewed)
@@ -514,12 +511,21 @@ by doing either of the following:
  3) adding missing values to the relevant DOM table
 
 
-NOTES: 
-* ISEXTANT and MAINTAINER have the bad domains in the GDB
-  (that is the database is validated against a differnt set of domain values than ArcGIS will use)
+NOTES:
+* I documented, in the change log in Github, all the changes I made to the data in the various feature classes
+* All of the work I did (and am finishing) is in Github @ https://github.com/AKROGIS/Enterprise-QC
+* The geodatabase still has the old domains for ISEXTANT and MAINTAINER
+  That is the QC queries are validating against a differnt set of domain values (in DOM_* tables) than ArcGIS will use while editing in a map.
 * See akr_socio.dbo.POITYPES_OF_FACILITY_ITEMS_REMOVED_FROM_POI_PT_20210706 for POITYPES of buildings not in POI
+* See akr_socio.dbo.bldg_map_label_updates for changes I made to the map labels that were in POI
 * A building (or trail feature) that has a POITYPE but PUBLICDISPLAY = 'No public map display' may be retained in POI_PT, but will not be displayed
 * If a building (or trail feature) gets a POITYPE (i.e POITYPE was null and is now not null), then the facility feature should be added to POI_PT
 * If a building (or trail feature) loses a POITYPE (i.e POITYPE was not null and is now null), then the facility feature should be removed from POI_PT
-
+* The following _were_ differences in ISEXTANT and PUBLICDISPLAY; I assumed buildings was more accurate (it has a newer editdate in all cases)
+    FEATUREID                                MAPLABEL                                        POI     BLDG    POI                 BLDG
+    {244F1EBC-5994-4662-84C4-8C2F8368A206}	Crescent Lake Ranger Station	                True	True	Public Map Display	No Public Map Display
+    {48D40CE5-8EA9-4912-89B6-C6A69E093499}	Baked Mountain Hut	                            True	Partial	Public Map Display	No Public Map Display
+    {4AAFC217-F711-4E96-8DDE-9E8EB619B767}	Baked Mountain Hut #2	                        True	True	Public Map Display	No Public Map Display
+    {4DB86383-B88A-4DB7-9B84-A99A319889BB}	Baked Mountain Hut Outhouse	                    True	True	Public Map Display	No Public Map Display
+    {716D9BD2-EDB2-4688-B4E4-F62F06FBBF4A}	Frye-Bruhn Refrigerated Warehouse (Historic)	False	True	Public Map Display	Public Map Display
 */

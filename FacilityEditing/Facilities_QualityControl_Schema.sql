@@ -2696,6 +2696,16 @@ select t1.OBJECTID, 'Error: POITYPE is not a recognized value' as Issue, NULL fr
 -- What about webedituser, webcomment?
 -- ???????????????????????????????????
 
+
+-- Related table check.
+-- A building center point with a non null POITYPE should be replicated in the POI_PT table
+union all
+select b.OBJECTID, 'Error: Building center point with a POITYPE is not in POI_PT' as Issue, NULL as Details
+from akr_socio.gis.akr_POI_PT_evw as p right join akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b 
+on p.SRCDBIDVAL = b.FEATUREID where b.POITYPE is not null and p.SRCDBIDVAL is null
+
+
+
 ) AS I
 on D.OBJECTID = I.OBJECTID
 LEFT JOIN gis.QC_ISSUES_EXPLAINED_evw AS E
@@ -4396,6 +4406,15 @@ select t1.OBJECTID, 'Error: POITYPE is not a recognized value' as Issue, NULL fr
 -- ???????????????????????????????????
 -- What about webedituser, webcomment?
 -- ???????????????????????????????????
+
+
+-- Related table check.
+-- A trail feature point with a non null POITYPE should be replicated in the POI_PT table
+union all
+select t.OBJECTID, 'Error: Trail feature point with a POITYPE is not in POI_PT' as Issue, NULL as Details
+from akr_facility2.gis.TRAILS_FEATURE_PT_evw as t left join akr_socio.gis.akr_POI_PT_evw as p
+on p.SRCDBIDVAL = t.GEOMETRYID where t.POITYPE is not null and p.SRCDBIDVAL is null
+
 
 ) AS I
 on D.OBJECTID = I.OBJECTID
