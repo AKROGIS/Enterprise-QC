@@ -1081,13 +1081,14 @@ BEGIN
 
     -- MAINTAINER
     --     if it is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
-    merge into gis.POI_ln_evw0 as p
-      using (SELECT d.Code as FAMARESP, location FROM akr_facility2.dbo.FMSSExport as t join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
-      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+    merge into gis.AKR_POI_PT_evw as p
+      using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM akr_facility2.dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null and f.FAMARESP is not null)
       when matched then update set MAINTAINER = f.FAMARESP;
-    merge into gis.POI_ln_evw0 as p
-      using (SELECT d.Code as FAMARESP, a.Asset FROM akr_facility2.dbo.FMSSExport_Asset as a join akr_facility2.dbo.FMSSExport as t on a.Location = t.Location
-             join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+    merge into gis.AKR_POI_PT_evw as p
+      using (SELECT t.FAMARESP, a.Asset FROM akr_facility2.dbo.FMSSExport_Asset as a
+      join (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, [Location] FROM akr_facility2.dbo.FMSSExport) as t
+      on a.Location = t.Location) as f
       on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
       when matched then update set MAINTAINER = f.FAMARESP;
 
@@ -1276,12 +1277,13 @@ BEGIN
     -- MAINTAINER
     --     if it is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
     merge into gis.AKR_POI_PT_evw as p
-      using (SELECT d.Code as FAMARESP, location FROM akr_facility2.dbo.FMSSExport as t join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
-      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+      using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM akr_facility2.dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null and f.FAMARESP is not null)
       when matched then update set MAINTAINER = f.FAMARESP;
     merge into gis.AKR_POI_PT_evw as p
-      using (SELECT d.Code as FAMARESP, a.Asset FROM akr_facility2.dbo.FMSSExport_Asset as a join akr_facility2.dbo.FMSSExport as t on a.Location = t.Location
-             join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+      using (SELECT t.FAMARESP, a.Asset FROM akr_facility2.dbo.FMSSExport_Asset as a
+      join (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, [Location] FROM akr_facility2.dbo.FMSSExport) as t
+      on a.Location = t.Location) as f
       on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
       when matched then update set MAINTAINER = f.FAMARESP;
 
@@ -1467,13 +1469,14 @@ BEGIN
 
     -- MAINTAINER
     --     if it is null and FACLOCID is non-null or FACASSETID is non-null use FMSS Lookup.
-    merge into gis.POI_py_evw0 as p
-      using (SELECT d.Code as FAMARESP, location FROM akr_facility2.dbo.FMSSExport as t join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
-      on f.Location = p.FACLOCID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
+    merge into gis.AKR_POI_PT_evw as p
+      using (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, location FROM akr_facility2.dbo.FMSSExport) as f
+      on f.Location = p.FACLOCID and (p.MAINTAINER is null and f.FAMARESP is not null)
       when matched then update set MAINTAINER = f.FAMARESP;
-    merge into gis.POI_py_evw0 as p
-      using (SELECT d.Code as FAMARESP, a.Asset FROM akr_facility2.dbo.FMSSExport_Asset as a join akr_facility2.dbo.FMSSExport as t on a.Location = t.Location
-             join akr_facility2.dbo.DOM_MAINTAINER as d on t.FAMARESP = d.FMSS) as f
+    merge into gis.AKR_POI_PT_evw as p
+      using (SELECT t.FAMARESP, a.Asset FROM akr_facility2.dbo.FMSSExport_Asset as a
+      join (SELECT case when FAMARESP = 'Fed Gov' then 'FEDERAL' when FAMARESP = 'State Gov' then 'STATE'  when FAMARESP = '' then NULL else upper(FAMARESP) end as FAMARESP, [Location] FROM akr_facility2.dbo.FMSSExport) as t
+      on a.Location = t.Location) as f
       on f.Asset = p.FACASSETID and (p.MAINTAINER is null or p.MAINTAINER = '' or p.MAINTAINER = 'Unknown') and f.FAMARESP is not null
       when matched then update set MAINTAINER = f.FAMARESP;
 
