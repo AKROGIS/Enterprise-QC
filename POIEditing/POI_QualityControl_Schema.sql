@@ -1838,11 +1838,11 @@ BEGIN
     -- WEBCOMMENT -- No calcs; it is obsolete and will be removed shortly
 
     -- Shape
-    -- merge into gis.AKR_POI_PT_evw as p
-    --   using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
-    --   on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
-    --   and (p.Shape.STY <> b.Shape.STY or p.Shape.STX <> b.Shape.STY)
-    --   when matched then update set Shape = Geometry::Point(b.Shape.STX, b.Shape.STY, b.Shape.STSrid);
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' and p.SRCDBIDVAL = b.FEATUREID
+      and (p.Shape.STY <> b.Shape.STY or p.Shape.STX <> b.Shape.STY)
+      when matched then update set Shape = Geometry::Point(b.Shape.STX, b.Shape.STY, b.Shape.STSrid);
 
     -- Stop editing
     exec sde.edit_version @version, 2; -- 2 to stop edits
@@ -2074,11 +2074,11 @@ BEGIN
     -- WEBCOMMENT -- No calcs; it is obsolete and will be removed shortly
 
     -- Shape
-    -- merge into gis.AKR_POI_PT_evw as p
-    --   using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
-    --   on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
-    --   and (p.Shape.STY <> b.Shape.STY or p.Shape.STX <> b.Shape.STY)
-    --   when matched then update set Shape = Geometry::Point(b.Shape.STX, b.Shape.STY, b.Shape.STSrid);
+    merge into gis.AKR_POI_PT_evw as p
+      using akr_facility2.gis.TRAILS_FEATURE_PT_evw as b
+      on p.SRCDBNAME = 'akr_facility2.GIS.TRAILS_FEATURE_PT' and p.SRCDBIDVAL = b.GEOMETRYID
+      and (p.Shape.STY <> b.Shape.STY or p.Shape.STX <> b.Shape.STY)
+      when matched then update set Shape = Geometry::Point(b.Shape.STX, b.Shape.STY, b.Shape.STSrid);
 
     -- Stop editing
     exec sde.edit_version @version, 2; -- 2 to stop edits
