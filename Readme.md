@@ -1,5 +1,4 @@
-Enterprise Database QC Tools
-============================
+# Enterprise Database QC Tools
 
 This repository contains tools and instructions for maintaining the integrity
 of the Alaska Region's enterprise geospatial databases. These are esri
@@ -37,7 +36,21 @@ also contains some lists of outstanding issues (as CSV files).
 
 ### POI Analysis
 
-SQL Scripts for analyzing the POI database (in akr_socio).
+This folder contains an SQL Script for analyzing the POI database (in `akr_socio`)
+before updates in July 2021 to support automated QC, Calculated values, and
+synchronizing with source databases.  It also contains a log of all changes made
+to `akr_socio` in syncing with `akr_facility2`and cleaning up QC issues.
+
+### POI Editing
+
+A SQL schema file (`*Schema.sql`) to create the views and stored procedures
+needed to implement the QC and calculated value in `akr_socio`. The `Do*.sql`
+scripts are intended to be run on a version of `akr_socio` before posting
+changes to `DEFAULT`.  These files are very similar to the files for facility
+editing as described in the  [Facility Editing Readme](./FacilityEditing/Readme.md).
+Details on managing the editing, review, posting process is very similar to the
+process described in the
+ [Facility Editing document](./FacilityEditing/Editing Facilities.md).
 
 ### FMSS Export
 
@@ -45,7 +58,6 @@ This folder contains instructions and SQL scripts for exporting data from the
 Facility Maintenance and Management System (FMSS) and importing it into our
 enterprise datasets.  This allows us to link our GIS data to FMSS and join
 the additional attributes in FMSS to our spatial features.
-
 
 ## Build
 
