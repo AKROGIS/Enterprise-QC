@@ -50,7 +50,7 @@ changes to `DEFAULT`.  These files are very similar to the files for facility
 editing as described in the  [Facility Editing Readme](./FacilityEditing/Readme.md).
 Details on managing the editing, review, posting process is very similar to the
 process described in the
- [Facility Editing document](./FacilityEditing/Editing Facilities.md).
+ [Facility Editing document](./FacilityEditing/Editing%20Facilities.md).
 
 ### FMSS Export
 
