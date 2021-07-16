@@ -1612,6 +1612,67 @@ GO
 
 -- =============================================
 -- Author:		Regan Sarwas
+-- Create date: 2021-07-16
+-- Description:	Remove POI Pts with a broken link to a facility record
+--
+-- These queries are preset with to the known tables (SRCDBNAM) and linking field (SCRDBIDFLD).  Dynamic SQL queries (built
+-- from the values in those fields) are unsafe.  If the values in those fields change, this script should be reviewed and edited.
+--
+-- 
+--   IMPORTANT:
+--   As of 2021-07-16: When a source and a destination version are set, then source version view pulls from the source base table, 
+--   not the version or even default view. Thia appears to be a bug. Work around is to compress to state zero so that the source
+--   version is in the base table.  Other solutions may be:
+--      1) set master as current database, and run all queries with fully qualified view names
+--      2) Upgrade the geodatabae on akr_socio (it is still at 10.2, while facilities is at 10.8)
+--      3) Set the source version; read data to a temp table; set the destination version; write updates
+-- =============================================
+
+CREATE PROCEDURE [dbo].[Delete_POI_PTs_no_longer_linked_to_facilities] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500),
+    @source_version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the source version
+    exec akr_facility2.sde.set_current_version @source_version
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- add/update calculated values
+
+    -- Remove unmatched building center points
+    merge into akr_socio.gis.akr_POI_PT_evw as Target
+        using akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as Source 
+        on Target.SRCDBNAME is null or Target.SRCDBNAME <> 'akr_facility2.GIS.AKR_BLDG_CENTER_PT' or Target.SRCDBIDVAL = Source.FEATUREID
+        WHEN NOT MATCHED BY Source THEN delete;
+
+    -- Remove unmatched trail feature points
+    merge into akr_socio.gis.akr_POI_PT_evw as Target
+        using akr_facility2.gis.TRAILS_FEATURE_PT_evw as Source 
+        on Target.SRCDBNAME is null or Target.SRCDBNAME <> 'akr_facility2.GIS.TRAILS_FEATURE_PT' or Target.SRCDBIDVAL = Source.GEOMETRYID
+        WHEN NOT MATCHED BY Source THEN delete;
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
 -- Create date: 2021-07-08
 -- Description:	Sync attributes with a source table
 --

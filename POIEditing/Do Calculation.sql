@@ -22,7 +22,7 @@ select owner, name from sde.SDE_versions where parent_version_id is not null ord
 -- 2) Set the operable version to a named version
 --    Edit 'owner.name' to be one of the versions in the previous list, then select all of the remaining code
 --    and execute (press F5 or the execute button)
---    Alternatively, replace all occurrances of @version with the appropriate 'owner.name' version text,
+--    Alternatively, replace all occurrences of @version with the appropriate 'owner.name' version text,
 ---   then execute one statement (or a group of statements) at a time.
 DECLARE @version nvarchar(255) = 'owner.name'
 DECLARE @facility_version nvarchar(255) = 'owner.name'
@@ -31,10 +31,17 @@ exec dbo.Calc_POI_PT @version
 exec dbo.Calc_POI_LN @version
 exec dbo.Calc_POI_PY @version
 
--- Run the following querries to ensure that records that have a source in facilities are current
+-- Run the following queries to ensure that records that have a source in facilities are current
 -- They can be run anytime without harm, however they must be run if related records are changed.
 exec dbo.Sync_POI_Pt_with_Buildings @version, @facility_version
 exec dbo.Sync_POI_Pt_with_TrailFeatures @version, @facility_version
+
+-- Run the following query to delete records in POI_PT with a broken link to a source record in akr_facility2
+-- This only needs to be run if there are "Missing record" errors in the QC queries.
+-- It should only be run after verifying that the record in facilities has been deleted.
+exec dbo.Delete_POI_PTs_no_longer_linked_to_facilities @version, @facility_version
+
+
 
 
 -- Calcs to fix The fact that DBOs have to edit as SDE and not Domain User (with ArcGIS 10.x)
