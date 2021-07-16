@@ -7,21 +7,16 @@
 -- 1) List the named versions (select the following line and press F5 or the Execute button)
 select owner, name from akr_facility2.sde.SDE_versions where parent_version_id is not null order by owner, name
 
--- 2) Set the operable version to a named version
---    Edit 'owner.name' to be one of the versions in the previous list, then select and execute the following line
+-- 2) Set the versions to check
+-- 2a) first set the version of the related features.  Due a [bug](https://github.com/AKROGIS/Enterprise-QC/issues/4),
+--     the first version set will be ignored and the query will compare against the base table of the related features.
+exec akr_socio.sde.set_default;
+--   OR set to a specific socio version
+--   exec akr_socio.sde.set_current_version 'owner.name';
+-- 2b) Set the version of the database to be checked
 exec akr_facility2.sde.set_current_version 'owner.name';
--- OR set the operable version to default
--- exec akr_facility2.sde.set_default
--- Do the same for the akr_socio database (for matching POI records for building centers and trail side features)
---   IMPORTANT:
---   As of 2021-07-16: When a source and a destination version are set, then source version view pulls from the source base table,
---   not the version or even default view. This appears to be a bug. Work around is to compress to state zero so that the source
---   version is in the base table.  Other solutions may be:
---      1) set master as current database, and run all queries with fully qualified view names
---      2) Upgrade the geodatabase on akr_socio (it is still at 10.2, while facilities is at 10.8)
-exec akr_socio.sde.set_default
--- OR set to a specific facility version
--- exec akr_socio.sde.set_current_version 'owner.name';
+--   OR set the operable version to default
+--   exec akr_facility2.sde.set_default
 
 -- 3) Select each of the following lines and then press F5 (or the Execute button)
 --    If there are issues, then either email (copy/paste or save as csv) or describe them to the editor
