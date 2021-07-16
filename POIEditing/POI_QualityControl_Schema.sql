@@ -1613,6 +1613,183 @@ GO
 -- =============================================
 -- Author:		Regan Sarwas
 -- Create date: 2021-07-16
+-- Description:	Create missing POI Points for facilities with a defined POITYPE
+--
+-- These queries are preset with to the known tables (SRCDBNAM) and linking field (SCRDBIDFLD).  Dynamic SQL queries (built
+-- from the values in those fields) are unsafe.  If the values in those fields change, this script should be reviewed and edited.
+--
+--
+--   IMPORTANT:
+--   As of 2021-07-16: When a source and a destination version are set, then source version view pulls from the source base table, 
+--   not the version or even default view. Thia appears to be a bug. Work around is to compress to state zero so that the source
+--   version is in the base table.  Other solutions may be:
+--      1) set master as current database, and run all queries with fully qualified view names
+--      2) Upgrade the geodatabae on akr_socio (it is still at 10.2, while facilities is at 10.8)
+--      3) Set the source version; read data to a temp table; set the destination version; write updates
+-- =============================================
+
+CREATE PROCEDURE [dbo].[Create_POI_Points] 
+    -- Add the parameters for the stored procedure here
+    @version nvarchar(500),
+    @source_version nvarchar(500)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    -- Set the source version
+    exec akr_facility2.sde.set_current_version @source_version
+
+    -- Set the version to edit
+    exec sde.set_current_version @version
+    
+    -- Create temp table of missing building center points
+    SELECT 
+         b.[BLDGNAME] as POINAME
+        ,b.[BLDGALTNAME] as POIALTNAME
+        ,b.[MAPLABEL]
+        ,b.[POITYPE]
+        --,b.[BLDGSTATUS]
+        --,b.[BLDGCODE]
+        --,b.[BLDGTYPE]
+        --,b.[FACOWNER]
+        --,b.[FACOCCUPANT]
+        --,b.[FACMAINTAIN]
+        --,b.[FACUSE]
+        ,NULL AS POIDESC
+        ,b.[SEASONAL] as SEASONAL
+        ,b.[SEASDESC] as SEASDESC
+        ,b.[FACMAINTAIN] as MAINTAINER
+        ,b.[ISEXTANT]
+        ,b.[POINTTYPE]
+        ,'Yes' AS ISCURRENTGEO
+        ,b.[ISOUTPARK]
+        ,b.[PUBLICDISPLAY]
+        ,b.[DATAACCESS]
+        ,b.[UNITCODE]
+        ,b.[UNITNAME]
+        ,b.[GROUPCODE]
+        ,b.[GROUPNAME]
+        ,b.[REGIONCODE]
+        ,b.[CREATEDATE]
+        ,b.[CREATEUSER]
+        ,b.[EDITDATE]
+        ,b.[EDITUSER]
+        ,b.[MAPMETHOD]
+        ,b.[MAPSOURCE]
+        ,b.[SOURCEDATE]
+        ,b.[XYACCURACY]
+        ,b.[FACLOCID]
+        ,b.[FACASSETID]
+        --,b.[CRID]
+        --,b.[ASMISID]
+        --,b.[CLIID]
+        --,b.[LCSID]
+        --,b.[FIREBLDGID]
+        --,b.[PARKBLDGID]
+        ,'{' + convert(varchar(max),newid()) + '}' AS FEATUREID
+        ,'{' + convert(varchar(max),newid()) + '}' AS GEOMETRYID
+        ,b.[NOTES]
+        ,'akr_facility2.GIS.AKR_BLDG_CENTER_PT' AS SRCDBNAME
+        ,'FEATUREID' AS SRCDBIDFLD
+        ,b.[FEATUREID] as SRCDBIDVAL
+        ,'BLDGNAME' AS SRCDBNMFLD
+        ,b.[BLDGNAME] AS SRCDBNMVAL
+        ,b.[WEBEDITUSER]
+        ,b.[WEBCOMMENT]
+        ,b.[Shape]
+        --,b.[GDB_GEOMATTR_DATA]
+    INTO #Temp_BLDG_POI_Points
+    FROM akr_facility2.gis.AKR_BLDG_CENTER_PT_evw as b
+    left join akr_socio.gis.akr_POI_PT_evw as p
+    on p.SRCDBIDVAL = b.FEATUREID where b.POITYPE is not null and p.SRCDBIDVAL is null
+
+    -- Create temp table of missing trail feature points
+    SELECT
+        t.[TRLFEATNAME] AS POINAME
+        ,t.[TRLFEATALTNAME] AS POIALTNAME
+        ,t.[MAPLABEL]
+        ,t.[POITYPE]
+        --,t.[TRLFEATTYPE]
+        --,t.[TRLFEATTYPEOTHER]
+        --,t.[TRLFEATSUBTYPE]
+        ,t.[TRLFEATDESC] AS POIDESC
+        --,t.[TRLFEATCOUNT]
+        --,t.[WHLENGTH]
+        --,t.[WHLENUOM]
+        , NULL as SEASONAL
+        , NULL as SEASDESC
+        , NULL as MAINTAINER
+        ,t.[ISEXTANT]
+        ,t.[POINTTYPE]
+        , 'Yes' AS ISCURRENTGEO
+        ,t.[ISOUTPARK]
+        ,t.[PUBLICDISPLAY]
+        ,t.[DATAACCESS]
+        ,t.[UNITCODE]
+        ,t.[UNITNAME]
+        ,t.[GROUPCODE]
+        ,t.[GROUPNAME]
+        ,t.[REGIONCODE]
+        ,t.[CREATEDATE]
+        ,t.[CREATEUSER]
+        ,t.[EDITDATE]
+        ,t.[EDITUSER]
+        ,t.[MAPMETHOD]
+        ,t.[MAPSOURCE]
+        ,t.[SOURCEDATE]
+        ,t.[XYACCURACY]
+        ,t.[FACLOCID]
+        ,t.[FACASSETID]
+        ,'{' + convert(varchar(max),newid()) + '}' AS FEATUREID
+        ,'{' + convert(varchar(max),newid()) + '}' AS GEOMETRYID
+        ,t.[NOTES]
+        ,'akr_facility2.GIS.TRAILS_FEATURE_PT' AS SRCDBNAME
+        ,'GEOMETRYID' AS SRCDBIDFLD
+        ,t.[GEOMETRYID] as SRCDBIDVAL
+        ,'TRLFEATNAME' AS SRCDBNMFLD
+        ,t.[TRLFEATNAME] AS SRCDBNMVAL
+        ,t.[WEBEDITUSER]
+        ,t.[WEBCOMMENT]
+        ,t.[Shape]
+        --,t.[GDB_GEOMATTR_DATA]
+        --,t.[SEGMENTID]
+    INTO #Temp_TrailFeature_POI_Points
+    FROM akr_facility2.gis.TRAILS_FEATURE_PT_evw as t
+    left join akr_socio.gis.akr_POI_PT_evw as p
+    on p.SRCDBIDVAL = t.GEOMETRYID where t.POITYPE is not null and p.SRCDBIDVAL is null
+
+
+    -- Start editing
+    exec sde.edit_version @version, 1 -- 1 to start edits
+
+    -- Add missing building points
+    INSERT INTO akr_socio.gis.akr_POI_PT_evw
+    SELECT * FROM #Temp_BLDG_POI_Points
+
+    -- Add missing trail feature points
+    INSERT INTO akr_socio.gis.akr_POI_PT_evw
+    SELECT * FROM #Temp_TrailFeature_POI_Points
+
+    -- Stop editing
+    exec sde.edit_version @version, 2; -- 2 to stop edits
+
+
+    -- Clean up - delete temp tables
+    Drop table #Temp_BLDG_POI_Points
+    Drop table #Temp_TrailFeature_POI_Points
+
+END
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Regan Sarwas
+-- Create date: 2021-07-16
 -- Description:	Remove POI Pts with a broken link to a facility record
 --
 -- These queries are preset with to the known tables (SRCDBNAM) and linking field (SCRDBIDFLD).  Dynamic SQL queries (built

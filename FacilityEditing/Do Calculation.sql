@@ -39,6 +39,12 @@ exec dbo.Calc_Trails @version
 exec dbo.Calc_Trail_Features @version
 exec dbo.Calc_Trail_Attributes @version
 
+-- Set the poi version, and run the following SPROC if you want to create missing
+-- POIs from the building center points and trail feature points with a defined POITYPE
+DECLARE @poi_version nvarchar(255) = 'owner.name'
+exec akr_socio.dbo.Create_POI_Points @poi_version, @version
+
+
 -- Calcs to fix The fact that Regan has to edit as SDE and not Domain User
 exec sde.set_current_version @version
 exec sde.edit_version @version, 1 -- 1 to start edits
