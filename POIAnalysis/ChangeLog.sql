@@ -469,8 +469,61 @@ select * from akr_socio.dbo.QC_ISSUES_POI_PT_for_angie_on_20210713
 -- POST these changes to DEFAULT
 
 
--- Changes to do
--- 7) query to create a missing POI
+-- 2021-07-16
+
+-- Example of bug identified in scripts that need to look at versions in both socio and facility2
+-- Will create two new versions, edit them, and then delete the versions
+-- do not run all at once, break up into chunks at each empty comment
+
+-- Look at the base tables
+select MAPLABEL from akr_facility2.gis.akr_bldg_center_pt where OBJECTID = 100  -- remember value: 'Corner House`
+select MAPLABEL from akr_socio.gis.poi_pt where OBJECTID = 10  -- remember value: 'Lake Brooks Picnic Area Shelter'
+--
+-- Create a version and make a change in database #1
+exec akr_facility2.sde.create_version 'sde.default', 'v1', 2, 2, '';
+exec akr_facility2.sde.set_current_version 'dbo.v1'
+exec akr_facility2.sde.edit_version 'dbo.v1', 1
+update akr_facility2.gis.akr_bldg_center_pt_evw set MAPLABEL = 'A' where OBJECTID = 100  -- 'A' must be different than base table
+exec akr_facility2.sde.edit_version 'dbo.v1', 2
+--
+-- Do the same in database 2
+exec akr_socio.sde.create_version 'sde.default', 'v2', 2, 2, '';
+exec akr_socio.sde.set_current_version 'dbo.v2'
+exec akr_socio.sde.edit_version 'dbo.v2', 1
+update akr_socio.gis.akr_poi_pt_evw set MAPLABEL = 'B' where OBJECTID = 10  -- 'B' must be different than base table
+exec akr_socio.sde.edit_version 'dbo.v2', 2
+--
+-- Look at the base tables again (should be the same as before edits)
+select MAPLABEL from akr_facility2.gis.akr_bldg_center_pt where OBJECTID = 100
+select MAPLABEL from akr_socio.gis.poi_pt where OBJECTID = 10
+--
+-- Look at the versions inependently (not possible when doing a join or merge)
+exec akr_facility2.sde.set_current_version 'dbo.v1'
+select MAPLABEL from akr_facility2.gis.akr_bldg_center_pt_evw where OBJECTID = 100  -- RIGHT (`A`)
+exec akr_socio.sde.set_current_version 'dbo.v2'
+select MAPLABEL from akr_socio.gis.akr_poi_pt_evw where OBJECTID = 10  -- RIGHT ('B')
+--
+-- Set v1, then v2, then select from the versions
+exec akr_facility2.sde.set_current_version 'dbo.v1'
+exec akr_socio.sde.set_current_version 'dbo.v2'
+select MAPLABEL from akr_facility2.gis.akr_bldg_center_pt_evw where OBJECTID = 100  -- WRONG ( base table value not `A`)
+select MAPLABEL from akr_socio.gis.akr_poi_pt_evw where OBJECTID = 10  -- RIGHT ('B')
+--
+-- Set v2, then v1, then select from the versions
+exec akr_socio.sde.set_current_version 'dbo.v2'
+exec akr_facility2.sde.set_current_version 'dbo.v1'
+select MAPLABEL from akr_facility2.gis.akr_bldg_center_pt_evw where OBJECTID = 100  -- RIGHT ('A')
+select MAPLABEL from akr_socio.gis.akr_poi_pt_evw where OBJECTID = 10  -- WRONG  ( base table value not `B`)
+--
+-- Cleanup Drop the versions
+exec akr_facility2.sde.set_default
+exec akr_facility2.sde.delete_version 'dbo.v1'
+exec akr_socio.sde.set_default
+exec akr_socio.sde.delete_version 'dbo.v2'
+
+
+-- Changes to do (these two changes will be documented in the issues as they are too complicated; 
+--    they will require reading add/delete tables and comparing with previous state)
 -- 8) when adding new building w/o POITYPE, raise question do you want to add to POI?
 -- 9) query about changes to public properties and public display (changes that should be reviewed)
 
