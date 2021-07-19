@@ -15,36 +15,47 @@
 
 -- To edit versioned data in SQL, see this help: http://desktop.arcgis.com/en/arcmap/latest/manage-data/using-sql-with-gdbs/edit-versioned-data-using-sql-sqlserver.htm
 
+-- This file should be run in chunks (i.e. opened in SSMS or azure data
+-- studio then selecting the commands to run and press F5 or clicking the run/execute button).
+-- Note that the line that declare the version will not be "remembered", so it
+-- needs to be copied to locations that will allow it to be selected with the
+-- commands you want to run, or delete the intervening commands.
+
 -- 1) Find the named version
 --    List the named versions (select the following line and press F5 or the Execute button)
 select owner, name from sde.SDE_versions where parent_version_id is not null order by owner, name
 
--- 2) Set the operable version to a named version
---    Edit 'owner.name' to be one of the versions in the previous list, then select all of the remaining code
---    and execute (press F5 or the execute button)
---    Alternatively, replace all occurrences of @version with the appropriate 'owner.name' version text,
----   then execute one statement (or a group of statements) at a time.
+-- 2) Set the version to fix/calculate, and calculate the features.
+--    tables without changes can be removed from this list (leaving them will
+--    not hurt, but take longer).
 DECLARE @version nvarchar(255) = 'owner.name'
-DECLARE @facility_version nvarchar(255) = 'owner.name'
 
 exec dbo.Calc_POI_PT @version
 exec dbo.Calc_POI_LN @version
 exec dbo.Calc_POI_PY @version
 
--- Run the following queries to ensure that records that have a source in facilities are current
--- They can be run anytime without harm, however they must be run if related records are changed.
+-- 3) Correct any changes in POI that break the synchronization with facilities.
+-- These commands should work with any version of facilities, however, as of
+-- July 2021, there is a bug (https://github.com/AKROGIS/Enterprise-QC/issues/4)
+-- that precludes this, as a result the version is ignored and POI is synced
+-- 3a )First specify the version of facilites to sync with
+DECLARE @facility_version nvarchar(255) = 'owner.name'
+-- 3b) Create missing POIs from the building center points and trail feature
+--     points that have defined a POITYPE
+exec akr_socio.dbo.Create_POI_Points @version, @facility_version
+-- 3c) Update any POIs that are linked to facilities with updates to the
+--     facility attributes and/or locations
 exec dbo.Sync_POI_Pt_with_Buildings @version, @facility_version
 exec dbo.Sync_POI_Pt_with_TrailFeatures @version, @facility_version
-
--- Run the following query to delete records in POI_PT with a broken link to a source record in akr_facility2
--- This only needs to be run if there are "Missing record" errors in the QC queries.
--- It should only be run after verifying that the record in facilities has been deleted.
+-- 3d) Run the following query to delete records in POI_PT with a broken link to a source record in akr_facility2
+--    This only needs to be run if there are "Missing record" errors in the QC queries.
+--    It should only be run after verifying that the POI record should be deleted,
+--    and that there is not some other QC related problem.
 exec dbo.Delete_POI_PTs_no_longer_linked_to_facilities @version, @facility_version
 
-
-
-
--- Calcs to fix The fact that DBOs have to edit as SDE and not Domain User (with ArcGIS 10.x)
+-- 4) Fix Create/Edit user (optional)
+--   This is only required because a bug prevents the DBO from editing in ArcMap.
+--   Either use Pro to do editing, or edit as SDE and then run these fixes.
 exec sde.set_current_version @version
 exec sde.edit_version @version, 1 -- 1 to start edits
 

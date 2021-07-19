@@ -204,13 +204,22 @@ run this script one final time after all changes are made and the QC
 check comes back clean.
 In general, an attribute will only be calculated if the value is null (or
 empty) an existing value that is different than what the calculated value
-would be will result in a QC issue needing resolution. 
+would be will result in a QC issue needing resolution.
 
 This query must be run on any edited feature classes in a version being QC
 checked to ensure there are not missing attributes. The QC check is often
 silent on missing values (i.e. `GEOMETRYID`) when it expect that this script
 will provide the missing values.
 
+The [Do Calculation script](./Do%20Calculation.sql) also has instructions for
+updating the POI dataset in the akr_socio database with changes to facilities.
+This step will ensure that there is a POIs for each facility that has defined a
+POITYPE.  It will also update the related POIs with changes to the related
+facilities.  These steps should also be run as part of the calculations step
+when editing POIS to fix any accidental changes in POI that break the coupling.
+The POIs QC checks do not look for mismatched attributes/locations in related
+features, but rather assumes that all changes in facilities will overwrite any
+related POIs.
 
 ## Post To DEFAULT
 

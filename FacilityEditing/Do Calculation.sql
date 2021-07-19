@@ -15,15 +15,19 @@
 
 -- To edit versioned data in SQL, see this help: http://desktop.arcgis.com/en/arcmap/latest/manage-data/using-sql-with-gdbs/edit-versioned-data-using-sql-sqlserver.htm
 
+-- This file should be run in chunks (i.e. opened in SSMS or azure data
+-- studio then selecting the commands to run and press F5 or clicking the run/execute button).
+-- Note that the line that declare the version will not be "remembered", so it
+-- needs to be copied to locations that will allow it to be selected with the
+-- commands you want to run, or delete the intervening commands.
+
 -- 1) Find the named version
 --    List the named versions (select the following line and press F5 or the Execute button)
 select owner, name from sde.SDE_versions where parent_version_id is not null order by owner, name
 
--- 2) Set the operable version to a named version
---    Edit 'owner.name' to be one of the versions in the previous list, then select all of the remaining code
---    and execute (press F5 or the execute button)
---    Alternatively, replace all occurrances of @version with the appropriate 'owner.name' version text,
----   then execute one statement (or a group of statements) at a time.
+-- 2) Set the version to fix/calculate, and calculate the features.
+--    tables without changes can be removed from this list (leaving them will
+--    not hurt, but take longer).
 DECLARE @version nvarchar(255) = 'owner.name'
 
 exec dbo.Calc_Asset @version
@@ -39,13 +43,26 @@ exec dbo.Calc_Trails @version
 exec dbo.Calc_Trail_Features @version
 exec dbo.Calc_Trail_Attributes @version
 
--- Set the poi version, and run the following SPROC if you want to create missing
--- POIs from the building center points and trail feature points with a defined POITYPE
+-- 3) Update POI to stay in sync with changes made in facilities.
+-- These three commands should be run whenever there are changes to facilities to
+-- ensure that POI is synced with facilities. The commands should work with the
+-- current version of facilities, however, as of July 2021, there is a bug
+-- (https://github.com/AKROGIS/Enterprise-QC/issues/4) which precludes this, So,
+-- these commands must be done after the facility changes have been posted to
+-- default and then compressed into the base tables.
+-- 3a )First create.a version in akr_socio for the changes, and declare the name here
 DECLARE @poi_version nvarchar(255) = 'owner.name'
+-- 3b) Create missing POIs from the building center points and trail feature
+--     points that have defined a POITYPE
 exec akr_socio.dbo.Create_POI_Points @poi_version, @version
+-- 3c) Update any POIs that are linked to facilities with updates to the
+--     facility attributes and/or locations
+exec dbo.Sync_POI_Pt_with_Buildings @version, @facility_version
+exec dbo.Sync_POI_Pt_with_TrailFeatures @version, @facility_version
 
-
--- Calcs to fix The fact that Regan has to edit as SDE and not Domain User
+-- 4) Fix Create/Edit user (optional)
+--   This is only required because a bug prevents the DBO from editing in ArcMap.
+--   Either use Pro to do editing, or edit as SDE and then run these fixes.
 exec sde.set_current_version @version
 exec sde.edit_version @version, 1 -- 1 to start edits
 
